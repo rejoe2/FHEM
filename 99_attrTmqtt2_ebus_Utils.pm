@@ -1,5 +1,5 @@
 ##############################################
-# $Id: attrTmqtt2_ebus_Utils.pm 2021-07-15 Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24767+ 2021-07-19 Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -52,7 +52,9 @@ sub j2nv {
     my $pre   = shift;
     my $filt  = shift;
     my $not   = shift;
-    $EVENT=~ s{[{]"value":\s("[^"]+")[}]}{$1}g;
+
+    return if !length $EVENT;
+    $EVENT=~ s,[{]"value":\s("?[^"}]+"?)[}],$1,g;
     return json2nameValue($EVENT, $pre, $filt, $not);
 }
 
@@ -152,6 +154,7 @@ sub upd_day_profile {
     my $daylist = shift // q(Su|Mo|Tu|We|Th|Fr|Sa);
 
     my $hash = $defs{$name} // return;
+    return if !length $payload;
 
     my @Dl = ("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday");
 
