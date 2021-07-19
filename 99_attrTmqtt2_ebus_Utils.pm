@@ -19,6 +19,7 @@ BEGIN {
     GP_Import(
         qw(
           json2nameValue
+          toJSON
           AttrVal
           InternalVal
           CommandGet
@@ -62,12 +63,11 @@ sub send_weekprofile {
     my $name       = shift // return;
     my $wp_name    = shift // return;
     my $wp_profile = shift // return;
-    my $model      = shift // ReadingsVal($name,'week','selected'); #selected,Mo-Fr,Mo-So,Sa-So? holiday to set actual $wday to sunday program?
+    my $model      = shift // ReadingsVal($name,'week','unknown'); #selected,Mo-Fr,Mo-So,Sa-So? holiday to set actual $wday to sunday program?
     #[quote author=Reinhart link=topic=97989.msg925644#msg925644 date=1554057312]
     #"daysel" nicht. Für mich bedeutet dies, das das Csv mit der Feldbeschreibung nicht überein stimmt. Ich kann aber nirgends einen Fehler sichten (timerhc.inc oder _templates.csv). [code]daysel,UCH,0=selected;1=Mo-Fr;2=Sa-So;3=Mo-So,,Tage[/code]
     #Ebenfalls getestet mit numerischem daysel (0,1,2,3), auch ohne Erfolg.
     my $onLimit    = shift // '20';
-    my $topic      = shift // AttrVal($name,'devicetopic','') . '/hcTimer.$wkdy/set ';
 
     my $hash = $defs{$name} // return;
 
@@ -81,13 +81,50 @@ sub send_weekprofile {
     my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
 
     my $payload;
-    my @days = (0..6);
+    #my @days = (0..6);
     my $text = decode_json($wp_profile_data);
 
-    ( $model, @days ) = split m{:}xms, $model;
+    ( $model, my @days ) = split m{:}xms, $model;
     (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime;
 
-    @days = ( $model eq 'Mo-Fr' || $model eq 'Mo-So' ) ? (1) : ($model eq 'Sa-So' || $model eq 'holiday' ) ? (0) :  (0..6) if !@days;
+    my @models;
+    if ( $model eq 'unknown' ) {
+        my $monday = toJSON($text->{$D[1]}{time}) . toJSON($text->{$D[1]}{temp});
+        my $satday = toJSON($text->{$D[6]}{time}) . toJSON($text->{$D[6]}{temp});
+        my $sunday = toJSON($text->{$D[0]}{time}) . toJSON($text->{$D[0]}{temp});
+        $models[0] = $satday eq $sunday && $sunday eq $monday ? '3' : $satday eq $sunday ? 2 : 0;
+        $models[1] = 1;
+        for my $i (2..5) {
+            my $othday = toJSON($text->{$D[$i]}{time}) . toJSON($text->{$D[$i]}{temp});
+            next if $othday eq $monday;
+            $models[1] = 0;
+            last;
+        }
+        @days = $models[0] == 3 ? (1) :
+                $models[1] == 1 && $models[0] == 2 ? (0,1) :
+                $models[1] == 1 ? (0,1,6) :
+                $models[1] == 0 && $models[0] == 2 ? (0..5) : (0..6)
+    }
+
+    if (!@days) {
+        if ( $model eq 'Mo-Fr' ) {
+            @days = (1);
+            $models[1] = 1;
+        } elsif ( $model eq 'Mo-So' ) {
+            @days = (1);
+            $models[1] = 1;
+            $models[0] = 3;
+        } elsif ( $model eq 'holiday' ) {
+            @days = (0);
+        } elsif ( $model eq 'selected' ) {
+            @days = (0..6);
+            $models[1] = 0;
+            $models[0] = 0;
+        } elsif ( $model eq 'Sa-So' ) {
+            @days = (0);
+            $models[0] = 2;
+        }
+    }
 
     for my $i (@days) {
         $payload = q{};
@@ -104,7 +141,6 @@ sub send_weekprofile {
                     $payload .= qq{$time;$text->{$D[$i]}{time}[$j];};
                     $pairs++;
                     $val = $val eq 'on' ? 'off' : 'on';
-                    #$time = $text->{$D[$i]}{time}[$j] if $j;
                 }
             }
             while ( $pairs < 3 && !defined $text->{$D[$i]}{time}[$j] ) {
@@ -118,8 +154,18 @@ sub send_weekprofile {
         if ( $model eq 'holiday' ) {
             $payload .= 'selected';
             CommandSet($defs{$name},"$name $Dl[$wday] $payload") if ReadingsVal($name,$Dl[$wday],'') ne $payload;
+        } elsif ( $model eq 'selected' ) {
+            $payload .= 'selected';
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
+        } elsif ($i == 1) {
+            $payload .=  defined $models[0] && $models[0] == 3 ? 'Mo-So' : defined $models[1] && $models[1] ? 'Mo-Fr' : 'selected';
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
+        } elsif ($i == 0 || $i == 6 ) {
+            my $united = defined $models[0] && $models[0] == 2; 
+            $payload .=  $united ? 'Sa-So' : 'selected';
+            CommandSet($defs{$name},"$name $Dl[$united ? 6 : $i] $payload") if ReadingsVal($name,$Dl[$united ? 6 : $i],'') ne $payload;
         } else {
-            $payload .= $model;
+            $payload .= 'selected';
             CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
         }
     }
