@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24767+ 2021-07-19 Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24777 2021-07-20 05:37:30Z Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -24,6 +24,8 @@ BEGIN {
           InternalVal
           CommandGet
           CommandSet
+          CommandAttr
+          CommandDefine
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBeginUpdate
@@ -34,6 +36,7 @@ BEGIN {
           json2nameValue
           defs
           Log3
+          trim
           )
     );
 }
@@ -187,6 +190,103 @@ sub _compareOnOff {
     return;
 }
 
+sub analyzeReadingList {
+    my $name   = shift // return;
+    my $setpre = shift // 0;
+
+    my $hash = $defs{$name} // return;
+
+    my $cid = $defs{$name}{CID};
+    my $dt = $defs{$name}{DEVICETOPIC};
+
+    my $rList_old = AttrVal( $name, 'readingList', '');
+    my $rList_new = q{};
+    my $firstprofile = 0;
+
+    my $newline;
+    for my $line ( split q{\n}, $rList_old ) {
+        $line = trim($line);
+        next if $line eq '';
+        my $func;
+        my $prefix;
+
+        if ( $line =~ m{FHEM::aTm2u_ebus::}xm ) {
+            $rList_new .= $rList_new ? qq{\n$line} : $line;
+            next;
+        }
+        my ($re,$code) = split q{ }, $line, 2;
+        if ( !defined $code ) {
+            Log3($name, 3, "ERROR: deleted empty code in existing readingList line >$line< for $name");
+            next;
+        }
+
+        $re =~ s{\$DEVICETOPIC}{$dt}g;
+        $re =~ s{\A$cid:}{}g;
+        $code = trim($code);
+
+        #not Perl?
+        if($code !~ m{\A[{].*[}]\z}s) {
+            $rList_new .= $rList_new ? qq{\n$re $code} : qq{$re $code};
+            next;
+        }
+
+        #weekprofile type rL element?
+        if ( $re =~ m{(?<start>.+[/])(?<short>[^/:.]+)(?:[.]|\\x2e)(?<dy>[^.]+)(?:[.]|\\x2e)[1-3]:}xm ) {
+            my $newtop = qq{$+{start}$+{short}.*:.*};
+            my $short = $+{short};
+            $func = $+{dy} =~ m{So|Mo|Di|Mi|Do|Fr|Sa}xms ? q{{ FHEM::aTm2u_ebus::upd_day_profile( $NAME, $TOPIC, $EVENT, 'So|Mo|Di|Mi|Do|Fr|Sa' ) }} : q{{ FHEM::aTm2u_ebus::upd_day_profile( $NAME, $TOPIC, $EVENT ) }};
+            $newline = qq{$newtop $func};
+            next if $firstprofile eq $short;
+            if ( !$firstprofile ) {
+                $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+                $firstprofile = $short;
+                next;
+            }
+            my $newdev  = qq{${name}_${short}};
+            if ( !defined $defs{$newdev} ) {
+                CommandDefine( $defs{$name}, "$newdev MQTT2_DEVICE" );
+                readingsBeginUpdate($defs{$newdev});
+                readingsBulkUpdate($defs{$newdev}, 'associatedWith', $name);
+                readingsBulkUpdate($defs{$newdev}, 'IODev', InternalVal($name, 'IODev',undef)->{NAME});
+                readingsEndUpdate($defs{$newdev}, 0);
+                my $nroom = AttrVal($name, 'room','MQTT2_DEVICE');
+                CommandAttr(undef, "$newdev room $nroom");
+            }
+            my $rl2 = AttrVal($newdev, 'readingList', "");
+            $rl2 .= q{\n} if $rl2;
+            CommandAttr(undef, "$newdev readingList $rl2$newline") if index($rl2, $newtop) == -1;
+            next;
+        }
+
+        #json2nameValue type rL element with dot?
+        if ( $re =~ m{(?<start>.+[/])(?<short>[^/:]+)(?:[.]|\\x2e)(?<item>[^.:123]+):}xm ) {
+            my $newtop = qq{$+{start}$+{short}.$+{item}:.*};
+            my $prefix = qq{$+{short}_$+{item}_};
+            
+            $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
+            $newline = qq{$newtop $func};
+            $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            next;
+        }
+
+        #json2nameValue type rL element w/o dot?
+        if ( $code =~ m{\A[{]\s+json2nameValue.*[}]\z}s) {
+            $func = q<{ FHEM::aTm2u_ebus::j2nv( $EVENT, '>;
+            my $funcb = q<', $JSONMAP ) }>;
+            my $mid = q{};
+            if ( $setpre ) {
+                $re =~ m{(?<start>.+[/])(?<pre>[^/:]+):}xm;
+                $mid = qq{$+{pre}_};
+            }
+            $newline = qq{$re $func${mid}${funcb}};
+            $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            next;
+        }
+    }
+    #Log3(undef,3,"readingList new: $rList_new");
+    CommandAttr(undef, "$name readingList $rList_new") if index($rList_old, $rList_new) == -1;
+    return;
+}
 
 
 #ebusd/hc1/HP1.Mo.1:.* { json2nameValue($EVENT) }
@@ -259,12 +359,20 @@ __END__
   <b>Functions to support attrTemplates for ebusd</b><br> 
 </ul>
 <ul>
-  <li><b>aTm2u_ebus::j2nv</b><br>
-  <code>aTm2u_ebus::j2nv($,$$$)</code><br>
-  This ist just a wrapper to fhem.pl json2nameValue() to prevent the "_value" postfix. It will first clean the first argument by applying <code>$EVENT=~ s{[{]"value":\s("[^"]+")[}]}{$1}g;</code>. 
+  <li><b>FHEM::aTm2u_ebus::j2nv</b><br>
+  <code>FHEM::aTm2u_ebus::j2nv($,$$$)</code><br>
+  This is just a wrapper to fhem.pl json2nameValue() to prevent the "_value" postfix. It will first clean the first argument by applying <code>$EVENT=~ s,[{]"value":\s("?[^"}]+"?)[}],$1,g</code>. 
   </li>
-  <li><b>aTm2u_ebus::createBarView</b><br>
-  <code>aTm2u_ebus::createBarView($,$$)</code><br>
+  <li><b>FHEM::aTm2u_ebus::upd_day_profile</b><br>
+  <code>FHEM::aTm2u_ebus::upd_day_profile($$$,$)</code><br>
+  Helper function to collect weekprofile info received over different topics. $NAME, $TOPIC and $EVENT are obligatory to be handed over, additionally you may provide a <i>daylist</i> as 4th argument. <i>daylist</i> defaults to Su|Mo|Tu|We|Th|Fr|Sa. Generated readings will be named Sunday, Monday, ..., so make sure to use different MQTT2-devices for each topic-group, if there's more than one item attached to your ebus capable to use weekly profiles.
+  </li>
+  <li><b>FHEM::aTm2u_ebus::send_weekprofile</b><br>
+  <code>FHEM::aTm2u_ebus::send_weekprofile($$$,$$)</code><br>
+  Helper function that may be capable to translate a (temperature) <i>weekly profile<i> provided by a <i>weekprofile<i> TYPE device to the ebus format (max. three pairs of on/off switching times).
+  </li>
+  <li><b>FHEM::aTm2u_ebus::createBarView</b><br>
+  <code>FHEM::aTm2u_ebus::createBarView($,$$)</code><br>
   Parameters are 
   <ul>
     <li>$value (required)</li> 
