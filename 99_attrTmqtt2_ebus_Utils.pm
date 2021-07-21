@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24777 2021-07-20 05:37:30Z Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24777+ extended analysis 2021-07-21 Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -28,6 +28,8 @@ BEGIN {
           CommandAttr
           CommandDefine
           CommandDeleteReading
+          CommandVersion
+          FmtDateTime
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBeginUpdate
@@ -202,6 +204,9 @@ sub analyzeReadingList {
 
     my $cid = $defs{$name}{CID};
     my $dt = $defs{$name}{DEVICETOPIC};
+    my $revsn = (split q{\n}, CommandVersion(undef, 'attrTmqtt2_ebus_Utils noheader'))[0] // 'unknown';
+    $revsn = FmtDateTime(time) . " $revsn";
+    my $attrTemplt = q{ebus_analyzeReadingList};
 
     my $rList_old = AttrVal( $name, 'readingList', '');
     my $rList_new = q{};
@@ -294,6 +299,7 @@ sub analyzeReadingList {
                 readingsBeginUpdate($defs{$newdev});
                 readingsBulkUpdate($defs{$newdev}, 'associatedWith', $name);
                 readingsBulkUpdate($defs{$newdev}, 'IODev', InternalVal($name, 'IODev',undef)->{NAME});
+                readingsBulkUpdate($defs{$newdev}, 'attrTemplateVersion', $revsn);
                 readingsEndUpdate($defs{$newdev}, 0);
                 my $nroom = AttrVal($name, 'room','MQTT2_DEVICE');
                 CommandAttr(undef, "$newdev room $nroom");
@@ -303,11 +309,13 @@ sub analyzeReadingList {
                     $sList .= $sList ? qq{\n$sLlin} : $sLlin;
                 }
                 CommandAttr(undef, "$newdev setList $sList");
+                CommandAttr(undef, "$newdev model $attrTemplt");
                 addToDevAttrList($newdev, 'weekprofile', 'weekprofile');
                 CommandAttr(undef, "$newdev weekprofile $newdev");
                 my $ac = ReadingsVal($name, 'associatedWith','');
                 $ac .= $ac ? qq{,$newdev} : $newdev;
                 readingsSingleUpdate($defs{$name}, 'associatedWith', $ac, 0);
+                
             }
             my $rl2 = AttrVal($newdev, 'readingList', "");
             $rl2 .= q{\n} if $rl2;
@@ -341,7 +349,9 @@ sub analyzeReadingList {
     }
     #Log3(undef,3,"readingList new: $rList_new");
     CommandAttr(undef, "$name readingList $rList_new") if index($rList_old, $rList_new) == -1;
+    CommandAttr(undef, "$name model $attrTemplt") if AttrVal($name, 'model', '') ne $attrTemplt;
     CommandDeleteReading(undef, "$name .*_value");
+    readingsSingleUpdate($defs{$name}, 'attrTemplateVersion', $revsn,0);
     return;
 }
 
