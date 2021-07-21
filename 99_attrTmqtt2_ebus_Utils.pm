@@ -67,6 +67,23 @@ sub j2nv {
     return json2nameValue($EVENT, $pre, $filt, $not);
 }
 
+sub j2newlineReading {
+    my $rName = shift // return;
+    my $EVENT = shift // return;
+    my $pre   = shift;
+    my $filt  = shift;
+    my $not   = shift;
+
+    return if !length $EVENT;
+    $EVENT=~ s,[{]"value":\s("?[^"}]+"?)[}],$1,g;
+    my $values = json2nameValue($EVENT, $pre, $filt, $not);
+    my @all;
+    for my $item ( sort keys %{$values} ) {
+        push @all, qq{$item $values->{$item}};
+    }
+    return { $rName => join q{<br>}, @all };
+}
+
 sub send_weekprofile {
     my $name       = shift // return;
     my $wp_name    = shift // return;
@@ -251,11 +268,14 @@ sub analyzeReadingList {
             next;
         }
 
+        my $newtop;
+        my $short;
+
         #weekprofile type rL element?
         if ( $re =~ m{(?<start>.+[/])(?<short>[^/:.]+)(?:[.]|\\x2e)(?<dy>[^.]+)(?:[.]|\\x2e)[1-3]:}xm ) {
-            my $newtop = qq{$+{start}$+{short}.*:.*};
+            $newtop = qq{$+{start}$+{short}.*:.*};
             my $sLtop  = qq{$+{start}$+{short}};
-            my $short  = $+{short};
+            $short  = $+{short};
             my $dy     = $+{dy};
             next if $firstprofile eq $short;
             my @Dl = ("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday");
@@ -323,12 +343,24 @@ sub analyzeReadingList {
             next;
         }
 
+        my $prefix ;
+
         #json2nameValue type rL element with dot?
         if ( $re =~ m{(?<start>.+[/])(?<short>[^/:]+)(?:[.]|\\x2e)(?<item>[^.:123]+):}xm ) {
-            my $newtop = qq{$+{start}$+{short}.$+{item}:.*};
-            my $prefix = qq{$+{short}_$+{item}_};
+            $newtop = qq{$+{start}$+{short}.$+{item}:.*};
+            $prefix = qq{$+{short}_$+{item}_};
             
             $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
+            $newline = qq{$newtop $func};
+            $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            next;
+        }
+
+        #json2nameValue type rL element with Error content? ebusd/sc/ErrorHistory
+        if ( $re =~ m{(?<start>.+[/])(?<short>ErrorHistory):}xm ) {
+            $newtop = $re;
+            $short  = $+{short};
+            $func = q<{ FHEM::aTm2u_ebus::j2newlineReading( > . qq{'$short', }. q<$EVENT, '', $JSONMAP ) }>;
             $newline = qq{$newtop $func};
             $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
             next;
