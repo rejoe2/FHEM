@@ -677,7 +677,7 @@ sub init_shortcuts {
         } elsif ($init_done && !defined $named->{r}) {
             return "Either a fhem or perl command or a response have to be provided!";
         }
-        $hash->{helper}{shortcuts}{$intent}{NAME} = $named->{d} if defined $named->{d};
+        $hash->{helper}{shortcuts}{$intent}{NAME} = $named->{n} if defined $named->{n};
         $hash->{helper}{shortcuts}{$intent}{response} = $named->{r} if defined $named->{r};
         if ( defined $named->{c} ) {
             $hash->{helper}{shortcuts}{$intent}{conf_req} = !looks_like_number($named->{c}) ? $named->{c} : 'default';
