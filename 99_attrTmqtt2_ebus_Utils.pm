@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24777+ extended analysis 2021-07-21 Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24785 + FileRead 2021-07-22 Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -28,7 +28,7 @@ BEGIN {
           CommandAttr
           CommandDefine
           CommandDeleteReading
-          CommandVersion
+          FileRead
           FmtDateTime
           readingsSingleUpdate
           readingsBulkUpdate
@@ -40,6 +40,7 @@ BEGIN {
           json2nameValue
           addToDevAttrList
           defs
+          attr
           Log3
           trim
           )
@@ -67,7 +68,7 @@ sub j2nv {
     return json2nameValue($EVENT, $pre, $filt, $not);
 }
 
-sub j2newlineReading {
+sub j2singleReading {
     my $rName = shift // return;
     my $EVENT = shift // return;
     my $pre   = shift;
@@ -79,9 +80,9 @@ sub j2newlineReading {
     my $values = json2nameValue($EVENT, $pre, $filt, $not);
     my @all;
     for my $item ( sort keys %{$values} ) {
-        push @all, qq{$item $values->{$item}};
+        push @all, qq{$item: $values->{$item}};
     }
-    return { $rName => join q{<br>}, @all };
+    return { $rName => join q{ - }, @all };
 }
 
 sub send_weekprofile {
@@ -221,7 +222,7 @@ sub analyzeReadingList {
 
     my $cid = $defs{$name}{CID};
     my $dt = $defs{$name}{DEVICETOPIC};
-    my $revsn = (split q{\n}, CommandVersion(undef, 'attrTmqtt2_ebus_Utils noheader'))[0] // 'unknown';
+    my $revsn = _getVersion();
     $revsn = FmtDateTime(time) . " $revsn";
     my $attrTemplt = q{ebus_analyzeReadingList};
 
@@ -360,9 +361,10 @@ sub analyzeReadingList {
         if ( $re =~ m{(?<start>.+[/])(?<short>ErrorHistory):}xm ) {
             $newtop = $re;
             $short  = $+{short};
-            $func = q<{ FHEM::aTm2u_ebus::j2newlineReading( > . qq{'$short', }. q<$EVENT, '', $JSONMAP ) }>;
+            $func = q<{ FHEM::aTm2u_ebus::j2singleReading( > . qq{'$short', }. q<$EVENT, '', $JSONMAP ) }>;
             $newline = qq{$newtop $func};
             $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            CommandDeleteReading(undef, "$name ${short}_.*");
             next;
         }
 
@@ -444,6 +446,23 @@ sub createBarView {
     "background-image:         linear-gradient(left,$color $percent".'%, rgba(0,0,0,0) '.$percent.'%);"';
     # Rückgabe des definierten Strings
   return $stylestring;
+}
+
+sub _getVersion {
+    my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
+    my $fn = "$modpath.FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
+    my ($ret, @content) = FileRead($fn);
+    if ($ret) {
+        Log3(undef, 1, "Error reading file $fn!") ;
+        return 'unknown';
+    }
+    for (@content) {
+        chomp;
+        if(m{#.*\$Id\:[^\$\n\r].+\$}xm) {
+           return $_;
+        }
+    }
+    return 'unknown';
 }
 
 1;

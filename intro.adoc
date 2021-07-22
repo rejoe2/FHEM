@@ -1,0 +1,109 @@
+//$Id$
+
+[preface]
+== Einführung 
+
+=== Willkommen zu dieser Einführung!
+
+Vielleicht interessiert dich vorab, wer hier schreibt und warum?
+
+Here you are:
+
+Hausautomatisierung und FHEM _mache_ ich seit 2013. Damals war das „ganz einfach“ mit FHEM zu beginnen: Alles Wesentliche stand in einem Dokument namens _Heimautomatisierung mit FHEM_, kurz _das PDF_. Das druckte man sich aus, kaufte einen _CUL_ und die für den jeweiligen Zweck passenden Geräte einer bestimmten Produktlinie eines einzigen Herstellers, installierte FHEM auf seiner FritzBox und hat dann mal angefangen, das ausgedruckte Dokument durchzuarbeiten und die Beispiele dort mehr oder weniger 1:1 zu kopieren. + 
+Für mich als Nicht-IT-Professional war das alles zunächst schwer zu verstehen, aber nach und nach ist meine Hausautomatisierung gewachsen, meine Kenntnisse ebenso, und heute darf ich als _Maintainer_ sogar ein paar Teile zu dem Code beitragen, den du vielleicht demnächst nutzen willst. Wenn mir das jemand im Jahr 2016 geweissagt hätte, hätte ich ihn für verrückt erklärt! Aber so schnell ändern sich eben die Zeiten… +
+Geändert hat sich noch einiges mehr: Dass das Kürzel _IoT_ für das _Internet of Things_ steht, weiß heute fast jeder, und ein erheblicher Teil der heute verkauften _Gadgets_ ist irgendwie vernetzt und nennt sich _„smart“_. Vor allem bei TV- und HiFi-Geräten (nennt man das noch so?) ist es Standard, dass man diese auch über das Handy fernsteuern kann, meist braucht man dazu _nur irgendeine App_. Die Zahl der (vermeintlichen) Standards ist erheblich gewachsen, ebenso wie die Zahl der Hersteller und Handelsmarken. Woran es mangelt, ist eine sinnvolle Verbindung aller dieser Geräte miteinander und eine einheitliche Bedienung. 
+
+
+Aber erst mal zurück in’s Jahr 2013: Mein Ziel damals war eigentlich nur, elektrische Rollläden zu verbauen, ohne für jeden eine eigene Zeitschaltuhr kaufen zu müssen (und halbjährlich zwischen Sommer- und Winterzeit umzustellen usw.), sowie ein paar Lichtschalter an Stellen anzubringen, wo dummerweise kein Kabel lag, an das man einen Schalter hätte anschließen können. Dabei war es für mich am wichtigsten, folgende Fragen vorab zu klären:
+
+[arabic]
+. _Kann ich das mit der Hausautomatisierung? Oder ist das für mich zu schwierig?!?_ +
+. _Ist FHEM für mich die passende Lösung, oder soll ich lieber was Anderes nehmen?_
+
+Ich habe das damals für mich entschieden, indem ich erst ausgiebig in _dem PDF_ geblättert und gelesen habe. Danach hatte ich das noch unsichere Gefühl, dass das wohl irgendwie zu schaffen sein wird und habe dann einfach mal mit wenigen Geräten ausprobiert, wie das in der Praxis funktioniert.
+ 
+Die Welt ist aber nicht stehengeblieben und das betreffende PDF wurde zum meinem großen Bedauern seit 2014 nicht mehr aktualisiert.
+
+Diese Einführung ist nun der Versuch, dir zu helfen, diese beiden Fragen - jedenfalls zu einem gewissen Teil - für dich selbst auch im Jahr 2020 beantworten zu können. Mir selbst hilft es sehr, wenn ich Dinge in einem größeren, systematischen Zusammenhang erklärt bekomme. Der Schwerpunkt liegt daher im Folgenden eher auf Grundzügen und der Verbindung zwischen den verschiedenen Teilen, damit du am Ende ein „Netz“ hast, mit dem du „fischen gehen kannst“, um ein bekanntes Bild zu zitieren: +
+
+[quote,Konfuzius]
+____
+
+Gib einem Mann einen Fisch und du ernährst ihn für einen Tag. Lehre einen Mann zu fischen und du ernährst ihn für sein Leben. +
+____
+(Zu Konfuzius’ Zeiten waren die Männer für’s Fischen zuständig – solltest du also kein Mann sein, nimm’s nicht persönlich).
+
+Viele hier behandelte Aspekte sind eigentlich nicht FHEM-spezifisch, sondern gelten für jede Art der Hausautomatisierung. Deswegen war dann der zweite Teil der Frage 2 für mich von weniger entscheidender Bedeutung: Letztlich wollte ich „nur“ eine Lösung, die im Hintergrund bestimmte Probleme automatisch löst, ohne dass ich mehr als notwendig eingreifen muß. Es kann also durchaus sein, dass es andere Softwarelösungen gibt, die „moderner“  aussehen als die Standard-Webschnittstelle von FHEM und ebenfalls alle möglichen Dinge im Haus einheitlich bedienbar machen. Aber auch für eine schickere Web-Oberfläche bietet FHEM Alternativen und Schnittstellen… 
+
+Wichtiger waren und sind mir andere Gesichtspunkte:
+
+* FHEM ist robust! Richtig eingerichtet, kann ein FHEM-Server problemlos mehrere Monate laufen, bis man eben „mal wieder ran muss“, um z.B. das Betriebssystem zu aktualisieren. +
+* FHEM ist leichtgewichtig. Es ist wenig anspruchsvoll, was die erforderlichen Ressourcen angeht. +
+* FHEM läuft ohne Cloud, meine Daten bleiben im Haus! +
+* FHEM ist open source. +
+* Es gibt für fast jede Hardware irgendeine Möglichkeit, diese irgendwie in FHEM zu integrieren (oft genug nicht nur eine…), und es gibt eine klasse Community, die auf alle möglichen und unmöglichen Fragen mindestens eine Antwort kennt!
+
+Im Verlauf der Zeit habe ich einige Erfahrungen gesammelt, unter anderem auch zu den vielfältigen Möglichkeiten, ein bestimmtes Stück Hardware einzubinden oder ein Problemfeld zu lösen, wobei manche dieser Erfahrungen durchaus unangenehm waren. Diese Einführung berücksichtigt daher in der Regel die meiner persönlichen Meinung nach jeweils einfachste Möglichkeit, etwas mit FHEM zu machen. Andere FHEM-User haben andere Erfahrungen gemacht oder empfinden vielleicht andere Lösungen als einfacher. Niemand weiß alles, daher mag die eine oder anderer Kritik an der sehr begrenzten Auswahl hier durchaus seine Berechtigung haben, das sei ausdrücklich betont!
+
+Die nachfolgenden Erläuterungen sollen dir daher helfen, vor allem den ersten der „drei Wege“ zu gehen, und dir insbesondere den letzten möglichst zu ersparen: +
+[quote,Konfuzius]
+____
+Der Mensch hat dreierlei Wege, klug zu Handeln; erstens durch Nachdenken, das ist das Edelste, zweitens durch Nachahmen, das ist das Leichteste, und drittens durch Erfahrung, das ist das Bitterste.
+____
+
+
+Wenn du über einen Lösungsweg _nachdenkst_ oder ihn _nachahmen_ willst, berücksichtige daher möglichst das https://de.wikipedia.org/wiki/KISS-Prinzip[KISS-Prinzip] - versuche die Lösung möglichst „simple & stupid“ zu halten! Das wird dir hoffentlich die langfristige Pflege deiner Automatisierungslösung erleichtern und manche bittere Erfahrung ersparen…
+
+Hoppla: Was meint *langfristige Pflege*? +
+Dein Heim zum Teil des IoT zu machen, indem du FHEM oder eine andere Lösung, oder bestimmte Hardwarekomponenten usw. wählst, ist jeweils eine Entscheidung mit Auswirkungen für Jahre oder sogar Jahrzehnte. FHEM und der Server, auf dem es läuft, bedarf wenigstens hin und wieder der laufenden Pflege und Absicherung, und je mehr Schnittstellen du von deinem Netz in das WWW hast, desto wichtiger ist diese Aufgabe. Und solltest du dein Heim irgendwann in ferner Zukunft verkaufen wollen, ist die heute (oder morgen) getroffene Auswahl der Komponenten eventuell ein gewichtiges Argument für oder gegen dein Objekt!
+
+Nur wenn du auch bereit bist, die laufende Pflege deines Systems zu übernehmen, solltest du dich überhaupt für irgendeine Hausautomatisierungslösung entscheiden.
+
+In diesem Sinne eine erfolgreiche Einarbeitung, _KISS_ und willkommen als neuer Beta-User!
+
+`Beta-User`
+
+
+PS: Wer bereits allgemein mit dem Thema Hausautomatisierung vertraut ist und/oder aktuelle Programmierkenntnisse hat, kann auch direkt mit dem https://wiki.fhem.de/wiki/Quick-Start[Quick-Start] beginnen. Dieser bietet einen direkteren Einstieg in die FHEM-Spezifika. Diese Einführung hier ist vor allem für _normale_ Menschen gedacht, die - wie ich selbst - keinen beruflichen IT-Hintergrund haben und daher vielleicht ähnliche Fragen haben wie ich damals… +
+Beiden Leserkreisen sei ergänzend dazu die _commandref_ in der _modular_-Variante ans Herz gelegt. Neben einer Übersicht, welche Module überhaupt offizieller Bestandteil von FHEM sind, erhält man mit dem Rahmendokument auch eine straffe Darstellung der in FHEM vorhandenen Kommandos, allgemeinen Attribute und ähnliche grundlegende Informationen.
+
+Verbesserungsvorschläge nehme ich übrigens auch von _Professionals_ gerne entgegen!
+
+=== Hausautomatisierung - was ist das überhaupt?
+
+Falls du dich noch fragen solltest, um was es denn bei einer _Hausautomatisierung_ eigentlich geht:
+Neben den beiden Beispielen, die mich zu FHEM geführt haben, gibt es einige andere Motive, eine solche Lösung einzusetzen. Manche nutzen FHEM vorwiegend als Informationszentrale ("Wann kommt als nächstes die Müllabfuhr und was hat die Müllentsorgung in diesem Jahr gekostet?", "Wie ist der Pegelstand des nächstgelegenen Flusses?", ...), für die meisten steht jedoch auch etwas allgemeiner gesprochen die *Fernbedienung elektrischer Geräte in ihrem Haushalt* im Vordergrund.
+Dabei werden häufig folgende Ziele verfolgt:
+
+- Energie sparen durch zielgerichtetes Regeln bzw. Ein- und Ausschalten - wobei seit einiger Zeit für Besitzer einer Photovoltaikanlage auch die Frage eine Rolle spielt, wann die _eigene_ elektrische Energie verbraucht werden kann.
+- Mehr Komfort durch Fernbedienung und Automatisierungen – zeitgesteuert oder abhängig von Messdaten wie z.B. der Temperatur, Helligkeit, Regen, Bewegung etc..
+- Zugriff auf die Steuerung auch über (W)LAN und das Internet.
+- Spaß am Basteln. :-)
+
+Es geht also um Möglichkeiten wie: Wenn ich auf einen Schalter drücke, soll das Licht angehen; die Heizung soll entsprechend der wirklichen Wohnraumnutzung gesteuert werden; bei Sonnenaufgang soll die Gartenwegbeleuchtung ausgehen; der Rollladen soll an Wochentagen um 7 Uhr morgens hochfahren, sofern nicht Wochenende ist und ich nicht in Urlaub bin; die Markise soll bei starkem Wind automatisch eingefahren werden; die Musik soll automatisch eingeschaltet werden wenn ich nach Hause komme; die Waschmaschine soll dann starten, wenn das angesagte Gewitter vorbei ist und die PV-Anlage wieder ausreichend Strom liefert; wenn die Haustür für klingelnde Gäste geöffnet wird, soll das Telefonklingeln beendet werden; über (W)LAN in das Heimnetzwerk eingebundene Geräte sollen ebenfalls gesteuert werden. 
+Alle angeschlossenen Geräte sollen auch vom PC, Tablet-PC oder Smartphone aus bedienbar sein - das Ganze über eine einheitliche Oberfläche. 
+Das alles (und noch mehr) ist mit FHEM möglich. 
+
+=== Hausautomatisierung mit FHEM - eine Warnung!
+Falls du FHEM vorwiegend dazu einsetzen willst, eine bessere _Fernbedienung_ für alles mögliche zu haben: Schau' dir unbedingt auch andere Lösungen an!
+FHEM ist sehr mächtig, man kann damit im Prinzip jedes _gadget_ irgendwie im Sinne einer Hausautomatisierung nutzbar machen. ABER: FHEM erfordert eine gründliche Einarbeitung, und wenn man nur mal schnell eine ansprechende Oberfläche für gängige IoT-Consumer-Ware sucht, ist man bei anderen weit verbreiteten Lösungen wie https://www.openhab.org/[OpenHAB], https://www.home-assistant.io/[Home Assistant], https://www.iobroker.net/[ioBroker] oder https://www.domoticz.com/[Domoticz] eventuell schneller am Ziel (auch wenn es manchmal Sinn macht, FHEM dann als Interface zur Hardware einzusetzen; für manche User ist dies ein guter Weg, FHEM für sich nutzbar zu machen...).
+
+Wie auch immer: Für viele User - mich eingeschlossen - steht bei FHEM die regelbasierte Steuerung von Gegenständen im Vordergrund, *Automatisierung* eben.
+
+
+=== _Zum Verständnis dieses Dokuments_
+
+* Einige Stichworte und Überschriften tauchen mehrfach auf. In der Regel werden zunächst nur Grundzüge erläutert. Diese werden dann wieder aufgegriffen und vertieft, wenn dann auch die anderen erforderlichen Grundlagen genannt sind, die man braucht, um diese weiteren Details einordnen zu können. +
+* Manchmal erschien es zweckmäßig, bereits früh auf weitere, vertiefende Stichworte hinzuweisen, welche aber zu weit führen würden und daher nicht mehr Bestandteil dieser Einführung sein werden. Diese als *_Für später_* gekennzeichneten Teile kannst du bei den ersten Durchgängen durch die Einführung getrost ignorieren und dann wieder aufgreifen, wenn du dich in die grundlegenden Dinge eingearbeitet hast und schon etwas sicherer bist. Sie dienen eher dem Wiederfinden der Stichworte und dem Versuch einer sinnvollen Einordnung in das Gesamtbild. +
+* Ich habe die ersten Jahre mit FHEM _das PDF_ immer mal wieder hervorgeholt und zumindest überflogen. Für mich war es wertvoll, weil ich immer wieder neue interessante Details entdeckt habe. Es wäre mir eine große Ehre, wenn andere Menschen das von dieser Einführung irgendwann auch mal schreiben würden. Da sie ebenfalls ständig zu aktualisieren sein wird, bedanke ich mich bereits jetzt im Namen der anderen künftigen Leser für deine Rückmeldung und eventuelle Vorschläge zur weiteren Verbesserung. +
+* Ein Tipp noch zum Thema _klug handeln durch Nachahmen_: Vor allem, wenn du Lösungen aus dem Wiki oder dieser Einführung nachahmst, solltest du auch intensiv darüber nachdenken. Denn zum einen veraltet leider manche Anleitung schneller, als sie geschrieben wurde, z.B. weil es neueren, besseren Modul-Code gibt, eine Firmware aktualisiert wurde oder fehleranfällige Hardware vom Hersteller durch bessere ersetzt wurde (tbc…), und zum anderen sind auch manche der im Wiki dargestellten Lösungen nicht intensiv auf Stringenz, Optimierung und Schreibfehler geprüft, sondern geben eben das wieder, was der Schreiber zum Zeitpunkt des Niederschreibens erarbeitet hatte und dankenswerterweise (!) z.B. ins Wiki übertragen hat.
+
+=== _Outro_
+
+* Der Autor dieser Einleitung ist tatsächlich ein konkreter User. Der nachfolgende Text wurde jedoch zu großen Teilen auch von anderen Usern beigesteuert und verbessert, ebenso sind vielfache Anregungen betreffend Layout und Tools zum Erstellen des Dokuments an sich eingeflossen. Ein herzliches Dankeschön an dieser Stelle für eure konstruktive Mitarbeit! +
+* Das Entwicklungsmodell von FHEM kann am ehesten als https://en.wikipedia.org/wiki/Perpetual_beta[_Perpetual Beta_] bezeichnet werden, die Software ist immer in der Entwicklung. Ein bestimmtes _Release_ ist nur eine Art Schnappschuss zu einer bestimmten Zeit, über den bestenfalls einige Grundeinstellungen für einzelne Module (_defaults_) anders gesetzt werden. Wer FHEM nutzt, hat daher nach meinem Verständnis eine _Beta-Version_ im Einsatz, ist also ebenfalls _Beta-User_. In der _Open-Source_-Welt ist allerdings typischerweise die Beta-Version die stabilste verfügbare Variante einer Software, weil die Entwickler an einem als _stable_ bezeichneten Zweig in der Regel nur noch Bugfixes vornehmen. Diese Bugfixes werden aber in der Regel zuerst über die aktuelle Entwicklerversion ausgetestet, der Fokus der Entwickler in der open-source-Welt liegt eindeutig auf der Verbesserung der jeweiligen Beta-Version…
+
+=== about FHEM ===
+Das Kürzel FHEM steht für *F*reundliche *H*ausautomation und *E*nergie-*M*essung und wird _feem_ ausgesprochen. Der Hauptentwickler von FHEM (oder vielleicht besser: DER Entwickler zentraler Komponenten) ist Rudolf König, der mit unnachahmlicher Geduld das Prinzip der Freundlichkeit auch im Forum allen vorlebt. Ihm gilt ebenfalls mein persönlicher Dank für viele Aha-Erlebnisse auf verschiedensten Gebieten!
+
+Seit 2016 stellt der FHEM e.V. u.a. die Infrastruktur für die Bereitstellung der Software und des Forums bereit. Falls du FHEM also finanziell unterstützen willst: Entsprechende Links findest du auf der Webseite.
