@@ -160,7 +160,7 @@ sub myCalendar2Holiday {
   }
   push @holidays, @singledays;
   unshift (@holidays, "# get $getstring");
-  my $today = strftime "%d.%m.%y, %H:%M", localtime(time);;\
+  my $today = strftime "%d.%m.%y, %H:%M", localtime(time);
   unshift (@holidays, "# Created by myCalendar2Holiday on $today");
   FileWrite("./FHEM/${targetname}.holiday",@holidays);
 }
