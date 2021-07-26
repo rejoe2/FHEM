@@ -1,5 +1,5 @@
-# $Id: 98_combine.pm 2020-04-24 justme1968 $
-# source: https://forum.fhem.de/index.php/topic,110165.msg1041882.html#msg1041882
+
+# $Id: 98_combine.pm 21366 2020-03-06 12:01:05Z justme1968 $
 
 package main;
 
@@ -168,24 +168,26 @@ combine_2html($)
   $ret .= "<table class='block wide' style='text-align:center'>";
 
   $ret .= sprintf("<tr class='%s'>", ($row++&1)?"odd":"even");
-  my @rules = @{$hash->{helper}{rules}};
-  while( @rules ) {
-    my $item = shift @rules;
-    my $op = shift @rules;
+  if( defined($hash->{helper}) && defined($hash->{helper}{rules}) ) {
+    my @rules = @{$hash->{helper}{rules}};
+    while( @rules ) {
+      my $item = shift @rules;
+      my $op = shift @rules;
 
-    my ($dev, $reading) = split( ':', $item, 2 );
-    if( defined($reading) ) {
-      my %extPage = ();
-      my ($allSets, $cmdlist, $txt) = FW_devState($dev, $room, \%extPage);
-      $ret .= "<td style='cursor:pointer' informId='$name-$dev'>$txt</td>";
+      my ($dev, $reading) = split( ':', $item, 2 );
+      if( defined($reading) ) {
+        my %extPage = ();
+        my ($allSets, $cmdlist, $txt) = FW_devState($dev, $room, \%extPage);
+        $ret .= "<td style='cursor:pointer' informId='$name-$dev'>$txt</td>";
 
-    } else {
-       $ret .= "<td>$dev</td>";
+      } else {
+         $ret .= "<td>$dev</td>";
+      }
+
+      #$ret .= "<td></td>" if( defined($op) );
+      #$ret .= "<td>$op</td>" if( defined($op) );
+      $ret .= "<td>&#x2297;</td>" if( defined($op) );
     }
-
-    #$ret .= "<td></td>" if( defined($op) );
-    #$ret .= "<td>$op</td>" if( defined($op) );
-    $ret .= "<td>&#x2297;</td>" if( defined($op) );
   }
   $ret .= "<td>=</td>";
   my %extPage = ();
@@ -195,18 +197,20 @@ combine_2html($)
 
 
   $ret .= sprintf("<tr class='%s'>", ($row++&1)?"odd":"even");
-  @rules = @{$hash->{helper}{rules}};
-  while( @rules ) {
-    my $item = shift @rules;
-    my $op = shift @rules;
+  if( defined($hash->{helper}) && defined($hash->{helper}{rules}) ) {
+    my @rules = @{$hash->{helper}{rules}};
+    while( @rules ) {
+      my $item = shift @rules;
+      my $op = shift @rules;
 
-    $ret .= "<td>";
-    $ret .= "<div informId='$name-$item'>$hash->{helper}{watch}{$item}</div>";
-    $ret .= "<br>";
-    $ret .= "<div>$item</div>";
-    $ret .= "</td>";
-    $ret .= "<td>$op</td>" if( defined($op) );
-    #$ret .= "<td>&#x2297;</td>" if( defined($op) );
+      $ret .= "<td>";
+      $ret .= "<div informId='$name-$item'>$hash->{helper}{watch}{$item}</div>";
+      $ret .= "<br>";
+      $ret .= "<div>$item</div>";
+      $ret .= "</td>";
+      $ret .= "<td>$op</td>" if( defined($op) );
+      #$ret .= "<td>&#x2297;</td>" if( defined($op) );
+    }
   }
   $ret .= "<td>=</td>";
   $ret .= "<td>";

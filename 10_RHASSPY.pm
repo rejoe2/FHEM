@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24573 + new respond + $
+# $Id: 10_RHASSPY.pm 24786 2021-07-22 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -347,7 +347,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.36';
+    $hash->{MODULE_VERSION} = '0.4.37';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -709,7 +709,7 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents)[\s]*=}x) {
+        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
@@ -945,9 +945,13 @@ sub _analyze_rhassypAttr {
     for my $line (@lines) {
         my ($key, $val) = split m{:}x, $line, 2;
         next if !$val; 
-        
+
+        if ($key eq 'colorForceHue2rgb') {
+            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{forceHue2rgb} = $val;
+        }
+
+        my($unnamed, $named) = parseParams($val);
         if ($key eq 'group') {
-            my($unnamed, $named) = parseParams($val);
             my $specials = {};
             my $partOf = $named->{partOf} // shift @{$unnamed};
             $specials->{partOf} = $partOf if defined $partOf;
@@ -956,19 +960,13 @@ sub _analyze_rhassypAttr {
 
             $hash->{helper}{devicemap}{devices}{$device}{group_specials} = $specials;
         }
-        if ($key eq 'colorForceHue2rgb') {
-            $hash->{helper}{devicemap}{devices}{$device}{color_specials}{forceHue2rgb} = $val;
-        }
         if ($key eq 'colorCommandMap') {
-            my($unnamed, $named) = parseParams($val);
             $hash->{helper}{devicemap}{devices}{$device}{color_specials}{CommandMap} = $named if defined $named;
         }
         if ($key eq 'colorTempMap') {
-            my($unnamed, $named) = parseParams($val);
             $hash->{helper}{devicemap}{devices}{$device}{color_specials}{Colortemp} = $named if defined $named;
         }
         if ($key eq 'venetianBlind') {
-            my($unnamed, $named) = parseParams($val);
             my $specials = {};
             my $vencmd = $named->{setter} // shift @{$unnamed};
             my $vendev = $named->{device} // shift @{$unnamed};
@@ -979,12 +977,10 @@ sub _analyze_rhassypAttr {
             $hash->{helper}{devicemap}{devices}{$device}{venetian_specials} = $specials if defined $vencmd || defined $vendev;
         }
         if ($key eq 'priority') {
-            my($unnamed, $named) = parseParams($val);
             $hash->{helper}{devicemap}{devices}{$device}{prio}{inRoom} = $named->{inRoom} if defined $named->{inRoom};
             $hash->{helper}{devicemap}{devices}{$device}{prio}{outsideRoom} = $named->{outsideRoom} if defined $named->{outsideRoom};
         }
         if ( $key eq 'scenes' && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene} ) {
-            my($unnamed, $named) = parseParams($val);
             my $combined = _combineHashes( $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}, $named);
             for (keys %{$combined}) {
                 delete $combined->{$_} if $combined->{$_} eq 'none' || defined $named->{all} && $named->{all} eq 'none';
@@ -994,7 +990,9 @@ sub _analyze_rhassypAttr {
                 : delete $hash->{helper}{devicemap}{devices}{$device}{intents}->{SetScene};
         }
         if ($key eq 'confirm') {
-            $hash->{helper}{devicemap}{devices}{$device}{confirmIntents} = $val;
+            #my($unnamed, $named) = parseParams($val);
+            $hash->{helper}{devicemap}{devices}{$device}{confirmIntents} = join q{,}, (@{$unnamed}, keys %{$named});
+            $hash->{helper}{devicemap}{devices}{$device}{confirmIntentResponses} = $named if $named;
         }
     }
 
@@ -1785,16 +1783,23 @@ sub getNeedsConfirmation {
     my $device = shift;
 
     my $re = defined $device ? $device : $data->{Group};
+    my $target = defined $device ? $data->{Device} : $data->{Group};
     Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation called, regex is $re" );
     my $timeout = _getDialogueTimeout($hash);
-    my $response = getResponse($hash, 'DefaultConfirmationRequestRawInput');
+    my $response;
     my $rawInput = $data->{rawInput};
-    $response =~ s{(\$\w+)}{$1}eegx;
+    my $Value    = $data->{Value};
+    $Value = $hash->{helper}{lng}->{words}->{$Value} if defined $hash->{helper}{lng}->{words} && defined $hash->{helper}{lng}->{words}->{$Value};
 
     if (defined $hash->{helper}{tweaks} 
          && defined $hash->{helper}{tweaks}{confirmIntents} 
          && defined $hash->{helper}{tweaks}{confirmIntents}{$intent} 
          && $hash->{helper}{tweaks}{confirmIntents}{$intent} =~ m{\b$re(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
+        $response = defined $hash->{helper}{tweaks}{confirmIntentResponses} 
+                    && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
+                    : getResponse($hash, 'DefaultConfirmationRequestRawInput');
+        
+        $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true for tweak, response is $response" );
         setDialogTimeout($hash, $data, $timeout, $response);
         return 1;
@@ -1805,7 +1810,15 @@ sub getNeedsConfirmation {
     my $confirm = $hash->{helper}{devicemap}{devices}{$device}->{confirmIntents};
     return if !defined $confirm;
     if ( $confirm->{$intent} =~ m{\b$intent(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
-        Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level" );
+        $response = defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses} 
+                    && defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent} 
+                  ? $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent}
+                  : defined $hash->{helper}{tweaks} 
+                    && defined $hash->{helper}{tweaks}{confirmIntentResponses} 
+                    && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
+                  : getResponse($hash, 'DefaultConfirmationRequestRawInput');
+        $response =~ s{(\$\w+)}{$1}eegx;
+        Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level, response is $response" );
         setDialogTimeout($hash, $data, $timeout, $response);
         return 1;
     }
@@ -2877,6 +2890,8 @@ sub handleIntentSetOnOff {
 
         # Mapping found?
         if ( defined $device && defined $mapping ) {
+            #check if confirmation is required
+            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOff', $device );
             my $cmdOn  = $mapping->{cmdOn} // 'on';
             my $cmdOff = $mapping->{cmdOff} // 'off';
             my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
