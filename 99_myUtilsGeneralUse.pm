@@ -1,5 +1,5 @@
 ##############################################
-# $Id: myUtilsGeneralUse.pm 2021-01-26 Beta-User $
+# $Id: myUtilsGeneralUse.pm 2021-07-26 Beta-User $
 #
 
 package main;
@@ -8,15 +8,13 @@ use strict;
 use warnings;
 
 sub
-myUtilsGeneralUse_Initialize
-{
+myUtilsGeneralUse_Initialize {
   my $hash = shift;
 }
 
 # Enter you functions below _this_ line.
 
-sub
-mySwitchOffAfter {
+sub mySwitchOffAfter {
   my $ondevice = shift // return;
   my $duration  = shift // "01:00:01";
   my $idname = "my_switchoff_".$ondevice;
@@ -25,9 +23,7 @@ mySwitchOffAfter {
 
 }
 
-sub
-myHHMMSS2sec
-{
+sub myHHMMSS2sec {
   my ($h,$m,$s) = split(":", shift);
   $m = 0 if !$m;
   $s = 0 if !$s;
@@ -126,31 +122,30 @@ sub myTimeout_stairway_motion {
   }
 }
 
-
 sub myCalendar2Holiday {
   my $calname    = shift // return;
   my $regexp     = shift // return;
   my $targetname = shift // $calname;
   my $field      = shift // "summary";
   my $limit      = shift // 10;
-  my $yearEndRe  = shift;
-  
+  my $from       = shift // q{-10d};
+  my $to         = shift // q{100d};
+
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) =  localtime(gettimeofday());
-  my $getstring = $calname . ' events format:custom="4 $T1 $t2 $S ($D)" timeFormat:"%m-%d" limit:count=' . $limit." filter:field($field)=~\"$regexp\"";
-  my @holidaysraw = split( /\n/, CommandGet( undef, "$getstring" ));
-  
+  my $getstring = $calname . ' events format:custom="4 $T1 $t2 $S ($D)" timeFormat:"%Y-%m-%d" limit:count=' . "${limit},from=${from},to=$to filter:field($field)=~\"$regexp\"";
+  my @holidaysraw = split m{\n}xms, CommandGet( undef, $getstring );
+
   my @holidays;
   my @singledays;
- 
+
   for my $holiday (@holidaysraw) {
     my @tokens = split (" ",$holiday);
 
     my $endsecond = $tokens[2]-1;
     my @end_arr = localtime($endsecond);
-    
-    my $overYE = $end_arr[5] > $year || $yearEndRe && $tokens[3] =~ m/$yearEndRe/ ? 1 : 0; 
-    
-    $tokens[2] = strftime "%m-%d", localtime($endsecond);
+
+
+    $tokens[2] = strftime "%Y-%m-%d", localtime($endsecond);
 
     my $severalDays = $tokens[2] eq $tokens[1] ? 0 : 1;
     $holiday = join(' ', @tokens);
@@ -159,13 +154,8 @@ sub myCalendar2Holiday {
       splice @tokens, 2, 1;
       $holiday = join(' ', @tokens);
       push (@singledays, $holiday);
-    } elsif ( !$overYE ) {
+    } else {
       push (@holidays, $holiday);
-    } else { 
-      $holiday = "4 $tokens[1] 12-31 $tokens[3] $tokens[4] (part 1)";
-      push (@holidays,$holiday) if $month > 9;
-      $holiday = "4 01-01 $tokens[2] $tokens[3] $tokens[4] (part 2)";
-      unshift (@holidays,$holiday);
     }
   }
   push @holidays, @singledays;
