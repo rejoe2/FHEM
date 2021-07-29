@@ -1809,7 +1809,7 @@ sub getNeedsConfirmation {
 
     my $confirm = $hash->{helper}{devicemap}{devices}{$device}->{confirmIntents};
     return if !defined $confirm;
-    if ( $confirm->{$intent} =~ m{\b$intent(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
+    if ( $confirm =~ m{\b$intent(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
         $response = defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses} 
                     && defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent} 
                   ? $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent}
