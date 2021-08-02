@@ -347,7 +347,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.37';
+    $hash->{MODULE_VERSION} = '0.4.38';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -993,6 +993,9 @@ sub _analyze_rhassypAttr {
             #my($unnamed, $named) = parseParams($val);
             $hash->{helper}{devicemap}{devices}{$device}{confirmIntents} = join q{,}, (@{$unnamed}, keys %{$named});
             $hash->{helper}{devicemap}{devices}{$device}{confirmIntentResponses} = $named if $named;
+        }
+        if ($key eq 'confirmValueMap') {
+            $hash->{helper}{devicemap}{devices}{$device}{confirmValueMap} = $named if $named;
         }
     }
 
@@ -1794,11 +1797,11 @@ sub getNeedsConfirmation {
     if (defined $hash->{helper}{tweaks} 
          && defined $hash->{helper}{tweaks}{confirmIntents} 
          && defined $hash->{helper}{tweaks}{confirmIntents}{$intent} 
-         && $hash->{helper}{tweaks}{confirmIntents}{$intent} =~ m{\b$re(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
+         && $re =~ m{\A($hash->{helper}{tweaks}{confirmIntents}{$intent})\z}m ) { 
         $response = defined $hash->{helper}{tweaks}{confirmIntentResponses} 
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                     : getResponse($hash, 'DefaultConfirmationRequestRawInput');
-        
+
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true for tweak, response is $response" );
         setDialogTimeout($hash, $data, $timeout, $response);
@@ -1817,6 +1820,8 @@ sub getNeedsConfirmation {
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses} 
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                   : getResponse($hash, 'DefaultConfirmationRequestRawInput');
+        my $words = $hash->{helper}{devicemap}{devices}{$device}->{confirmValueMap} // $hash->{helper}{lng}->{words} // {};
+        $Value    = $words->{$data->{Value}} // $Value;
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level, response is $response" );
         setDialogTimeout($hash, $data, $timeout, $response);
