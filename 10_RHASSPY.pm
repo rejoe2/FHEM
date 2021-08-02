@@ -93,7 +93,6 @@ my $languagevars = {
     'SilentCancelConfirmation' => "",
     'DefaultConfirmationReceived' => "ok will do it",
     'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
-    'DefaultConfirmationRequest' => 'please confirm switching $device $wanted',
     'DefaultConfirmationRequestRawInput' => 'please confirm: $rawInput',
     'RequestChoiceDevice' => 'there are several possible devices, choose between $first_items and $last_item',
     'RequestChoiceRoom' => 'more than one possible device, please choose one of the following rooms $first_items and $last_item',
@@ -4741,6 +4740,21 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <p>Example:</p>
         <p><code>timeouts: confirm=25 default=30</code></p>
       </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-confirmIntents"></a>
+      <li><b>confirmIntents</b>
+        <p>This key may contain <i>&lt;Intent&gt;=&lt;regex&gt;</i> pairs beeing 
+        <ul>
+        <li><i>Intent</i> one of the intents supporting confirmation feature (atm: <i>SetOnOffGroup</i> and <i>SetOnOff</i>) and </li>
+        <li><i>regex</i> containing a regular expression matching to either the group name (for group intents) or the device name(s) - using a full match lookup. If intent and regex match, a confirmation will be requested.
+        </ul>
+        Example: <p><code>confirmIntents=SetOnOffGroup=light|blinds SetOnOff=blind.*</code></p>
+      </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-confirmIntentResponses"></a>
+      <li><b>confirmIntentResponses</b>
+        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.
+        Example: <p><code>confirmIntentResponses=SetOnOffGroup="really switch group $target $Value" SetOnOff="confirm setting $target $Value" </code></p>
+        <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.</p>
+      </li>
       <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
       <li><b>intentFilter</b>
         <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.
@@ -4857,6 +4871,16 @@ yellow=rgb FFFF00</code></p>
         <p>Keywords <i>inRoom</i> and <i>outsideRoom</i> can be used, each followed by comma separated types to give priority in <i>GetNumeric</i>. This may eleminate requests in case of several possible devices or rooms to deliver requested info type.</p>
         <p>Example:</p>
         <p><code>attr sensor_outside_main rhasspySpecials priority:inRoom=temperature outsideRoom=temperature,humidity,pressure</code></p>
+      </li>
+      <li><b>confirm</b>
+        <p>This is the more granular alternative to <a href="#RHASSPY-attr-rhasspyTweaks-confirmIntents">confirmIntents key in rhasspyTweaks</a> (including <i>confirmIntentResponses</i>). You may provide intent names only or <i>&lt;Intent&gt;=&lt;response&gt;</i> pairs like <code>confirm: SetOnOff="$target shall be switched $Value" SetScene</code> (Note: atm. only SetOnOff intent is supported). 
+        </p>
+      </li>
+      <li><b>confirmValueMap</b>
+        <p>Provide a device specific translation for $Value, e.g. for an awning <i>rhasspySpecials</i> could look like:<br>
+        <code>confirm: SetOnOff="really $Value $target"<br>
+              confirmValueMap: on="pull in" off="move out"</code>
+        </p>
       </li>
       <li><b>scenes</b>
         <p><code>attr lamp1 rhasspySpecials scenes:scene2="Kino zu zweit" scene3=Musik scene1=none scene4=none</code></p>
