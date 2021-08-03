@@ -306,7 +306,7 @@ my @topics = qw(
     hermes/nlu/intentNotRecognized
 );
 
-sub InitializeInitialize {
+sub Initialize {
     my $hash = shift // return;
 
     # Consumer
@@ -4768,7 +4768,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <li><b>confirmIntents</b>
         <p>This key may contain <i>&lt;Intent&gt;=&lt;regex&gt;</i> pairs beeing 
         <ul>
-        <li><i>Intent</i> one of the intents supporting confirmation feature (atm: <i>SetOnOffGroup</i> and <i>SetOnOff</i>) and </li>
+        <li><i>Intent</i> one of the intents supporting confirmation feature (all set type intents)  and </li>
         <li><i>regex</i> containing a regular expression matching to either the group name (for group intents) or the device name(s) - using a full match lookup. If intent and regex match, a confirmation will be requested.
         </ul>
         Example: <p><code>confirmIntents=SetOnOffGroup=light|blinds SetOnOff=blind.*</code></p>
@@ -4897,13 +4897,13 @@ yellow=rgb FFFF00</code></p>
         <p><code>attr sensor_outside_main rhasspySpecials priority:inRoom=temperature outsideRoom=temperature,humidity,pressure</code></p>
       </li>
       <li><b>confirm</b>
-        <p>This is the more granular alternative to <a href="#RHASSPY-attr-rhasspyTweaks-confirmIntents">confirmIntents key in rhasspyTweaks</a> (including <i>confirmIntentResponses</i>). You may provide intent names only or <i>&lt;Intent&gt;=&lt;response&gt;</i> pairs like <code>confirm: SetOnOff="$target shall be switched $Value" SetScene</code> (Note: atm. only SetOnOff intent is supported). 
+        <p>This is the more granular alternative to <a href="#RHASSPY-attr-rhasspyTweaks-confirmIntents">confirmIntents key in rhasspyTweaks</a> (including <i>confirmIntentResponses</i>). You may provide intent names only or <i>&lt;Intent&gt;=&lt;response&gt;</i> pairs like <code>confirm: SetOnOff="$target shall be switched $Value" SetScene</code>. 
         </p>
       </li>
       <li><b>confirmValueMap</b>
-        <p>Provide a device specific translation for $Value, e.g. for an awning <i>rhasspySpecials</i> could look like:<br>
+        <p>Provide a device specific translation for $Value, e.g. for a blind type device <i>rhasspySpecials</i> could look like:<br>
         <code>confirm: SetOnOff="really $Value $target"<br>
-              confirmValueMap: on="pull in" off="move out"</code>
+              confirmValueMap: on=open off=close</code>
         </p>
       </li>
       <li><b>scenes</b>
