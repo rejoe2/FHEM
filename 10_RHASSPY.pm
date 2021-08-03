@@ -306,7 +306,7 @@ my @topics = qw(
     hermes/nlu/intentNotRecognized
 );
 
-sub Initialize {
+sub InitializeInitialize {
     my $hash = shift // return;
 
     # Consumer
@@ -3004,6 +3004,7 @@ sub handleIntentSetTimedOnOff {
 
         # Mapping found?
         if ( defined $device && defined $mapping ) {
+            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
             my $cmdOn  = $mapping->{cmdOn} // 'on';
             my $cmdOff = $mapping->{cmdOff} // 'off';
             my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
@@ -3061,6 +3062,9 @@ sub handleIntentSetTimedOnOffGroup {
     return respond( $hash, $data, getResponse( $hash, 'duration_not_understood' ) ) 
     if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec};
 
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOffGroup' );
+
     my $devices = getDevicesByGroup($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
@@ -3106,7 +3110,7 @@ sub handleIntentSetTimedOnOffGroup {
 
         # Mapping found?
         next if !defined $mapping;
-        
+
         my $cmdOn  = $mapping->{cmdOn} // 'on';
         my $cmdOff = $mapping->{cmdOff} // 'off';
         my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
@@ -3211,6 +3215,9 @@ sub handleIntentSetNumericGroup {
     Log3($hash->{NAME}, 5, 'handleIntentSetNumericGroup called');
 
     return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !exists $data->{Value} && !exists $data->{Change};
+
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumericGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
 
@@ -3381,6 +3388,9 @@ sub handleIntentSetNumeric {
     # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
+
+    #check if confirmation is required
+    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric' );
 
     # execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd, $newVal);
@@ -3558,6 +3568,8 @@ sub handleIntentMediaControls {
         $mapping = getMapping($hash, $device, 'MediaControls', undef, defined $hash->{helper}{devicemap}, 0);
 
         if (defined $device && defined $mapping) {
+            #check if confirmation is required
+            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
             my $cmd = $mapping->{$command};
 
             #Beta-User: backwards compability check; might be removed later...
@@ -3623,6 +3635,10 @@ sub handleIntentSetScene{
 
         # Mapping found?
         return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !$device || !defined $mapping;
+
+        #check if confirmation is required
+        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetScene' );
+
         my $cmd = qq(scene $scene);
 
         # execute Cmd
@@ -3709,6 +3725,8 @@ sub handleIntentMediaChannels {
         #$cmd = (split m{=}x, $cmd, 2)[1];
 
         if ( defined $device && defined $cmd ) {
+            #check if confirmation is required
+            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaChannels' );
             $response = getResponse($hash, 'DefaultConfirmation');
             # Cmd ausführen
             analyzeAndRunCmd($hash, $device, $cmd);
@@ -3754,6 +3772,9 @@ sub handleIntentSetColor {
 
     return if $inBulk && !defined $device;
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
+
+    #check if confirmation is required
+    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetColor' );
 
     if ( defined $cmd || defined $cmd2 ) {
         $response = getResponse($hash, 'DefaultConfirmation');
@@ -3912,6 +3933,9 @@ sub handleIntentSetColorGroup {
     Log3($hash->{NAME}, 5, 'handleIntentSetColorGroup called');
 
     return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !exists $data->{Color} && !exists $data->{Rgb} &&!exists $data->{Saturation} && !exists $data->{Colortemp} && !exists $data->{Hue};
+
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetColorGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
 
@@ -4935,3 +4959,4 @@ yellow=rgb FFFF00</code></p>
 
 =end html
 =cut
+
