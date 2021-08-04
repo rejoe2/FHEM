@@ -4693,10 +4693,10 @@ attr DEVICE model McLighting
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
-name:go_eCharger
+name:go_eCharger_old
 filter:TYPE=MQTT2_DEVICE
-desc:See source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 for details. For complete MQTT-API see https://go-e.co/app/api.pdf
-order:W_02
+desc:Old version! See source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 for details. For complete MQTT-API see https://go-e.co/app/api.pdf
+order:W_02o
 par:BASE_ID;BASE_ID typically is go-eCharger;{ AttrVal("DEVICE","readingList","") =~ m,(go-eCharger)[/][^/]+[/].*:, ? $1 : undef }
 par:SERIAL;Serial number;{ AttrVal("DEVICE","readingList","") =~ m,go-eCharger[/]([^/]+)[/].*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
@@ -4713,9 +4713,34 @@ ALW:Activation\
 attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
 attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
 deletereading -q DEVICE (?!associatedWith|IODev).*
-attr DEVICE model go_eCharger
+attr DEVICE model go_eCharger_old
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+#source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 with myutils from https://forum.fhem.de/index.php/topic,115620.0.html
+name:go_eCharger
+filter:TYPE=MQTT2_DEVICE
+desc:New version, original source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924, uses myUtils code from https://forum.fhem.de/index.php/topic,115620.0.html. For complete MQTT-API see https://go-e.co/app/api.pdf
+order:W_02
+par:BASE_ID;BASE_ID typically is go-eCharger;{ AttrVal("DEVICE",'readingList','') =~ m,(go-eCharger)[/][^/]+[/].*:, ? $1 : undef }
+par:SERIAL;Serial number;{ AttrVal("DEVICE",'readingList','') =~ m,go-eCharger[/]([^/]+)[/].*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE",'icon','electric_car_icon') }
+{ Svn_GetFile('contrib/AttrTemplate/99_attrT_go_e_Utils.pm', 'FHEM/99_attrT_go_e_Utils.pm', sub(){ CommandReload(undef, '99_attrT_go_e_Utils') }) }
+attr DEVICE icon ICON
+attr DEVICE readingList BASE_ID/SERIAL/status:.* { FHEM::attrT_go_e_Utils::j2rN_extended($NAME,$EVENT,1) }\
+  BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
+attr DEVICE setList Activation:0,1 BASE_ID/SERIAL/cmd/req alw=$EVTPART1\
+  Ampere:selectnumbers,1,1,22,1,lin BASE_ID/SERIAL/cmd/req amp=$EVTPART1\
+  Three_Phases:0,1 BASE_ID/SERIAL/cmd/req fsp=$EVTPART1
+attr DEVICE stateFormat Status: charger_state \
+ALW:Activation\
+ P_akt: energy_akt
+attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model go_eCharger
+setreading DEVICE attrTemplateVersion 20210804
+
+
+attr go_echarger readingList go-eCharger/002227/status:.* { 
 
 ###########################################
 # provided as mqtt2_siedle.template by hydrotec
