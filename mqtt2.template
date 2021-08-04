@@ -4736,11 +4736,11 @@ ALW:Activation\
  P_akt: energy_akt
 attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
 deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE comment NOTE: additional code has been downloaded from svn (contrib).<br>There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html; issue "help attrT_go_e_Utils" for more info about.
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>This is in early development stage, there may be room for improvement! Please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html. To see more info about the provided code, issue <i>help attrT_go_e_Utils</i>.
 attr DEVICE model go_eCharger
 setreading DEVICE attrTemplateVersion 20210804
 
-
-attr go_echarger readingList go-eCharger/002227/status:.* { 
 
 ###########################################
 # provided as mqtt2_siedle.template by hydrotec
