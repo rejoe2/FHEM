@@ -382,6 +382,7 @@ LightScene_Save()
     push @content, $dumper->Dump;
   }
 
+  return if @content < 2;
   my $ret = FileWrite($statefile,@content);
   if ($ret){
     my $msg = "LightScene_Save: Cannot open $statefile: $!";
@@ -399,6 +400,9 @@ LightScene_Load($)
   my $statefile = myStatefileName();
 
   my ($ret, @content) = FileRead($statefile);
+  if ($ret && $ret =~ m{from database!\z}gm) {
+    ($ret, @content) = FileRead({FileName => $statefile, ForceType => 'file'});
+  }
   if ($ret) {
     my $msg = "LightScene_Load: Cannot open $statefile: $!";
     Log3 undef, 1, $msg;
