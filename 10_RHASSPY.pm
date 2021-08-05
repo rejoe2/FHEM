@@ -94,6 +94,7 @@ my $languagevars = {
     'DefaultConfirmationReceived' => "ok will do it",
     'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
     'DefaultConfirmationRequestRawInput' => 'please confirm: $rawInput',
+    'DefaultChangeIntentRequestRawInput' => 'change command to $rawInput',
     'RequestChoiceDevice' => 'there are several possible devices, choose between $first_items and $last_item',
     'RequestChoiceRoom' => 'more than one possible device, please choose one of the following rooms $first_items and $last_item',
     'DefaultChoiceNoOutstanding' => "no choice expected",
@@ -346,7 +347,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.38';
+    $hash->{MODULE_VERSION} = '0.4.39';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2305,11 +2306,9 @@ sub respond {
     my $hash     = shift // return;
     my $data     = shift // return;
     my $response = shift // return;
-    #former call: respond( $hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, getResponse( $hash, 'DefaultCancelConfirmation' ) );
+    my $topic    = shift // q{endSession};
 
     my $type      = $data->{requestType} // return;
-
-    my $topic = q{endSession};
 
     my $sendData;
 
@@ -2323,6 +2322,9 @@ sub respond {
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
         }
+    } elsif ($topic eq 'continueSession') {
+        $sendData->{text} = $response;
+        $sendData->{intentFilter} = 'null';
     } else {
         $sendData->{text} = $response;
         $sendData->{intentFilter} = 'null';
@@ -4119,7 +4121,8 @@ sub handleIntentNotRecognized {
     my $identiy = qq($data->{sessionId});
     my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
     return if !defined $data_old;
-    $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized} = $data;
+    return if !defined $data->{input} || lenght($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
+    $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized} = $data->{input};
     Log3( $hash->{NAME}, 5, "data_old is: " . toJSON( $hash->{helper}{'.delayed'}->{$identiy} ) );
     my $response = getResponse($hash, 'DefaultConfirmationRequestRawInput');
     my $rawInput = $data->{input};
@@ -4157,9 +4160,10 @@ sub handleIntentConfirmAction {
     my $data = shift // return;
 
     Log3($hash->{NAME}, 5, 'handleIntentConfirmAction called');
+    my $mode = $data->{Mode};
 
     #cancellation case
-    return handleIntentCancelAction($hash, $data) if $data->{Mode} ne 'OK' && $data->{Mode} ne 'Back' && $data->{Mode} ne 'Next' ;
+    return handleIntentCancelAction($hash, $data) if $mode ne 'OK' && $mode ne 'Back' && $mode ne 'Next' ;
 
     #confirmed case
     my $identiy = qq($data->{sessionId});
@@ -4173,13 +4177,36 @@ sub handleIntentConfirmAction {
     };
 
     #continued session after intentNotRecognized
-    if ( defined $data_old->{intentNotRecognized} && ( $data->{Mode} eq 'OK' || $data->{Mode} eq 'Back') ) {
-        Log3($hash->{NAME}, 5, "ConfirmAction in $data->{Mode}");
-        #$hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized} = $data;
-        #respond( $hash, $data, getResponse( $hash, 'DefaultConfirmationNoOutstanding' ) );
-        #return configure_DialogManager( $hash, $data->{siteId}, undef, undef, 1 ); #global intent filter seems to be not working!;
-        #atm no idea, how to continue...
-        return;
+    if ( defined $data_old->{intentNotRecognized} 
+         && (   $mode eq 'OK' 
+             || $mode eq 'Back' 
+             || $mode eq 'Next' ) ) {
+        Log3($hash->{NAME}, 5, "ConfirmAction in $data->{Mode} after intentNotRecognized");
+        if ($mode eq 'Back') {
+            delete $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized};
+            return; #we might need some acoustic feedback here?
+        }
+
+        if ( $mode eq 'Next' 
+             || $mode eq 'OK' && $data->{intent} =~ m{Choice}gxmsi ) {
+            #new nlu request with stored rawInput
+            my $topic = q{hermes/nlu/query};
+            my $sendData;
+            for my $key (qw(sessionId siteId customData lang)) {
+                $sendData->{$key} = $data->{$key} if defined $data->{$key} && $data->{$key} ne 'null';
+            }
+            $sendData->{input} = $data_old->{intentNotRecognized}; #input: string - text to recognize intent from (required)
+            $sendData->{intentFilter} = 'null'; #intentFilter: [string]? = null - valid intent names (null means all) - back to global FHEM defaults?
+            #id: string? = null - unique id for request (copied to response messages)
+            #siteId: string = "default" - Hermes site ID
+            #sessionId: string? = null - current session ID
+            #asrConfidence: float? = null
+            my $json = _toCleanJSON($sendData);
+            delete $hash->{helper}{'.delayed'}->{$identiy};
+            IOWrite($hash, 'publish', qq{$topic $json});
+            return;
+        }
+        #return;
     };
 
     $data_old->{siteId} = $data->{siteId};
