@@ -88,6 +88,7 @@ my $languagevars = {
     'NoActiveMediaDevice' => "Sorry no active playback device",
     'NoMediaChannelFound' => "Sorry but requested channel seems not to exist",
     'DefaultConfirmation' => "OK",
+    'DefaultConfirmationBack' => "So once more",
     'DefaultConfirmationTimeout' => "Sorry too late to confirm",
     'DefaultCancelConfirmation' => "Thanks aborted",
     'SilentCancelConfirmation' => "",
@@ -4184,7 +4185,7 @@ sub handleIntentConfirmAction {
         Log3($hash->{NAME}, 5, "ConfirmAction in $data->{Mode} after intentNotRecognized");
         if ($mode eq 'Back') {
             delete $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized};
-            return; #we might need some acoustic feedback here?
+            return respond( $hash, $data, {text => getResponse( $hash,'DefaultConfirmationBack')} );
         }
 
         if ( $mode eq 'Next' 
@@ -4204,10 +4205,11 @@ sub handleIntentConfirmAction {
             my $json = _toCleanJSON($sendData);
             delete $hash->{helper}{'.delayed'}->{$identiy};
             IOWrite($hash, 'publish', qq{$topic $json});
-            return;
+            return respond( $hash, $data, {text => getResponse( $hash,'DefaultConfirmation')} );
         }
         #return;
     };
+    return handleIntentCancelAction($hash, $data) if $mode ne 'OK'; #modes 'Back' or 'Next' in non-dialogical context
 
     $data_old->{siteId} = $data->{siteId};
     $data_old->{sessionId} = $data->{sessionId};
