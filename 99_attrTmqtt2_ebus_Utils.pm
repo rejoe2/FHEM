@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24785 + FileRead 2021-07-22 Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24789 2021-08-05 Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -80,7 +80,7 @@ sub j2singleReading {
     my $values = json2nameValue($EVENT, $pre, $filt, $not);
     my @all;
     for my $item ( sort keys %{$values} ) {
-        push @all, qq{$item: $values->{$item}};
+        push @all, qq{$item: $values->{$item}} if defined $values->{$item};
     }
     return { $rName => join q{ - }, @all };
 }
@@ -450,7 +450,7 @@ sub createBarView {
 
 sub _getVersion {
     my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
-    my $fn = "$modpath.FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
+    my $fn = "$modpath/FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
     my ($ret, @content) = FileRead($fn);
     if ($ret) {
         Log3(undef, 1, "Error reading file $fn!") ;
@@ -481,9 +481,17 @@ __END__
   <code>FHEM::aTm2u_ebus::j2nv($,$$$)</code><br>
   This is just a wrapper to fhem.pl json2nameValue() to prevent the "_value" postfix. It will first clean the first argument by applying <code>$EVENT=~ s,[{]"value":\s("?[^"}]+"?)[}],$1,g</code>. 
   </li>
+  <li><b>FHEM::aTm2u_ebus::j2singleReading</b><br>
+  <code>FHEM::aTm2u_ebus::j2singleReading($$,$$$)</code><br>
+  This is another wrapper to fhem.pl json2nameValue(), that will write all key/value pairs to a single reading. the name of the reading has to be handed over as first argument, the others (starting with JSON string ($EVENT) are identical to json2nameValue/j2nv. 
+  </li>
   <li><b>FHEM::aTm2u_ebus::upd_day_profile</b><br>
   <code>FHEM::aTm2u_ebus::upd_day_profile($$$,$)</code><br>
   Helper function to collect weekprofile info received over different topics. $NAME, $TOPIC and $EVENT are obligatory to be handed over, additionally you may provide a <i>daylist</i> as 4th argument. <i>daylist</i> defaults to Su|Mo|Tu|We|Th|Fr|Sa. Generated readings will be named Sunday, Monday, ..., so make sure to use different MQTT2-devices for each topic-group, if there's more than one item attached to your ebus capable to use weekly profiles.
+  </li>
+  <li><b>FHEM::aTm2u_ebus::analyzeReadingList</b><br>
+  <code>FHEM::aTm2u_ebus::($)</code><br>
+  This is a helper function. It analyzes a reading list of a given FHEM device (and the existing reading names) and tries to assign one of the above mentionned special functions to each line instead of json2nameValue(). Lines without Perl statements or already using these functions are ignored. This works best, if autocreate in "complex" mode had been used to automatically build the readingList. 
   </li>
   <li><b>FHEM::aTm2u_ebus::send_weekprofile</b><br>
   <code>FHEM::aTm2u_ebus::send_weekprofile($$$,$$)</code><br>
