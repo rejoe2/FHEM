@@ -1787,13 +1787,14 @@ sub getNeedsConfirmation {
     my $device = shift;
 
     my $re = defined $device ? $device : $data->{Group};
+    return if !defined $re;
     my $target = defined $device ? $data->{Device} : $data->{Group};
     Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation called, regex is $re" );
     my $timeout = _getDialogueTimeout($hash);
     my $response;
     my $rawInput = $data->{rawInput};
     my $Value    = $data->{Value};
-    $Value = $hash->{helper}{lng}->{words}->{$Value} if defined $hash->{helper}{lng}->{words} && defined $hash->{helper}{lng}->{words}->{$Value};
+    $Value = $hash->{helper}{lng}->{words}->{$Value} if defined $Value && defined $hash->{helper}{lng}->{words} && defined $hash->{helper}{lng}->{words}->{$Value};
 
     if (defined $hash->{helper}{tweaks} 
          && defined $hash->{helper}{tweaks}{confirmIntents} 
@@ -4122,10 +4123,10 @@ sub handleIntentNotRecognized {
     my $identiy = qq($data->{sessionId});
     my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
     return if !defined $data_old;
-    return if !defined $data->{input} || lenght($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
+    return if !defined $data->{input} || length($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
     $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized} = $data->{input};
     Log3( $hash->{NAME}, 5, "data_old is: " . toJSON( $hash->{helper}{'.delayed'}->{$identiy} ) );
-    my $response = getResponse($hash, 'DefaultConfirmationRequestRawInput');
+    my $response = getResponse($hash, 'DefaultChangeIntentRequestRawInput');
     my $rawInput = $data->{input};
     $response =~ s{(\$\w+)}{$1}eegx;
     $data_old->{customData} = 'intentNotRecognized';
@@ -4988,4 +4989,3 @@ yellow=rgb FFFF00</code></p>
 
 =end html
 =cut
-
