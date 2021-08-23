@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24789 2021-08-05 Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24831 2021-08-06 06:03:27Z Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -350,6 +350,17 @@ sub analyzeReadingList {
         if ( $re =~ m{(?<start>.+[/])(?<short>[^/:]+)(?:[.]|\\x2e)(?<item>[^.:123]+):}xm ) {
             $newtop = qq{$+{start}$+{short}.$+{item}:.*};
             $prefix = qq{$+{short}_$+{item}_};
+            
+            $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
+            $newline = qq{$newtop $func};
+            $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            next;
+        }
+
+        #json2nameValue type rL element with StartOf or EndOf?
+        if ( $re =~ m{(?<start>.+[/])(?<short>(?:StartOf|EndOf)[^/:]+):}xm ) {
+            $newtop = qq{$+{start}$+{short}:.*};
+            $prefix = qq{$+{short}_};
             
             $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
             $newline = qq{$newtop $func};
