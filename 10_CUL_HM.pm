@@ -567,7 +567,7 @@ sub CUL_HM_primaryDev() {###########################
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split m{\s+}xms, $def;
   my $HMid = uc($a[2]);
   return "wrong syntax: define <name> CUL_HM 6-digit-hex-code [Raw-Message]"
         if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6}([A-F0-9]{2})?$/i );
