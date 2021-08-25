@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24851 2021-08-15 05:57:45Z martinp876 $
+# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define 2021-08-25 Beta-User $
 
 package main;
 
@@ -905,6 +905,7 @@ sub CUL_HM_Attr(@) {#################################
         $attr{$name}{subType} = "virtual";
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
         $updtReq = 1;
+        CUL_HM_AttrInit($hash,'CCU-FHEM');
         CUL_HM_UpdtCentral($name);
     }
     else{
@@ -10696,6 +10697,8 @@ sub CUL_HM_UpdtCentral($){
                                    grep{AttrVal($_,"peerIDs","") =~ m/$id/} 
                                    keys %defs)){
     # now for each ccu Channel, that ist peered with someone. 
+    #Log3($name, 3, "CUL_HM_UpdtCentral for $name. ccuBId: $ccuBId");
+    next if $ccuBId eq '';
     my $btn = hex(substr($ccuBId,6,2)) + 0;
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId") if (!$modules{CUL_HM}{defptr}{$ccuBId});
     foreach my $pn (grep !/^$/,

@@ -347,8 +347,6 @@ sub analyzeReadingList {
             next;
         }
 
-        my $prefix ;
-
         #json2nameValue type rL element with dot?
         if ( $re =~ m{(?<start>.+[/])(?<short>[^/:]+)(?:[.]|\\x2e)(?<item>[^.:123]+):}xm ) {
             $newtop = qq{$+{start}$+{short}.$+{item}};
