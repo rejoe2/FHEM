@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define 2021-08-25 Beta-User $
+# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define + renamed a lot 2021-08-26 Beta-User $
 
 package main;
 
@@ -224,7 +224,7 @@ sub CUL_HM_updateConfig($){##########################
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
     # only once after startup - clean up definitions. During operation define function will take care
-    Log 1,"CUL_HM start inital cleanup";
+    Log 3,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
     foreach my $name  (@hmdev){
@@ -543,7 +543,7 @@ sub CUL_HM_updateConfig($){##########################
   }
   
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
+  Log 3,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
 }
@@ -1526,7 +1526,8 @@ sub CUL_HM_Notify(@){###############################
                  );# no notification about myself
   my $events = $dev->{CHANGED};
   return undef if(!$events); # Some previous notify deleted the array.
-  my $cws = join(";#",@{$dev->{CHANGED}});
+  #my $cws = join(";#",@{$dev->{CHANGED}});
+  my $count;
   foreach my $evnt(@{$events}){
     if($evnt =~ m/^(DELETEATTR)/){
     }
@@ -1536,6 +1537,7 @@ sub CUL_HM_Notify(@){###############################
         if ($ent eq $modules{CUL_HM}{helper}{primary}){
           $modules{CUL_HM}{helper}{primary} = ""; # force rescan  
           CUL_HM_primaryDev();
+          $count++;
         }
       }
     }
@@ -1547,6 +1549,7 @@ sub CUL_HM_Notify(@){###############################
         ||($evnt eq "RENAMED" && $defs{$new}{TYPE} eq "CUL_HM")){
         CUL_HM_Rename($new,$ent) if($evnt eq "RENAMED");
         CUL_HM_primaryDev() if ($ent eq $modules{CUL_HM}{helper}{primary});
+        $count++;
       }
       else{##------- update dependancies to IO devices used
         my @culHmDevs = grep{$defs{$_}{DEF} =~ m/^......$/} grep{$defs{$_}{TYPE} eq "CUL_HM"} keys %defs;
@@ -1564,18 +1567,25 @@ sub CUL_HM_Notify(@){###############################
                      split(",",$ios)
                      );
               $attr{$HMdef}{IOgrp} = "$vccu:$ios";
+              $count++;
             }
             else {# the vccu has no IO anymore - delete clients
               CommandDeleteAttr (undef,"$HMdef IOgrp") ; 
+              $count++;
             }
           }
-          CommandAttr (undef,"$vccu IOList $ea")if ($ea ne $eaOld);
+          if ($ea ne $eaOld) {
+            CommandAttr (undef,"$vccu IOList $ea");
+            $count++;
+          }
         }
         foreach my $HMdef (grep{AttrVal($_,"IODev","") eq $ent} @culHmDevs){# for each IODev
           CommandAttr (undef,"$HMdef IODev $new");
+          $count++;
         }
       }
-      return "CUL_HM renamed a lot";
+      return "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event" if $count;
+      return;
     }
     elsif (!$modules{CUL_HM}{helper}{initDone} &&  $evnt =~ m/INITIALIZED/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
