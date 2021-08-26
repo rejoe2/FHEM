@@ -224,7 +224,7 @@ sub CUL_HM_updateConfig($){##########################
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
     # only once after startup - clean up definitions. During operation define function will take care
-    Log 3,"CUL_HM start inital cleanup";
+    Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
     foreach my $name  (@hmdev){
@@ -543,7 +543,7 @@ sub CUL_HM_updateConfig($){##########################
   }
   
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  Log 3,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
+  Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
 }
