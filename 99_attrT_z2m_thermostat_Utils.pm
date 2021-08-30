@@ -2,7 +2,7 @@
 # $Id: 99_attrT_z2m_thermostat_Utils.pm 24890 mod 2021-08-30 Beta-User $
 #
 
-package ::attrT_z2m_thermostat_Utils;    ## no critic 'Package declaration'
+package FHEM::attrT_z2m_thermostat_Utils;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;

@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_attrTmqtt2_ebus_Utils.pm 24831 2021-08-06 06:03:27Z Beta-User $
+# $Id: 99_attrTmqtt2_ebus_Utils.pm 24890 2021-08-29 17:01:19Z Beta-User $
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
@@ -476,8 +476,8 @@ sub _getVersion {
     }
     for (@content) {
         chomp;
-        if(m{#.*\$Id\:[^\$\n\r].+\$}xm) {
-           return $_;
+        if ( m{#.*(\$Id\:[^\$\n\r].+)\$} ) {
+            return $1;
         }
     }
     return 'unknown';
@@ -487,10 +487,13 @@ sub _getVersion {
 
 __END__
 =pod
+=item summary helper functions needed for ebus MQTT2_DEVICE
+=item summary_DE needed Hilfsfunktionen für ebus MQTT2_DEVICE
 =begin html
 
 <a id="attrTmqtt2_ebus_Utils"></a>
 <h3>attrTmqtt2_ebus_Utils</h3>
+  There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,97989.0.html.
 <ul>
   <b>Functions to support attrTemplates for ebusd</b><br> 
 </ul>
