@@ -21,7 +21,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id: 00_MYSENSORS.pm 24446 + small bugfixes Beta-User $
+# $Id: 00_MYSENSORS.pm 24683 2021-06-26 04:52:49Z Beta-User $
 #
 ##############################################
 
@@ -497,6 +497,11 @@ sub Start {
   getFirmwareTypes($hash, 'start');
   return if IsDisabled( $hash->{NAME} );
   DevIo_CloseDev($hash);
+  if($dev eq 'none') {
+    Log3($hash, 1, "$hash->{NAME} device is none, commands will be echoed only");
+    $::attr{$hash->{NAME}}{dummy} = 1;
+    return;
+  }
   return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
 }
 
