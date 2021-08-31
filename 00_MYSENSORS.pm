@@ -117,7 +117,7 @@ my %sensorAttr = (
 sub Define {
   my $hash = shift // return;
 
-  InternalTimer(time, 'MYSENSORS::Start', $hash,0); 
+  InternalTimer(time, \&Start, $hash,0); 
   return;
 }
 
@@ -481,7 +481,7 @@ sub Attr {
   }
   if ($attribute eq 'disable') {
     return Stop($hash) if $command eq 'set' && $value;
-    InternalTimer(time, "MYSENSORS::Start", $hash,0);
+    InternalTimer(time, \&Start, $hash,0);
     return;
   }
   return;
@@ -502,7 +502,7 @@ sub Start {
     $::attr{$hash->{NAME}}{dummy} = 1;
     return;
   }
-  return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
+  return DevIo_OpenDev($hash, 0, \&Init);
 }
 
 sub Stop {
@@ -515,7 +515,7 @@ sub Stop {
 
 sub Ready {
   my $hash = shift // return;
-  return DevIo_OpenDev($hash, 1, "MYSENSORS::Init") if($hash->{STATE} eq 'disconnected');
+  return DevIo_OpenDev($hash, 1, \&Init) if($hash->{STATE} eq 'disconnected');
   if(defined($hash->{USBDev})) {
     my $po = $hash->{USBDev};
     my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
@@ -560,8 +560,8 @@ sub GetConnectStatus {
   Log3( $name, 4, "MySensors: GetConnectStatus called ..." );
 
   # neuen Timer starten in einem konfigurierten Interval.
-  InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
-  InternalTimer(gettimeofday()+5, "MYSENSORS::Start", $hash);  #Start timer for reset if after 5 seconds RESPONSE is not received
+  InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);# Restart check in 5 mins again
+  InternalTimer(gettimeofday()+5, \&Start, $hash);  #Start timer for reset if after 5 seconds RESPONSE is not received
   #query heartbeat from gateway 
   return sendMessage($hash, 
                      radioId => 0, 
@@ -611,8 +611,8 @@ sub Read {
       if ($msg->{ack}) {
         onAcknowledge($hash,$msg);
       }
-      RemoveInternalTimer($hash,"MYSENSORS::GetConnectStatus");
-      InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
+      RemoveInternalTimer($hash,\&GetConnectStatus);
+      InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);# Restart check in 5 mins again
       
       my $type = $msg->{cmd};
       my $dispatch = {
@@ -706,11 +706,11 @@ sub onInternalMsg {
         my $client = shift;
         MYSENSORS::DEVICE::onGatewayStarted($client);
       });
-      return InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);
+      return InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);
     }
     
     if ($type == I_HEARTBEAT_RESPONSE) {
-      RemoveInternalTimer($hash,"MYSENSORS::Start"); ## Reset reconnect because timeout was not reached
+      RemoveInternalTimer($hash,\&Start); ## Reset reconnect because timeout was not reached
       readingsSingleUpdate($hash, 'heartbeat', 'alive', 0);
       if ($client = matchClient($hash,$msg)){ 
          return if IsDisabled( $client->{NAME} );
@@ -903,14 +903,14 @@ sub sendMessage {
 sub _scheduleTimer {
   my $hash = shift;
   $hash->{outstandingAck} = 0;
-  RemoveInternalTimer($hash,"MYSENSORS::Timer");
+  RemoveInternalTimer($hash,\&Timer);
   my $next;
   for my $radioid (keys %{$hash->{messagesForRadioId}}) {
     my $msgsForId = $hash->{messagesForRadioId}->{$radioid};
     $hash->{outstandingAck} += @{$msgsForId->{messages}};
     $next = $msgsForId->{nexttry} if (!defined $next || $next >= $msgsForId->{nexttry});
   };
-  InternalTimer($next, "MYSENSORS::Timer", $hash, 0) if (defined $next);
+  InternalTimer($next, \&Timer, $hash, 0) if defined $next;
   return;
 }
 
