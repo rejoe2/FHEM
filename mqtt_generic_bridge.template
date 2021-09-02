@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt_generic_bridge.template 23804 2021-02-23 06:27:25Z Beta-User $
+# $Id: mqtt_generic_bridge.template 24880 2021-08-28 09:20:20Z Beta-User $
 #
 # This file provides templates to configure MQTT_GENERIC_BRIDGE itself and especially also subordinated devices
 #
@@ -226,5 +226,5 @@ par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BR
 par:MQTTPREFIX;prefix used in MGB;{ InternalVal("DEVICE",'prefix',undef) } 
 
 option:global
-attr TARGETDEV MQTTPREFIXSubscribe state:topic={"$base/$device"} volume|mute|speakers|input:topic={"$base/$device/$name"}
+attr TARGETDEV MQTTPREFIXPublish state:topic={"$base/$device"} volume|mute|speakers|input:topic={"$base/$device/$name"}
 attr TARGETDEV MQTTPREFIXSubscribe state:stopic={"$base/$device"} volume|mute|speakers|input:stopic={"$base/$device/$name"}
