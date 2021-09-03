@@ -24,8 +24,6 @@ option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return
 attr DEVICE genericDeviceType switch
 option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0] && NOTDELAYED;return 0}
 set DEVICE attrTemplate speechcontrol_general_naming_master_template
-option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 0 if !$devices[0]; NOTDELAYED ? return 0 : return 1 }
-set DEVICE attrTemplate speechcontrol_general_naming_master_template_delayed \DELAYED=NOTDELAYED
 
 name:speechcontrol_type_light
 filter:NAME=speechrecognTesting
@@ -103,13 +101,6 @@ option:{my @devices=devspec2array('TYPE=siri'); my @alexas=devspec2array('TYPE=a
 option:{my @devices=devspec2array('TYPE=gassistant'); $devices[0] ? return 1 : return 0}
 option:{my @devices=devspec2array('TYPE=RHASSPY'); $devices[0] ? return 1 : return 0}
 
-name:speechcontrol_general_naming_master_template_delayed
-filter:NAME=speechrecognTesting
-order:10000200a
-desc:generic template to allow looping for multi channel devices
-par:DELAYED;Set this to 0 to not apply naming template on first round;{ 0 } 
-option:{ !DELAYED }
-set DEVICE attrTemplate speechcontrol_general_naming_master_template
 
 #######
 # alexa specials

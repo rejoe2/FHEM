@@ -1053,7 +1053,7 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
-setreading DEVICE attrTemplateVersion 20210902
+setreading DEVICE attrTemplateVersion 20210903
 
 
 # sonoff 1 channel + USB device flashed with Tasmota.
@@ -1072,7 +1072,7 @@ attr DEVICE_CH2 setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_switch
 set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210902
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210903
 
 # plug with LED flashed with Tasmota.
 name:tasmota_plug_with_rgbw_split
@@ -1115,7 +1115,7 @@ deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 set DEVICE attrTemplate speechcontrol_type_switch
 set DEVICE_CH2 attrTemplate speechcontrol_type_light_255 \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210903
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
@@ -1276,7 +1276,8 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200529
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 
 
 # sonoff 2 channel device flashed with Tasmota with dual energy meassuring. Source: https://forum.fhem.de/index.php/topic,122231.0.html
