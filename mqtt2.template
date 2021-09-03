@@ -1070,6 +1070,7 @@ attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210902
 
@@ -1112,7 +1113,7 @@ attr DEVICE_CH2 devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","sta
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 set DEVICE attrTemplate speechcontrol_type_switch
-set DEVICE_CH2 attrTemplate speechcontrol_type_light_255
+set DEVICE_CH2 attrTemplate speechcontrol_type_light_255 \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
 
@@ -1314,7 +1315,8 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210728
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 
 
 #contributed by 87insane
