@@ -1069,7 +1069,7 @@ attr DEVICE_CH2 icon ICON
 attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210902
 
