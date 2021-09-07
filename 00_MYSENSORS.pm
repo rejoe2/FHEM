@@ -499,7 +499,7 @@ sub Start {
   DevIo_CloseDev($hash);
   if($dev eq 'none') {
     Log3($hash, 1, "$hash->{NAME} device is none, commands will be echoed only");
-    $::attr{$hash->{NAME}}{dummy} = 1;
+    $::attr{$hash->{NAME}}{disable} = 1;
     return;
   }
   return DevIo_OpenDev($hash, 0, \&Init);
@@ -515,8 +515,9 @@ sub Stop {
 
 sub Ready {
   my $hash = shift // return;
-  return DevIo_OpenDev($hash, 1, \&Init) if($hash->{STATE} eq 'disconnected');
-  if(defined($hash->{USBDev})) {
+  return if AttrVal($hash->{NAME}, 'disable', 0);
+  return DevIo_OpenDev($hash, 1, \&Init) if DevIo_getState($hash) eq 'disconnected';
+  if ( defined $hash->{USBDev} ) {
     my $po = $hash->{USBDev};
     my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
     return ( $InBytes > 0 );
