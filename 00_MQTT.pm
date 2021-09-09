@@ -211,11 +211,11 @@ sub process_event($$) {
 
 sub Set($@) {
   my ($hash, @a) = @_;
-  return "Need at least one parameters" if(@a < 2);
+  return 'Need at least one parameter!' if @a < 2;
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
     if(!defined($sets{$a[1]}));
   my $command = $a[1];
-  my $value = $a[2];
+  #my $value = $a[2];
 
   return Start($hash) if $command eq 'connect';
   return Stop($hash)  if $command eq 'disconnect';
