@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_HMLAN.pm 18152 + "Clients" 2021-09-08 Beta-User $
+# $Id: 00_HMLAN.pm 18152 + "Clients", + #120600 2021-09-10 Beta-User $
 package main;
 
 
@@ -62,7 +62,7 @@ sub HMLAN_Initialize($) {
   $hash->{GetFn}   = "HMLAN_Get";
   $hash->{NotifyFn}= "HMLAN_Notify";
   $hash->{AttrFn}  = "HMLAN_Attr";
-  
+
 # Normal devices
   $hash->{DefFn}   = "HMLAN_Define";
   $hash->{UndefFn} = "HMLAN_Undef";
@@ -77,6 +77,7 @@ sub HMLAN_Initialize($) {
                      "wdTimer:5,10,15,20,25 ".
                      "logIDs:multiple,sys,all,broadcast ".
                      $readingFnAttributes;
+  #$hash->{Clients} = ":CUL_HM:";
   return;
 }
 
@@ -120,6 +121,7 @@ sub HMLAN_Define($$) {#########################################################
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
   $hash->{helper}{q}{scnt}        = 0;
+  $hash->{helper}{q}{sending}     = 0;
   $hash->{helper}{q}{loadNo}      = 0;
   $hash->{helper}{q}{loadLastMax} = 0;   # max load in last slice
   my @ald = ("0") x $HMmlSlice;
@@ -643,6 +645,7 @@ sub HMLAN_Parse($$) {##########################################################
   my @mFld = split(',', $rmsg);
   my $letter = substr($mFld[0],0,1); # get leading char
 
+  $hash->{helper}{q}{sending} = 0 if ($letter eq "R");
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     # max speed for devices is 100ms after receive - example:TC
     my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
@@ -830,8 +833,9 @@ sub HMLAN_Parse($$) {##########################################################
 }
 sub HMLAN_Ready($) {###########################################################
   my ($hash) = @_;
-  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit");
+  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit",  sub(){});
 }
+
 sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", 0) != 0);
@@ -904,6 +908,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
+    $hash->{helper}{q}{sending} = 1;
     $hash->{helper}{q}{scnt}++;  
   }
   else{
@@ -938,6 +943,7 @@ sub HMLAN_DoInit($) {##########################################################
 
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
+  $hash->{helper}{q}{sending} = 0;
 
   my $tn = gettimeofday();
   my $wdTimer = AttrVal($name,"wdTimer",25);
@@ -988,11 +994,18 @@ sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
+  my $tn = gettimeofday();
+
+  if ($hash->{helper}{q}{sending}) { #Currently sending, reschedule KeepAlive
+    RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+    InternalTimer($tn+0.1,"HMLAN_KeepAlive", "keepAlive:".$name, 1);
+    return;
+  }
   $hash->{helper}{q}{keepAliveRec} = 0; # reset indicator
 
   return if(!$hash->{FD});
   
-  my $tn = gettimeofday();
+  #my $tn = gettimeofday();
   my $wdTimer = AttrVal($name,"wdTimer",25);
   my $rht = int($tn)>>15 ;
   if( $rht != $hash->{helper}{setTime}){# reset HMLAN watch about each 10h
@@ -1157,6 +1170,8 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 }
 
 1;
+
+__END__
 
 =pod
 =item device

@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define + renamed a lot 2021-08-26 Beta-User $
+# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define + renamed a lot + Clients 2021-09-09 Beta-User $
 
 package main;
 
@@ -227,6 +227,9 @@ sub CUL_HM_updateConfig($){##########################
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+    for (@hmdev){
+      CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef);
+    }
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
         $attr{$name}{model} = "VIRTUAL" if (!$attr{$name}{model} || $attr{$name}{model} =~ m/virtual_/);
@@ -978,7 +981,7 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        my @IOnames = devspec2array("Clients=:CUL_HM:");        
+        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');        
         return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
             if (!grep /^$attrVal$/,@IOnames);
         $attr{$name}{$attrName} = $attrVal;
@@ -993,7 +996,7 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m/:CUL_HM:/);
       }
       if($attr{$name}{$attrName}){# see who we lost
         foreach my $oldIOs (split(",",$attr{$name}{$attrName})){
@@ -4390,7 +4393,7 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
   if ($sVal > 179 ||$sVal <51 ){# need to raise alarm
     if ($sVal > 179){# need to raise alarm
       #"SHORT_COND_VALUE_LO" value="50"/>
-	  #"SHORT_COND_VALUE_HI" value="180"/>
+      #"SHORT_COND_VALUE_HI" value="180"/>
       $sProsa = "smoke-Alarm_".$No;
       $smokeSrc = $dName;
       push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
@@ -4624,7 +4627,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
-	  $regVal =~ s/ .*// if ($cmd eq "regVal");
+      $regVal =~ s/ .*// if ($cmd eq "regVal");
       return ($regVal =~ m/^invalid/)? "Value not captured:$name - $regReq"
                                      : $regVal;
     }
@@ -5357,8 +5360,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return $ret;
   }
   elsif($cmd eq "tempTmplSet") { ##############################################
-	return "template missing" if (!defined $a[2]);
-	my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
+    return "template missing" if (!defined $a[2]);
+    my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
     if ($modules{HMinfo}){
@@ -5372,7 +5375,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_tempListTmpl($name,"restore",$template);
   }
   elsif($cmd eq "tplDel") { ###################################################
-	return "template missing" if (!defined $a[2]);
+    return "template missing" if (!defined $a[2]);
     my ($p,$t) = split(">",$a[2]);
     HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
     return;
@@ -5730,7 +5733,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $cName =~ s/_chn-\d\d$//;
       my $curVal = CUL_HM_getRegFromStore($cName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
-	    return "peer required for $regName" if ($curVal =~ m/peer/);
+        return "peer required for $regName" if ($curVal =~ m/peer/);
         return "cannot calculate value. Please issue set $name getConfig first - $curVal";
       }
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
@@ -10825,7 +10828,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       $dIo = $oldIODevH->{NAME};
     }
     else {
-      my @IOs = devspec2array("Clients=:CUL_HM:");
+      my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
       ($dIo) = (grep{CUL_HM_operIObyIOName($_)} @IOs,@IOs);# tricky: use first active IO else use any IO for CUL_HM
     }
     $newIODevH  = $defs{$dIo} if($dIo);
@@ -12305,7 +12308,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
               spaces must not be used in the list.<br>
               <b>replay</b> can be entered to repeat the last sound played once more.<br>
               <b>repeat</b> defines how often the sequence shall be played. Defaults to 1.<br>
- 	      <b>volume</b> is defined between 0 and 10. 0 stops any sound currently playing. Defaults to 10 (100%).<br>
+          <b>volume</b> is defined between 0 and 10. 0 stops any sound currently playing. Defaults to 10 (100%).<br>
               Example:
               <ul><code>
                  # "hello" in display, symb bulb on, backlight, beep<br>
@@ -13767,12 +13770,12 @@ sub CUL_HM_getIcon($) { ####################################################### 
               d&uuml;rfen in der Liste nicht benutzt werden.<br>
               <b>replay</b> kann verwendet werden um den zuletzt gespielten Klang zu wiederholen.<br>
               <b>repeat</b> definiert wie oft die Sequenz ausgef&uuml;hrt werden soll. Standard ist 1.<br>
- 	      <b>volume</b> kann im Bereich 0..10 liegen. 0 stoppt jeden aktuell gespielten Sound. Standard ist 10 (100%.<br>
+          <b>volume</b> kann im Bereich 0..10 liegen. 0 stoppt jeden aktuell gespielten Sound. Standard ist 10 (100%.<br>
               Beispiel:
               <ul><code>
                 set cfm_Mp3 playTone 3 # MP3 Titel 3 einmal<br>
                 set cfm_Mp3 playTone 3 3 # MP3 Titel 3 dreimal<br>
- 		set cfm_Mp3 playTone 3 1 5 # MP3 Titel 3 mit halber Lautst&auml;rke<br>
+	set cfm_Mp3 playTone 3 1 5 # MP3 Titel 3 mit halber Lautst&auml;rke<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 # MP3 Titelfolge 3,6,8,3,4 einmal<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 Titelfolge 3,6,8,3,4 255 mal<br>
                 set cfm_Mp3 playTone replay # Wiederhole letzte Sequenz<br>
@@ -14497,3 +14500,5 @@ sub CUL_HM_getIcon($) { ####################################################### 
 =end html_DE
 
 =cut
+
+
