@@ -1409,11 +1409,12 @@ sub CUL_HM_AttrAssign($) {###########################
   my $modH = $modules{CUL_HM};
   return undef if (!$init_done); # we cannot determine now. if attributes are missing
   my   @attrGrp = ('glb'); # global for all CUL_HM
-  push @attrGrp,'dev'         if ($entH->{helper}{role}{dev});
-  push @attrGrp,'devPhy'      if ($entH->{helper}{role}{dev} && !$entH->{helper}{role}{vrt});
-  push @attrGrp,'chn'         if ($entH->{helper}{role}{chn});
-  push @attrGrp,'virtual'     if ($entH->{helper}{role}{vrt});
-  push @attrGrp,'tempTmplSet' if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet});
+  push @attrGrp,'dev'          if ($entH->{helper}{role}{dev});
+  push @attrGrp,'devPhy'       if ($entH->{helper}{role}{dev} && !$entH->{helper}{role}{vrt});
+  push @attrGrp,'chn'          if ($entH->{helper}{role}{chn});
+  push @attrGrp,'virtual'      if ($entH->{helper}{role}{vrt});
+  push @attrGrp,'tempTmplSet'  if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet});
+  push @attrGrp,'tempListTmpl' if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet}); #Beta-User: has been removed or not included intenitally?
   push @attrGrp,AttrVal($name,'subType',''); # subType as final - will overwrite values like for param
   push @attrGrp,AttrVal($name,'model','');   # model   as final - will overwrite values like for param
   my %attrHash;
