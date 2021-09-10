@@ -217,9 +217,9 @@ sub CUL_HM_updateConfig($){##########################
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
-  RemoveInternalTimer("updateConfig");
+  RemoveInternalTimer("CUL_HM_updateConfig"); #RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(1,"CUL_HM_updateConfig", "startUp", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -1414,7 +1414,6 @@ sub CUL_HM_AttrAssign($) {###########################
   push @attrGrp,'chn'          if ($entH->{helper}{role}{chn});
   push @attrGrp,'virtual'      if ($entH->{helper}{role}{vrt});
   push @attrGrp,'tempTmplSet'  if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet});
-  push @attrGrp,'tempListTmpl' if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet}); #Beta-User: has been removed or not included intenitally?
   push @attrGrp,AttrVal($name,'subType',''); # subType as final - will overwrite values like for param
   push @attrGrp,AttrVal($name,'model','');   # model   as final - will overwrite values like for param
   my %attrHash;
@@ -4297,7 +4296,7 @@ sub CUL_HM_queueUpdtCfg($){
     }
     $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   }
-  RemoveInternalTimer("updateConfig");
+  RemoveInternalTimer("CUL_HM_updateConfig"); #RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
 }
 sub CUL_HM_parseSDteam(@){#handle SD team events
@@ -5365,7 +5364,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    if ($modules{HMinfo}){
+    #if ($modules{HMinfo}){
+    if (defined &HMinfo_tempListDefFn){
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
