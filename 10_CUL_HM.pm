@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24851 + cref + stateFormat + uninizalised-define + renamed a lot + Clients 2021-09-09 Beta-User $
+# $Id: 10_CUL_HM.pm 24961 2021-09-12 06:46:07Z martinp876 $
 
 package main;
 
@@ -217,9 +217,9 @@ sub CUL_HM_updateConfig($){##########################
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
-  RemoveInternalTimer("CUL_HM_updateConfig"); #RemoveInternalTimer("updateConfig");
+  RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(1,"CUL_HM_updateConfig", "startUp", 0);#start asap once FHEM is operational
+    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -227,9 +227,11 @@ sub CUL_HM_updateConfig($){##########################
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+    #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
     for (@hmdev){
       CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef);
     }
+    
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
         $attr{$name}{model} = "VIRTUAL" if (!$attr{$name}{model} || $attr{$name}{model} =~ m/virtual_/);
@@ -570,7 +572,7 @@ sub CUL_HM_primaryDev() {###########################
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
-  my @a = split m{\s+}xms, $def;
+  my @a = split("[ \t][ \t]*", $def);
   my $HMid = uc($a[2]);
   return "wrong syntax: define <name> CUL_HM 6-digit-hex-code [Raw-Message]"
         if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6}([A-F0-9]{2})?$/i );
@@ -908,6 +910,7 @@ sub CUL_HM_Attr(@) {#################################
         $attr{$name}{subType} = "virtual";
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
         $updtReq = 1;
+        #Beta-User# sonst braucht man nach dem define einen Neustart?
         CUL_HM_AttrInit($hash,'CCU-FHEM');
         CUL_HM_UpdtCentral($name);
     }
@@ -981,7 +984,8 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');        
+        #Beta-User: Original ist zu eng, liefert bei CUL&Co keine Treffer. Oder beabsichtigt? https://forum.fhem.de/index.php/topic,122848.msg1173977.html#msg1173977
+        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
         return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
             if (!grep /^$attrVal$/,@IOnames);
         $attr{$name}{$attrName} = $attrVal;
@@ -996,7 +1000,11 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m/:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients",
+                                                             defined $modules{InternalVal($nIO,"TYPE","")}{Clients}
+                                                                   ? $modules{InternalVal($nIO,"TYPE","")}{Clients}
+                                                                   :"")
+                                                   !~ m /:CUL_HM:/);
       }
       if($attr{$name}{$attrName}){# see who we lost
         foreach my $oldIOs (split(",",$attr{$name}{$attrName})){
@@ -1262,6 +1270,7 @@ sub CUL_HM_AttrCheck(@) {############################
   $defs{$name}{'.AttrList'} =~ m/ ?($attrName)(:*)(.*?) /;
   my ($attrFound,$attrOpt)  = ($1,$3);
 #  return "$attrName not defined for $name" if (!defined $attrFound); # must not occure - already checked global
+  #Beta-User: fixes https://forum.fhem.de/index.php/topic,122423.0.html
   return undef if (!$attrOpt || $attrOpt =~ m/^multiple|textField-/); # any value allowed
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
   
@@ -1409,11 +1418,11 @@ sub CUL_HM_AttrAssign($) {###########################
   my $modH = $modules{CUL_HM};
   return undef if (!$init_done); # we cannot determine now. if attributes are missing
   my   @attrGrp = ('glb'); # global for all CUL_HM
-  push @attrGrp,'dev'          if ($entH->{helper}{role}{dev});
-  push @attrGrp,'devPhy'       if ($entH->{helper}{role}{dev} && !$entH->{helper}{role}{vrt});
-  push @attrGrp,'chn'          if ($entH->{helper}{role}{chn});
-  push @attrGrp,'virtual'      if ($entH->{helper}{role}{vrt});
-  push @attrGrp,'tempTmplSet'  if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet});
+  push @attrGrp,'dev'         if ($entH->{helper}{role}{dev});
+  push @attrGrp,'devPhy'      if ($entH->{helper}{role}{dev} && !$entH->{helper}{role}{vrt});
+  push @attrGrp,'chn'         if ($entH->{helper}{role}{chn});
+  push @attrGrp,'virtual'     if ($entH->{helper}{role}{vrt});
+  push @attrGrp,'tempTmplSet' if ($entH->{helper}{cmds}{cmdLst}{tempTmplSet});
   push @attrGrp,AttrVal($name,'subType',''); # subType as final - will overwrite values like for param
   push @attrGrp,AttrVal($name,'model','');   # model   as final - will overwrite values like for param
   my %attrHash;
@@ -1530,7 +1539,7 @@ sub CUL_HM_Notify(@){###############################
   my $events = $dev->{CHANGED};
   return undef if(!$events); # Some previous notify deleted the array.
   #my $cws = join(";#",@{$dev->{CHANGED}});
-  my $count;
+  my $count; #Beta-User: Bessere Rückmeldung beim Umbenennen, https://forum.fhem.de/index.php/topic,122552.0.html
   foreach my $evnt(@{$events}){
     if($evnt =~ m/^(DELETEATTR)/){
     }
@@ -4296,7 +4305,7 @@ sub CUL_HM_queueUpdtCfg($){
     }
     $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
   }
-  RemoveInternalTimer("CUL_HM_updateConfig"); #RemoveInternalTimer("updateConfig");
+  RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
 }
 sub CUL_HM_parseSDteam(@){#handle SD team events
@@ -5347,8 +5356,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     ($fn,$template) = split(":",($template?$template
                                           :AttrVal($name,"tempListTmpl",$name)));
-    if ($modules{HMinfo}){
-      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
+    #if ($modules{HMinfo}){
+    #Beta-User: prevent crash, wenn no HMinfo device is defined
+    if (defined &HMinfo_tempListDefFn){
+       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
     else{
@@ -5364,8 +5375,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    #if ($modules{HMinfo}){
-    if (defined &HMinfo_tempListDefFn){
+    if ($modules{HMinfo}){
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
@@ -10711,8 +10721,7 @@ sub CUL_HM_UpdtCentral($){
                                    grep{AttrVal($_,"peerIDs","") =~ m/$id/} 
                                    keys %defs)){
     # now for each ccu Channel, that ist peered with someone. 
-    #Log3($name, 3, "CUL_HM_UpdtCentral for $name. ccuBId: $ccuBId");
-    next if $ccuBId eq '';
+    next if ($ccuBId !~ m/^[0-9A-F]{8}$/);
     my $btn = hex(substr($ccuBId,6,2)) + 0;
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId") if (!$modules{CUL_HM}{defptr}{$ccuBId});
     foreach my $pn (grep !/^$/,
@@ -11562,6 +11571,8 @@ sub CUL_HM_getIcon($) { ####################################################### 
 
 
 1;
+
+__END__
 
 =pod
 =encoding utf8
@@ -13776,7 +13787,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
               <ul><code>
                 set cfm_Mp3 playTone 3 # MP3 Titel 3 einmal<br>
                 set cfm_Mp3 playTone 3 3 # MP3 Titel 3 dreimal<br>
-	set cfm_Mp3 playTone 3 1 5 # MP3 Titel 3 mit halber Lautst&auml;rke<br>
+    set cfm_Mp3 playTone 3 1 5 # MP3 Titel 3 mit halber Lautst&auml;rke<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 # MP3 Titelfolge 3,6,8,3,4 einmal<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 Titelfolge 3,6,8,3,4 255 mal<br>
                 set cfm_Mp3 playTone replay # Wiederhole letzte Sequenz<br>
@@ -14501,5 +14512,3 @@ sub CUL_HM_getIcon($) { ####################################################### 
 =end html_DE
 
 =cut
-
-
