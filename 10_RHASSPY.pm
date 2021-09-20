@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-07-22 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-09-21 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -40,7 +40,7 @@ use utf8;
 use List::Util 1.45 qw(max min uniq);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw(strftime);
-use Data::Dumper;
+#use Data::Dumper;
 use FHEM::Core::Timer::Register qw(:ALL);
 
 sub ::RHASSPY_Initialize { goto &Initialize }
@@ -348,7 +348,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.39';
+    $hash->{MODULE_VERSION} = '0.4.40';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -4556,7 +4556,8 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   Might be usefull, if you have several instances of FHEM running, and may - in later versions - be a criteria to distinguish between different users (e.g. to only allow a subset of commands and/or rooms to be addressed).</li>
   <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
   Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
-  <li><b>useGenericAttrs</b>: By default, RHASSPY only uses it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Activating this with <code>useGenericAttrs=1</code> adds <code>genericDeviceType</code> to the global attribute list and activates RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. In later versions <code>homebridgeMapping</code> may also be on the list.</li>
+  <a id="RHASSPY-genericDeviceType"></a>
+  <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <i>genericDeviceType</i> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. To deactivate this, you may set <code>useGenericAttrs=0</code>. In later versions <code>homebridgeMapping</code> may also be used as source to automatically generate appropriate mappings for RHASSPY also.</li>
 </ul>
 
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
@@ -4573,7 +4574,8 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 <p>In case you are using the MQTT server also for other purposes than Rhasspy, you have to set <code>subscriptions</code> manually to at least include the following topics additionally to the other subscriptions desired for other purposes.</p>
 <p><code>hermes/intent/+<br>
 hermes/dialogueManager/sessionStarted<br>
-hermes/dialogueManager/sessionEnded</code></p>
+hermes/dialogueManager/sessionEnded<br>
+hermes/nlu/intentNotRecognized</code></p>
 
 <p><b>Important</b>: After defining the RHASSPY module, you are supposed to manually set the attribute <i>IODev</i> to force a non-dynamic IO assignement. Use e.g. <code>attr &lt;deviceName&gt; IODev &lt;m2client&gt;</code>.</p>
 
