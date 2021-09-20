@@ -4557,7 +4557,7 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <li><b>prefix</b>: May be used to distinguishe between different instances of RHASSPY on the FHEM-internal side.<br>
   Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language).</li>
   <a id="RHASSPY-genericDeviceType"></a>
-  <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <i>genericDeviceType</i> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. To deactivate this, you may set <code>useGenericAttrs=0</code>. In later versions <code>homebridgeMapping</code> may also be used as source to automatically generate appropriate mappings for RHASSPY also.</li>
+  <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <code>genericDeviceType</code> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. <code>useGenericAttrs=0</code> will deactivate this. Note: <code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
 </ul>
 
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
@@ -4579,13 +4579,13 @@ hermes/nlu/intentNotRecognized</code></p>
 
 <p><b>Important</b>: After defining the RHASSPY module, you are supposed to manually set the attribute <i>IODev</i> to force a non-dynamic IO assignement. Use e.g. <code>attr &lt;deviceName&gt; IODev &lt;m2client&gt;</code>.</p>
 
-<p><a id="RHASSPY-list"></a><b>Note:</b> RHASSPY consolidates a lot of data from different sources. The <b>final data structure RHASSPY uses</b> at runtime can be viewed using the <a href="#list">list command</a>. It's highly recommended to have a close look at this data structure, especially when starting with RHASSPY or in case something doesn't work as expected!<br> 
-When changing something relevant within FHEM for either the data structure in</p>
+<p><a id="RHASSPY-list"></a><b>Note:</b> RHASSPY consolidates a lot of data from different sources. The <b>final data structure RHASSPY uses at runtime</b> will be shown by the <a href="#list">list command</a>. It's highly recommended to have a close look at this data structure, especially when starting with RHASSPY or in case something doesn't work as expected!<br> 
+After changing something relevant within FHEM for either the data structure in</p>
 <ul>
   <li><b>RHASSPY</b> (this form is used when reffering to module or the FHEM device) or for </li>
   <li><b>Rhasspy</b> (this form is used when reffering to the remote service), </li>
 </ul>
-<p>these changes must be get to known to RHASSPY and (often, but not allways) to Rhasspy. See the different versions provided by the <a href="#RHASSPY-set-update">update command</a>.</p>
+<p>you have to make sure these changes are also updated in RHASSPYs internal data structure and (often, but not always) to Rhasspy. See the different versions provided by the <a href="#RHASSPY-set-update">update command</a>.</p>
 
 <a id="RHASSPY-set"></a>
 <h4>Set</h4>
