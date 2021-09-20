@@ -1,5 +1,4 @@
-
-# $Id: 31_LightScene.pm 18765 + cref-id + configDB usage - 2021-08-03 Beta-User $
+# $Id: 31_LightScene.pm 18765 + cref-id + configDB usage - 2021-09-21 Beta-User $
 
 package main;
 
@@ -383,11 +382,11 @@ LightScene_Save()
   }
 
   return if @content < 2;
+  my $dbused = configDBUsed();
   my $ret = FileWrite($statefile,@content);
   if ($ret){
-    my $msg = "LightScene_Save: Cannot open $statefile: $!";
-    Log3 undef, 1, $msg;
-  } 
+    Log3( undef, 1, "LightScene_Save: Write $statefile [DB: $dbused] failed $ret");
+  }
   return;
 }
 
@@ -400,17 +399,17 @@ LightScene_Load($)
   my $statefile = myStatefileName();
 
   my ($ret, @content) = FileRead($statefile);
-  if ($ret && $ret =~ m{from database!\z}gm) {
-    ($ret, @content) = FileRead({FileName => $statefile, ForceType => 'file'});
-  }
   if ($ret) {
-    my $msg = "LightScene_Load: Cannot open $statefile: $!";
-    Log3 undef, 1, $msg;
+    if (configDBUsed()){
+      Log3( $hash, 1, "LightScene_Load: please import your config file $statefile into configDB!");
+    } else {
+      Log3( $hash, 1, "LightScene_Load: Cannot open $statefile: $ret");
+    }
     return;
   }
   my $encoded;
   for my $line (@content) {
-    chomp $line;
+    #chomp $line;
     next if($line =~ m/^#.*$/);
     $encoded .= $line;
   }
