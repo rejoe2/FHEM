@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-12 06:46:07Z martinp876 $
+# $Id: 10_CUL_HM.pm 24961 2021-09-21 +Beta-User-Patches martinp876 $
 
 package main;
 
@@ -526,7 +526,7 @@ sub CUL_HM_updateConfig($){##########################
     #remove invalid attributes. After set commands fot templist
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
     foreach(keys %{$attr{$name}}){
-      delete $attr{$name}{$_} if (CUL_HM_AttrCheck('set',$name,$_,$attr{$name}{$_}));  
+      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User fixes missing tempListTempl
     }
     CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
