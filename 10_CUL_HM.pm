@@ -526,7 +526,7 @@ sub CUL_HM_updateConfig($){##########################
     #remove invalid attributes. After set commands fot templist
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
     foreach(keys %{$attr{$name}}){
-      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User: fixes missing tempListTmpl
+      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User: fixes missing tempListTmpl, see also noansi => https://forum.fhem.de/index.php/topic,122107.msg1166930.html#msg1166930
     }
     CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
@@ -10616,7 +10616,8 @@ sub CUL_HM_setAttrIfCh($$$$) {
 }
 sub CUL_HM_noDup(@) {#return list with no duplicates
   my %all;
-  return "" if (scalar(@_) == 0);
+  #return "" if (scalar(@_) == 0); #martinp876: @Ansgar: noDup muss ich noch untersuchen. Wird häufig benötigt...
+  return @_ if (!scalar(@_)); #noansi: return empty array instead of empty string, https://forum.fhem.de/index.php/topic,122107.msg1168262.html#msg1168262
   $all{$_}=0 foreach (grep {defined $_ && $_ !~ m/^$/} @_);
   delete $all{""}; #remove empties if present
   return (sort keys %all);
