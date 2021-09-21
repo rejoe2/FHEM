@@ -526,7 +526,7 @@ sub CUL_HM_updateConfig($){##########################
     #remove invalid attributes. After set commands fot templist
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
     foreach(keys %{$attr{$name}}){
-      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User fixes missing tempListTempl
+      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User: fixes missing tempListTmpl
     }
     CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
@@ -10712,7 +10712,12 @@ sub CUL_HM_UpdtCentral($){
                        ,sort map{"IO:$_"} split(",",AttrVal($name,"IOList",""))
                        ,sort devspec2array("TYPE=CUL_HM:FILTER=IOgrp=$name.*") # devices assigned to the vccu
                    )." ";
-  $defs{$name}{'.AttrList'}    =~ s/logIDs:.*? /$logOpt/;
+  #$defs{$name}{'.AttrList'}    =~ s/logIDs:.*? /$logOpt/;
+  if ( defined $defs{$name}{'.AttrList'} ) { #Beta-User: fixes "uninitialized ... in substitution" warning at startup
+      $defs{$name}{'.AttrList'} =~ s/logIDs:.*? /$logOpt/;
+  } else {
+      $defs{$name}{'.AttrList'} = $logOpt;
+  }
 
   # --- search for peers to CCU and potentially device this channel
   # create missing CCU channels 
