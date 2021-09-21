@@ -1085,8 +1085,10 @@ sub _analyze_genDevType {
         }
         $currentMapping = _analyze_genDevType_setter( $hash, $device, $allset, $currentMapping );
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
     }
-    elsif ( $gdt eq 'thermostat' ) {
+
+    if ( $gdt eq 'thermostat' ) {
         my $desTemp = $allset =~ m{\b(desiredTemp)([\b:\s]|\Z)}xms ? $1 : 'desired-temp';
         my $measTemp = InternalVal($device, 'TYPE', 'unknown') eq 'CUL_HM' ? 'measured-temp' : 'temperature';
         $currentMapping = 
@@ -1095,9 +1097,10 @@ sub _analyze_genDevType {
             SetNumeric => {'desired-temp' => { cmd => $desTemp, currentVal => $desTemp, maxVal => '28', minVal => '10', step => '0.5', type => 'temperature'}}
             };
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
     }
 
-    elsif ( $gdt eq 'thermometer' ) {
+    if ( $gdt eq 'thermometer' ) {
         my $r = $defs{$device}{READINGS};
         if($r) {
             for (sort keys %{$r}) {
@@ -1107,9 +1110,10 @@ sub _analyze_genDevType {
             }
         }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
     }
 
-    elsif ( $gdt eq 'blind' ) {
+    if ( $gdt eq 'blind' ) {
         if ( $allset =~ m{\bdim([\b:\s]|\Z)}xms ) {
             my $maxval = InternalVal($device, 'TYPE', 'unknown') eq 'ZWave' ? 99 : 100;
             $currentMapping = 
@@ -1129,6 +1133,7 @@ sub _analyze_genDevType {
             };
         }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
     }
 
     if ( $gdt eq 'media' ) { #genericDeviceType media
