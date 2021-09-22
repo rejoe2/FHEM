@@ -10853,7 +10853,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   my $result = 0; # default: IO unchanged
   if(  (defined $newIODevH && (!defined($oldIODevH) || $newIODevH != $oldIODevH))){
     my $ID = CUL_HM_hash2Id($hash);
-    IOWrite($hash, "", "remove:".$ID) if(defined($oldIODevH) && defined $oldIODevH->{NAME}); #IODev still old
+    IOWrite($hash, "", "remove:".$ID) if(defined($oldIODevH) && defined $oldIODevH->{NAME} && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old #Beta-User: might prevent log entries for CUL Type IO's
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
     $hash->{IODev} = $newIODevH;
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
@@ -12821,7 +12821,7 @@ __END__
       <li><a id="CUL_HM-attr-tempListTmpl"></a>tempListTmpl<br>
           Sets the default template for a heating controller. If not given the detault template is taken from 
           file tempList.cfg using the enitity name as template name (e.g. ./tempLict.cfg:RT1_Clima <br> 
-          To avoid template usage set this attribut to  '0'.<br> 
+          To avoid template usage set this attribut to 'none' or '0'.<br> 
           Format is &lt;file&gt;:&lt;templatename&gt;. lt
           </li>
       <li><a id="CUL_HM-attr-unit"></a>unit<br>
@@ -14200,7 +14200,7 @@ __END__
       <li><a id="CUL_HM-attr-tempListTmpl"></a>tempListTmpl<br>
         Setzt das Default f&uuml;r Heizungskontroller. Ist es nicht gesetzt wird der default filename genutzt und der name
         der entity als templatename. Z.B. ./tempList.cfg:RT_Clima<br> 
-        Um das template nicht zu nutzen kann man es auf '0'setzen.<br>
+        Um das template nicht zu nutzen kann man es auf 'none' oder '0'setzen.<br>
         Format ist &lt;file&gt;:&lt;templatename&gt;. 
         </li>
       <li><a id="CUL_HM-attr-modelForce"></a>modelForce<br>
