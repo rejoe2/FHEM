@@ -10851,9 +10851,9 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   }
 
   my $result = 0; # default: IO unchanged
-  if(  (defined $newIODevH && (!defined($oldIODevH) || $newIODevH != $oldIODevH))){
+  if(  (defined $newIODevH && (!defined($oldIODevH) || $newIODevH ne $oldIODevH))){ #Beta-User: nummeric comparison might be wrong?
     my $ID = CUL_HM_hash2Id($hash);
-    IOWrite($hash, "", "remove:".$ID) if(defined($oldIODevH) && defined $oldIODevH->{NAME} && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old #Beta-User: might prevent log entries for CUL Type IO's
+    IOWrite($hash, "", "remove:".$ID) if(defined($oldIODevH) && defined $oldIODevH->{NAME} && $oldIODevH->{TYPE} && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old #Beta-User: might prevent log entries for CUL Type IO's
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
     $hash->{IODev} = $newIODevH;
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
