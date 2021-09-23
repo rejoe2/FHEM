@@ -1,0 +1,867 @@
+Internals:
+   .AttrList  aesCommReq:1,0 do_not_notify:1,0 event-aggregator event-min-interval event-on-change-reading event-on-update-reading expert:multiple,defReg,allReg,rawReg,templ,none levelMap levelRange model oldreadings param peerIDs readOnly:0,1 showtime:1,0 stateFormat:textField-long timestamp-on-change-reading
+   DEF        2E7D4904
+   FUUID      5c432275-f33f-d171-6e18-461fc31f44b02262
+   NAME       Thermostat_WZ_OG_Clima
+   NR         127
+   NTFY_ORDER 50-Thermostat_WZ_OG_Clima
+   STATE      T: 19.9 desired: off valve: 0
+   TYPE       CUL_HM
+   chanNo     04
+   device     Thermostat_WZ_OG
+   disableNotifyFn 1
+   .attraggr:
+   .attrminint:
+   Helper:
+     DBLOG:
+       ValvePosition:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      0
+       boostTime:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      -
+       controlMode:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      manual
+       desired-temp:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      off
+       measured-temp:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      19.9
+       partyEnd:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      -
+       partyStart:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      -
+       partyTemp:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      -
+       state:
+         LogDB:
+           TIME       1632377502.61403
+           VALUE      T: 19.9 desired: off valve: 0
+   READINGS:
+     2021-09-22 20:03:06   .R-boostPeriod  5 min
+     2021-09-22 20:03:06   .R-decalcTime   11:00
+     2021-09-22 20:03:06   .R-decalcWeekday Sat
+     2021-09-22 20:03:06   .R-reguExtI     18
+     2021-09-22 20:03:06   .R-reguExtP     33
+     2021-09-22 20:03:06   .R-reguExtPstart 45
+     2021-09-22 20:03:06   .R-reguIntI     18
+     2021-09-22 20:03:06   .R-reguIntP     33
+     2021-09-22 20:03:06   .R-reguIntPstart 45
+     2021-09-22 20:03:06   .R-showWeekday  off
+     2021-09-22 20:03:06   .R-tempMax      24.5 C
+     2021-09-22 20:03:06   .R-tempMin      4.5 C
+     2021-09-22 20:03:06   .R-valveErrPos  15 %
+     2021-09-22 20:03:06   .R-valveMaxPos  100 %
+     2021-09-22 20:03:06   .R-winOpnDetFall 1.4 K
+     2021-09-22 20:03:06   .R-winOpnMode   off
+     2021-09-22 20:03:06   .R-winOpnPeriod 15 min
+     2021-09-22 20:03:06   .R-winOpnTempI  12 C
+     2021-09-22 20:03:25   .associatedWith Thermostat_WZ_OG,Thermostat_WZ_OG_Clima,Thermostat_WZ_OG_ClimaTeam,Thermostat_WZ_OG_Climate,Thermostat_WZ_OG_Weather,Thermostat_WZ_OG_WindowRec,Thermostat_WZ_OG_remote,Thermostat_WZ_OG
+     2020-11-25 20:19:35   .peerListRDate  2020-11-25 20:19:35
+     2021-06-02 05:32:48   CommandAccepted yes
+     2021-09-22 20:03:06   R-boostPos      80 %
+     2021-09-22 20:03:06   R-btnNoBckLight off
+     2021-09-22 20:03:06   R-dayTemp       21 C
+     2021-09-22 20:03:06   R-daylightSaveTime on
+     2021-09-22 20:03:06   R-modePrioManu  all
+     2021-09-22 20:03:06   R-modePrioParty all
+     2021-09-22 20:03:06   R-nightTemp     17 C
+     2021-09-22 20:03:06   R-noMinMax4Manu off
+     2021-09-22 20:03:06   R-regAdaptive   on
+     2021-09-22 20:03:06   R-showInfo      time
+     2021-09-22 20:03:06   R-sign          off
+     2021-09-22 20:03:06   R-tempOffset    0.0K
+     2021-09-22 20:03:06   R-valveOffsetRt 0 %
+     2021-09-22 20:03:06   R-winOpnBoost   off
+     2021-09-22 20:03:06   R_0_tempListSat  07:00 19.5 09:00 22.0 21:00 22.5 22:00 22.5 24:00 19.5
+     2021-09-22 20:03:06   R_1_tempListSun  07:30 19.5 09:00 22.0 21:00 22.5 22:00 22.5 24:00 19.5
+     2021-09-22 20:03:06   R_2_tempListMon  05:30 19.5 08:00 22.5 16:00 21.0 21:00 23.0 22:00 21.0 24:00 19.5
+     2021-09-22 20:03:06   R_3_tempListTue  05:30 19.5 08:00 22.5 16:30 21.0 21:00 23.0 22:00 21.0 24:00 19.5
+     2021-09-22 20:03:06   R_4_tempListWed  05:30 19.5 08:00 22.5 17:00 21.0 21:00 23.0 22:00 21.0 24:00 19.5
+     2021-09-22 20:03:06   R_5_tempListThu  05:30 19.5 09:30 22.5 13:00 21.0 21:00 23.0 22:00 21.0 24:00 19.5
+     2021-09-22 20:03:06   R_6_tempListFri  05:30 19.5 08:00 22.5 16:30 21.0 21:00 23.0 22:00 21.0 24:00 19.5
+     2021-09-22 20:03:06   R_tempList_State verified
+     2020-11-25 20:19:35   RegL_01.        00:00 08:00 
+     2020-11-25 20:19:40   RegL_07.        00:00 01:2A 02:22 03:09 04:31 05:18 06:03 07:00 08:16 09:07 0A:30 0B:00 0C:64 0D:0F 0E:05 0F:00 10:00 11:00 12:09 13:0E 14:4E 15:54 16:58 17:6C 18:5A 19:FC 1A:5B 1B:08 1C:4F 1D:20 1E:45 1F:20 20:45 21:20 22:45 23:20 24:45 25:20 26:45 27:20 28:45 29:20 2A:45 2B:20 2C:45 2D:20 2E:4E 2F:5A 30:58 31:6C 32:5A 33:FC 34:5B 35:08 36:4F 37:20 38:45 39:20 3A:45 3B:20 3C:45 3D:20 3E:45 3F:20 40:45 41:20 42:45 43:20 44:45 45:20 46:45 47:20 48:4E 49:42 4A:5A 4B:60 4C:54 4D:C0 4E:5C 4F:FC 50:55 51:08 52:4F 53:20 54:45 55:20 56:45 57:20 58:45 59:20 5A:45 5B:20 5C:45 5D:20 5E:45 5F:20 60:45 61:20 62:4E 63:42 64:5A 65:60 66:54 67:C6 68:5C 69:FC 6A:55 6B:08 6C:4F 6D:20 6E:45 6F:20 70:45 71:20 72:45 73:20 74:45 75:20 76:45 77:20 78:45 79:20 7A:45 7B:20 7C:4E 7D:42 7E:5A 7F:60 80:54 81:CC 82:5C 83:FC 84:55 85:08 86:4F 87:20 88:45 89:20 8A:45 8B:20 8C:45 8D:20 8E:45 8F:20 90:45 91:20 92:45 93:20 94:45 95:20 96:4E 97:42 98:5A 99:72 9A:54 9B:9C 9C:5C 9D:FC 9E:55 9F:08 A0:4F A1:20 A2:45 A3:20 A4:45 A5:20 A6:45 A7:20 A8:45 A9:20 AA:45 AB:20 AC:45 AD:20 AE:45 AF:20 B0:4E B1:42 B2:5A B3:60 B4:54 B5:C6 B6:5C B7:FC B8:55 B9:08 BA:4F BB:20 BC:45 BD:20 BE:45 BF:20 C0:45 C1:20 C2:45 C3:20 C4:45 C5:20 C6:45 C7:20 C8:45 C9:20 CA:12 CB:21 CC:2D CD:12 CE:21 CF:2D 
+     2021-09-23 08:11:42   ValvePosition   0
+     2021-09-23 08:11:42   boostTime       -
+     2021-09-22 20:03:12   cfgState        PeerIncom,TempChk
+     2021-09-22 10:49:58   commState       CMDs_done
+     2021-09-23 08:11:42   controlMode     manual
+     2021-09-23 08:11:42   desired-temp    off
+     2021-09-23 08:11:42   measured-temp   19.9
+     2021-09-23 08:11:42   partyEnd        -
+     2021-09-23 08:11:42   partyStart      -
+     2021-09-23 08:11:42   partyTemp       -
+     2021-06-02 05:32:48   recentStateType ack
+     2021-09-23 08:11:42   state           T: 19.9 desired: off valve: 0
+     2021-08-06 09:08:09   tempTmplSet     Nelly
+     2021-06-02 05:32:47   trigLast        fhem:81
+   helper:
+     peerFriend peerRTteam2
+     peerIDsState complete
+     peerOpt    p:thermostat
+     regLst     1,7
+     tmplChg    0
+     cfgChk:
+       idPz00     fail
+       idTp00     Thermostat_WZ_OG_Clima not found in file ./FHEM/9999_tempList_edit.cfg
+     cmds:
+       TmplKey    :1632333785:1632333805.52654
+       TmplTs     1632333805.52654
+       cmdKey     1:0:0::Thermostat_WZ_OG:0095:04:
+       cmdLst:
+         burstXmit  noArg
+         clear      [(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]
+         controlManu (on|off|5.0..30.0;0.5)
+         controlMode (auto|manual|boost|day|night)
+         controlParty -temp- -startDate- -startTime- -endDate- -endTime-
+         desired-temp (on|off|5.0..30.0;0.5)
+         getConfig  noArg
+         getRegRaw  (List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]
+         inhibit    [(on|{off})]
+         peerBulk   -peer1,peer2,...- [({set}|unset)]
+         peerSmart  -peerOpt-
+         regBulk    -list-.-peerChn- -addr1:data1- [-addr2:data2-]...
+         regSet     [(prep|{exec})] -regName- -value- [-peerChn-]
+         sign       [(on|{off})]
+         sysTime    noArg
+         tempListFri [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListMon [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListSat [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListSun [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListThu [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListTmpl [({verify}|restore)] [[-file-:]-templateName-]
+         tempListTue [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListWed [(prep|{exec})] -HH:MM- -temp- [...]
+         tempTmplSet -tempTmpl-
+         tplDel     -tplDel-
+         tplSet_0   -tplChan-
+       lst:
+         condition  slider,0,1,255
+         peer       
+         peerOpt    Thermostat_Bad_OG_ClimaTeam,Thermostat_Buero_ClimaTeam,Thermostat_Chillraum_ClimaTeam,Thermostat_Esszimmer_Gang_ClimaTeam,Thermostat_Esszimmer_Wand_ClimaTeam,Thermostat_Flur_ClimaTeam,Thermostat_Kind1_ClimaTeam,Thermostat_Lucie_hinten_ClimaTeam,Thermostat_Lucie_vorne_ClimaTeam,Thermostat_Schlafzimmer_ClimaTeam,Thermostat_Wohnzimmer_ClimaTeam,Thermostat_Wohnzimmer_SSO_ClimaTeam
+         tplChan    
+         tplDel     
+         tplPeer    
+       rtrvLst:
+         cmdList    [({short}|long)]
+         deviceInfo [({short}|long)]
+         list       [({normal}|full)]
+         param      -param-
+         reg        -addr- -list- [-peerChn-]
+         regList    noArg
+         regTable   noArg
+         regVal     -addr- -list- [-peerChn-]
+         saveConfig [-filename-]
+         tplInfo    noArg
+     expert:
+       def        1
+       det        0
+       raw        1
+       tpl        0
+     peerIDsH:
+       00000000   broadcast
+     role:
+       chn        1
+     shRegR:
+       07         00
+     shadowReg:
+     tmpl:
+Attributes:
+   alias      HK Wohnzimmer OG
+   devStateIcon {devStateIcon_Clima($name)}
+   group      Heizung
+   icon       hm-cc-rt-dn
+   model      HM-CC-RT-DN
+   peerIDs    00000000
+   room       WZ_OG,Steuerung->Heizung
+   userattr   weekprofile
+   webCmd     desired-temp
+   weekprofile Kind1
+   widgetOverride desired-temp:knob,min:4.5,max:31.5,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+
+
+   Internals:
+   .AttrList  .devInfo .mId .stc IODev IOgrp actCycle actStatus aesCommReq:1,0 aesKey:5,4,3,2,1,0 autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly burstAccess:0_off,1_auto commStInCh:on,off do_not_notify:1,0 dummy:1,0 event-aggregator event-min-interval event-on-change-reading event-on-update-reading expert:multiple,defReg,allReg,rawReg,templ,none firmware hmKey hmKey2 hmKey3 hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ignore:1,0 model modelForce:ACTIONDETECTOR,ACTIONDETECTOR,ASH550,ASH550I,CCU-FHEM,CMM,DORMA_ATENT,DORMA_BRC-H,DORMA_RC-H,HM-CC-RT-DN,HM-CC-RT-DN-BOM,HM-CC-SCD,HM-CC-TC,HM-CC-VD,HM-DIS-EP-WM55,HM-DIS-TD-T,HM-DIS-WM55,HM-DW-WM,HM-ES-PMSW1-DR,HM-ES-PMSW1-PL,HM-ES-PMSW1-PL-DN-R1,HM-ES-PMSW1-PL-DN-R2,HM-ES-PMSW1-PL-DN-R3,HM-ES-PMSW1-PL-DN-R4,HM-ES-PMSW1-PL-DN-R5,HM-ES-PMSW1-SM,HM-ES-TX-WM,HM-HM-LC-DW-WM,HM-LC-AO-SM,HM-LC-BL1-FM,HM-LC-BL1-FM-2,HM-LC-BL1-PB-FM,HM-LC-BL1-SM,HM-LC-BL1-SM-2,HM-LC-BL1PBU-FM,HM-LC-DDC1-PCB,HM-LC-DIM1L-CV,HM-LC-DIM1L-CV-2,HM-LC-DIM1L-CV-644,HM-LC-DIM1L-PL,HM-LC-DIM1L-PL-2,HM-LC-DIM1L-PL-3,HM-LC-DIM1L-PL-644,HM-LC-DIM1PWM-CV,HM-LC-DIM1PWM-CV-2,HM-LC-DIM1T-CV,HM-LC-DIM1T-CV-2,HM-LC-DIM1T-CV-644,HM-LC-DIM1T-DR,HM-LC-DIM1T-FM,HM-LC-DIM1T-FM-2,HM-LC-DIM1T-FM-644,HM-LC-DIM1T-FM-LF,HM-LC-DIM1T-PL,HM-LC-DIM1T-PL-2,HM-LC-DIM1T-PL-3,HM-LC-DIM1T-PL-644,HM-LC-DIM1TPBU-FM,HM-LC-DIM1TPBU-FM-2,HM-LC-DIM2L-CV,HM-LC-DIM2L-SM,HM-LC-DIM2L-SM-2,HM-LC-DIM2L-SM-644,HM-LC-DIM2T-SM,HM-LC-DIM2T-SM,HM-LC-DIM2T-SM-2,HM-LC-JA1PBU-FM,HM-LC-RGBW-WM,HM-LC-SW1-BA-PCB,HM-LC-SW1-DR,HM-LC-SW1-FM,HM-LC-SW1-FM-2,HM-LC-SW1-PB-FM,HM-LC-SW1-PCB,HM-LC-SW1-PL,HM-LC-SW1-PL-3,HM-LC-SW1-PL-CT-R1,HM-LC-SW1-PL-CT-R2,HM-LC-SW1-PL-CT-R3,HM-LC-SW1-PL-CT-R4,HM-LC-SW1-PL-CT-R5,HM-LC-SW1-PL-DN-R1,HM-LC-SW1-PL-DN-R2,HM-LC-SW1-PL-DN-R3,HM-LC-SW1-PL-DN-R4,HM-LC-SW1-PL-DN-R5,HM-LC-SW1-PL-OM54,HM-LC-SW1-PL2,HM-LC-SW1-SM,HM-LC-SW1-SM-2,HM-LC-SW1-SM-ATMEGA168,HM-LC-SW1PBU-FM,HM-LC-SW2-DR,HM-LC-SW2-DR-2,HM-LC-SW2-FM,HM-LC-SW2-FM-2,HM-LC-SW2-PB-FM,HM-LC-SW2-SM,HM-LC-SW2PBU-FM,HM-LC-SW4-BA-PCB,HM-LC-SW4-DR,HM-LC-SW4-DR-2,HM-LC-SW4-PCB,HM-LC-SW4-PCB-2,HM-LC-SW4-SM,HM-LC-SW4-SM-2,HM-LC-SW4-SM-ATMEGA168,HM-LC-SW4-WM,HM-LC-SW4-WM-2,HM-MOD-EM-8,HM-MOD-EM-8BIT,HM-MOD-RE-8,HM-OU-CF-PL,HM-OU-CFM-PL,HM-OU-CFM-TW,HM-OU-CM-PCB,HM-OU-LED16,HM-PB-2-FM,HM-PB-2-WM,HM-PB-2-WM55,HM-PB-2-WM55-2,HM-PB-4-WM,HM-PB-4DIS-WM,HM-PB-4DIS-WM-2,HM-PB-6-WM55,HM-PBI-4-FM,HM-RC-12,HM-RC-12-B,HM-RC-12-SW,HM-RC-19,HM-RC-19-B,HM-RC-19-SW,HM-RC-2-PBU-FM,HM-RC-2-PBU-FM-2,HM-RC-4,HM-RC-4-2,HM-RC-4-3,HM-RC-4-3-D,HM-RC-4-B,HM-RC-8,HM-RC-DIS-H-X-EU,HM-RC-KEY3,HM-RC-KEY3-B,HM-RC-KEY4-2,HM-RC-KEY4-3,HM-RC-P1,HM-RC-SEC3,HM-RC-SEC3-B,HM-RC-SEC4-2,HM-RC-SEC4-3,HM-SCI-3-FM,HM-SEC-CEN,HM-SEC-KEY,HM-SEC-KEY-O,HM-SEC-KEY-S,HM-SEC-MDIR,HM-SEC-MDIR-2,HM-SEC-MDIR-3,HM-SEC-RHS,HM-SEC-RHS-2,HM-SEC-SC,HM-SEC-SC-2,HM-SEC-SCO,HM-SEC-SD,HM-SEC-SD-2,HM-SEC-SFA-SM,HM-SEC-SIR-WM,HM-SEC-TIS,HM-SEC-WDS,HM-SEC-WDS-2,HM-SEC-WIN,HM-SEN-DB-PCB,HM-SEN-EP,HM-SEN-LI-O,HM-SEN-MDIR-O,HM-SEN-MDIR-O-2,HM-SEN-MDIR-O-3,HM-SEN-MDIR-SM,HM-SEN-MDIR-WM55,HM-SEN-RD-O,HM-SEN-WA-OD,HM-SWI-3-FM,HM-SYS-SRP-PL,HM-TC-IT-WM-W-EU,HM-WDC7000,HM-WDS10-TH-O,HM-WDS100-C6-O,HM-WDS100-C6-O-2,HM-WDS20-TH-O,HM-WDS30-OT2-SM,HM-WDS30-OT2-SM-2,HM-WDS30-T-O,HM-WDS40-TH-I,HM-WDS40-TH-I-2,HM-WS550,HM-WS550LCB,HM-WS550LCW,HM-WS550TECH,IS-WDS-TH-OD-S-R3,KFM-DISPLAY,KFM-SENSOR,KS550,KS550LC,KS550TECH,KS888,OLIGO-SMART-IQ-HM,PS-SWITCH,PS-TH-SENS,ROTO_ZEL-STG-RM-DWT-10,ROTO_ZEL-STG-RM-FDK,ROTO_ZEL-STG-RM-FEP-230V,ROTO_ZEL-STG-RM-FFK,ROTO_ZEL-STG-RM-FSA,ROTO_ZEL-STG-RM-FSS-UP3,ROTO_ZEL-STG-RM-FST-UP4,ROTO_ZEL-STG-RM-FWT,ROTO_ZEL-STG-RM-FZS,ROTO_ZEL-STG-RM-FZS-2,ROTO_ZEL-STG-RM-HS-4,ROTO_ZEL-STG-RM-WT-2,S550IA,SCHUECO_263-130,SCHUECO_263-131,SCHUECO_263-132,SCHUECO_263-133,SCHUECO_263-134,SCHUECO_263-135,SCHUECO_263-144,SCHUECO_263-145,SCHUECO_263-146,SCHUECO_263-147,SCHUECO_263-155,SCHUECO_263-157,SCHUECO_263-158,SCHUECO_263-160,SCHUECO_263-162,SCHUECO_263-167,SCHUECO_263-XXX,SENSOTIMER-ST-6,VIRTUAL,WDF-SOLAR,WS888 msgRepeat oldreadings param readOnly:0,1 readingOnDead:multiple,noChange,state,periodValues,periodString,channels rssiLog:1,0 serialNr showtime:1,0 stateFormat:textField-long subType:AlarmControl,KFM100,THSensor,blindActuator,blindActuatorSol,dimmer,display,keyMatic,motionAndBtn,motionDetector,no,outputUnit,powerMeter,powerSensor,pushButton,remote,repeater,rgb,senBright,sensRain,sensor,singleButton,siren,smokeDetector,swi,switch,thermostat,threeStateSensor,timer,tipTronic,virtual,winMatic timestamp-on-change-reading
+   CUL_0_MSGCNT 282
+   CUL_0_RAWMSG A0FB586102E7D490000000A24C70C0040::-71.5:CUL_0
+   CUL_0_RSSI -71.5
+   CUL_0_TIME 2021-09-23 08:11:42
+   DEF        2E7D49
+   FUUID      5c432275-f33f-d171-124b-f71ed029674b65fe
+   IODev      CUL_0
+   LASTInputDev myHmUART
+   MSGCNT     850
+   NAME       Thermostat_WZ_OG
+   NR         123
+   NTFY_ORDER 50-Thermostat_WZ_OG
+   STATE      CMDs_done
+   TYPE       CUL_HM
+   channel_01 Thermostat_WZ_OG_Weather
+   channel_02 Thermostat_WZ_OG_Climate
+   channel_03 Thermostat_WZ_OG_WindowRec
+   channel_04 Thermostat_WZ_OG_Clima
+   channel_05 Thermostat_WZ_OG_ClimaTeam
+   channel_06 Thermostat_WZ_OG_remote
+   disableNotifyFn 1
+   lastMsg    No:B5 - t:10 s:2E7D49 d:000000 0A24C70C0040
+   mapleCUN1_MSGCNT 284
+   mapleCUN1_RAWMSG A0FB586102E7D490000000A24C70C0040::-70:mapleCUN1
+   mapleCUN1_RSSI -70
+   mapleCUN1_TIME 2021-09-23 08:11:42
+   myHmUART_MSGCNT 284
+   myHmUART_RAWMSG 05000042B586102E7D490000000A24C70C0040
+   myHmUART_RSSI -66
+   myHmUART_TIME 2021-09-23 08:11:42
+   protLastRcv 2021-09-23 08:11:42
+   protRcv    284 last_at:2021-09-23 08:11:42
+   rssi_at_CUL_0 cnt:282 min:-94 max:-68 avg:-72.64 lst:-71.5 
+   rssi_at_mapleCUN1 cnt:284 min:-72.5 max:-62 avg:-68.58 lst:-70 
+   rssi_at_myHmUART cnt:284 min:-67 max:-65 avg:-65.6 lst:-66 
+   .attraggr:
+   .attrminint:
+   Helper:
+     DBLOG:
+       Activity:
+         LogDB:
+           TIME       1632334400.84036
+           VALUE      alive
+       actuator:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      0
+       battery:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      ok
+       batteryLevel:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      2.7
+       desired-temp:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      off
+       measured-temp:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      19.9
+       motorErr:
+         LogDB:
+           TIME       1632377502.60802
+           VALUE      ok
+   READINGS:
+     1900-01-01 00:00:01   .D-devInfo      00FFFF
+     1900-01-01 00:00:01   .D-stc          59
+     2021-09-22 20:03:08   .R-btnLock      off
+     2021-09-22 20:03:08   .R-globalBtnLock off
+     2021-09-22 20:03:08   .R-localResDis  off
+     2021-09-22 20:03:08   .R-lowBatLimitRT 2.1 V
+     2021-09-22 20:03:08   .R-modusBtnLock off
+     2021-09-22 20:03:25   .associatedWith Thermostat_WZ_OG,Thermostat_WZ_OG_Clima,Thermostat_WZ_OG_ClimaTeam,Thermostat_WZ_OG_Climate,Thermostat_WZ_OG_Weather,Thermostat_WZ_OG_WindowRec,Thermostat_WZ_OG_remote,Thermostat_WZ_OG
+     2021-09-23 08:11:42   .protLastRcv    20210923081142
+     2021-09-22 20:13:20   Activity        alive
+     2021-09-06 13:09:31   CommandAccepted yes
+     from archivexx        D-firmware      1.5
+     from archivexx        D-serialNr      LEQ0847917
+     2021-09-22 20:03:22   IODev           CUL_0
+     2020-11-25 20:19:33   PairedTo        0x425EE2
+     2021-09-22 20:03:08   R-backOnTime    10 s
+     2021-09-22 20:03:08   R-burstRx       on
+     2021-09-22 20:03:08   R-cyclicInfoMsg on
+     2021-09-22 20:03:08   R-cyclicInfoMsgDis 0
+     2021-09-22 20:03:08   R-pairCentral   0x425EE2
+     2020-11-25 20:19:33   RegL_00.        00:00 01:01 02:01 09:01 0A:42 0B:5E 0C:E2 0E:0A 0F:00 11:00 12:15 16:00 18:00 19:00 1A:00 
+     2020-11-25 23:59:55   RegL_07.        
+     2021-09-23 08:11:42   actuator        0
+     2021-09-23 08:11:42   battery         ok
+     2021-09-23 08:11:42   batteryLevel    2.7
+     2021-09-22 20:03:12   cfgState        ok
+     2021-09-22 10:49:58   commState       CMDs_done
+     2021-09-23 08:11:42   desired-temp    off
+     2021-09-23 08:11:42   measured-temp   19.9
+     2021-09-23 08:11:42   motorErr        ok
+     2020-11-25 20:17:07   powerOn         2020-11-25 20:17:07
+     2020-11-25 20:17:07   recentStateType info
+     2021-09-22 10:49:58   state           CMDs_done
+     2021-09-22 10:49:58   time-request    -
+   helper:
+     HM_CMDNR   181
+     cfgStateUpdt 0
+     lastMsgTm  1632377502.60078
+     mId        0095
+     peerFriend -
+     peerOpt    -:thermostat
+     regLst     0
+     rxType     140
+     supp_Pair_Rep 0
+     tmplChg    0
+     cmds:
+       TmplKey    :1632333785:1632333805.43978
+       TmplTs     1632333805.43978
+       cmdKey     0:1:0::Thermostat_WZ_OG:0095:01:
+       cmdLst:
+         assignHmKey noArg
+         burstXmit  noArg
+         clear      [(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]
+         deviceRename -newName-
+         fwUpdate   -filename- [-bootTime-]
+         getConfig  noArg
+         getDevInfo noArg
+         getRegRaw  (List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]
+         inhibit    [(on|{off})]
+         raw        -data- [...]
+         regBulk    -list-.-peerChn- -addr1:data1- [-addr2:data2-]...
+         regSet     [(prep|{exec})] -regName- -value- [-peerChn-]
+         reset      noArg
+         sysTime    noArg
+         tplDel     -tplDel-
+         tplSet_0   -tplChan-
+         unpair     noArg
+       lst:
+         condition  slider,0,1,255
+         peer       
+         peerOpt    
+         tplChan    
+         tplDel     
+         tplPeer    
+       rtrvLst:
+         cmdList    [({short}|long)]
+         deviceInfo [({short}|long)]
+         list       [({normal}|full)]
+         param      -param-
+         reg        -addr- -list- [-peerChn-]
+         regList    noArg
+         regTable   noArg
+         regVal     -addr- -list- [-peerChn-]
+         saveConfig [-filename-]
+         tplInfo    noArg
+     expert:
+       def        1
+       det        0
+       raw        1
+       tpl        0
+     io:
+       flgs       0
+       newChn     +2E7D49,00,00,00
+       nextSend   1632377502.69981
+       rxt        2
+       vccu       VCCU
+       p:
+         2E7D49
+         00
+         00
+         00
+       prefIO:
+     mRssi:
+       mNo        B5
+       io:
+         CUL_0:
+           -69.5
+           -69.5
+         mapleCUN1:
+           -70
+           -70
+         myHmUART:
+           -66
+           -66
+     peerIDsH:
+     prt:
+       bErr       0
+       sProc      0
+     q:
+       qReqConf   
+       qReqStat   
+     role:
+       dev        1
+       prs        1
+     rssi:
+       at_CUL_0:
+         avg        -72.6418439716312
+         cnt        282
+         lst        -71.5
+         max        -68
+         min        -94
+       at_mapleCUN1:
+         avg        -68.5845070422535
+         cnt        284
+         lst        -70
+         max        -62
+         min        -72.5
+       at_myHmUART:
+         avg        -65.6091549295775
+         cnt        284
+         lst        -66
+         max        -65
+         min        -67
+     shRegW:
+       07         04
+     tmpl:
+Attributes:
+   .mId       0095
+   IOgrp      VCCU
+   actCycle   000:10
+   actStatus  alive
+   autoReadReg 4_reqStatus
+   expert     defReg,rawReg
+   firmware   1.5
+   group      Heizung
+   icon       hm-cc-rt-dn
+   model      HM-CC-RT-DN
+   room       Steuerung->Heizung
+   serialNr   LEQ0847917
+   subType    thermostat
+   webCmd     getConfig:clear msgEvents:burstXmit
+
+
+   
+Internals:
+   .AttrList  aesCommReq:1,0 do_not_notify:1,0 event-aggregator event-min-interval event-on-change-reading event-on-update-reading expert:multiple,defReg,allReg,rawReg,templ,none levelMap levelRange model oldreadings param peerIDs readOnly:0,1 showtime:1,0 stateFormat:textField-long tempListTmpl:none,defaultWeekplan,Bad_OG,Buero,Buero_Ferien,Chillraum,Chillraum_Gast,Esszimmer,Esszimmer_Ferien,Flur,Kinder_Ferien,Lina,Lucie_hinten,Lucie_vorne,Nelly,Schlafzimmer,Wohnzimmer,Wohnzimmer_Ferien,Zentrale_Esszimmer timestamp-on-change-reading
+   DEF        2E7A9B04
+   FUUID      5c432275-f33f-d171-d63c-5ddeefa13a9d071b
+   NAME       Thermostat_Wohnzimmer_SSW_Clima
+   NR         85
+   NTFY_ORDER 50-Thermostat_Wohnzimmer_SSW_Clima
+   STATE      T: 21.9 desired: off valve: 0
+   TYPE       CUL_HM
+   chanNo     04
+   device     Thermostat_Wohnzimmer_SSW
+   disableNotifyFn 1
+   peerList   Thermostat_Wohnzimmer_SSO_ClimaTeam
+   .attraggr:
+   .attrminint:
+   Helper:
+     DBLOG:
+       ValvePosition:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      0
+       boostTime:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      -
+       controlMode:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      manual
+       desired-temp:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      off
+       measured-temp:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      21.9
+       partyEnd:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      -
+       partyStart:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      -
+       partyTemp:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      -
+       state:
+         LogDB:
+           TIME       1632377526.63485
+           VALUE      T: 21.9 desired: off valve: 0
+   READINGS:
+     2021-09-22 20:03:09   .R-boostPeriod  5 min
+     2021-09-22 20:03:09   .R-decalcTime   11:00
+     2021-09-22 20:03:09   .R-decalcWeekday Sat
+     2021-09-22 20:03:09   .R-reguExtI     15
+     2021-09-22 20:03:09   .R-reguExtP     30
+     2021-09-22 20:03:09   .R-reguExtPstart 30
+     2021-09-22 20:03:09   .R-reguIntI     18
+     2021-09-22 20:03:09   .R-reguIntP     33
+     2021-09-22 20:03:09   .R-reguIntPstart 45
+     2021-09-22 20:03:09   .R-showWeekday  off
+     2021-09-22 20:03:09   .R-tempMax      24.5 C
+     2021-09-22 20:03:09   .R-tempMin      4.5 C
+     2021-09-22 20:03:09   .R-valveErrPos  15 %
+     2021-09-22 20:03:09   .R-valveMaxPos  100 %
+     2021-09-22 20:03:09   .R-winOpnDetFall 1.4 K
+     2021-09-22 20:03:09   .R-winOpnMode   off
+     2021-09-22 20:03:09   .R-winOpnPeriod 15 min
+     2021-09-22 20:03:09   .R-winOpnTempI  12 C
+     2021-09-22 20:03:25   .associatedWith Thermostat_Wohnzimmer_ClimaTeam,Thermostat_Wohnzimmer_SSW,Thermostat_Wohnzimmer_SSW_Clima,Thermostat_Wohnzimmer_SSW_Climate,Thermostat_Wohnzimmer_SSW_Weather,Thermostat_Wohnzimmer_SSW_WindowRec,Thermostat_Wohnzimmer_SSW_remote,Thermostat_Wohnzimmer_SSW,Thermostat_Wohnzimmer_SSO_ClimaTeam
+     2021-02-14 17:25:42   .peerListRDate  2021-02-14 17:25:42
+     2021-08-24 23:57:23   CommandAccepted yes
+     2021-09-22 20:03:09   R-boostPos      80 %
+     2021-09-22 20:03:09   R-btnNoBckLight off
+     2021-09-22 20:03:09   R-dayTemp       22.5 C
+     2021-09-22 20:03:09   R-daylightSaveTime on
+     2021-09-22 20:03:09   R-modePrioManu  all
+     2021-09-22 20:03:09   R-modePrioParty all
+     2021-09-22 20:03:09   R-nightTemp     19 C
+     2021-09-22 20:03:09   R-noMinMax4Manu off
+     2021-09-22 20:03:09   R-regAdaptive   on
+     2021-09-22 20:03:09   R-showInfo      time
+     2021-09-22 20:03:09   R-sign          off
+     2021-09-22 20:03:09   R-tempOffset    0.0K
+     2021-09-22 20:03:09   R-valveOffsetRt 0 %
+     2021-09-22 20:03:09   R-winOpnBoost   off
+     2021-09-22 20:03:09   R_0_tempListSat  06:30 19.0 07:30 20.0 09:00 21.0 22:30 22.0 24:00 20.0
+     2021-09-22 20:03:09   R_1_tempListSun  06:30 19.0 07:30 20.0 09:00 21.0 22:30 22.5 24:00 20.0
+     2021-09-22 20:03:09   R_2_tempListMon  05:30 19.5 08:00 22.5 12:30 21.0 18:00 22.0 22:00 21.5 24:00 19.5
+     2021-09-22 20:03:09   R_3_tempListTue  05:30 19.5 08:00 22.5 12:30 21.0 18:00 22.0 22:00 21.5 24:00 19.5
+     2021-09-22 20:03:09   R_4_tempListWed  05:30 19.5 08:00 22.5 12:30 21.0 18:00 22.0 22:00 21.5 24:00 19.5
+     2021-09-22 20:03:09   R_5_tempListThu  05:30 19.5 08:00 22.5 12:30 21.0 18:00 22.0 22:00 21.5 24:00 19.5
+     2021-09-22 20:03:09   R_6_tempListFri  05:30 19.5 08:00 22.5 12:30 21.0 18:00 22.0 22:30 21.5 24:00 19.5
+     2021-09-22 20:03:09   R_tempList_State verified
+     2021-01-19 20:36:33   RegL_01.        00:00 08:00 
+     2021-01-19 20:36:37   RegL_07.        00:00 01:2D 02:26 03:09 04:31 05:18 06:03 07:00 08:16 09:07 0A:30 0B:00 0C:64 0D:0F 0E:05 0F:00 10:00 11:00 12:09 13:0E 14:4C 15:4E 16:50 17:5A 18:54 19:6C 1A:59 1B:0E 1C:51 1D:20 1E:45 1F:20 20:45 21:20 22:45 23:20 24:45 25:20 26:45 27:20 28:45 29:20 2A:45 2B:20 2C:45 2D:20 2E:4C 2F:4E 30:50 31:5A 32:54 33:6C 34:5B 35:0E 36:51 37:20 38:45 39:20 3A:45 3B:20 3C:45 3D:20 3E:45 3F:20 40:45 41:20 42:45 43:20 44:45 45:20 46:45 47:20 48:4E 49:42 4A:5A 4B:60 4C:54 4D:96 4E:58 4F:D8 50:57 51:08 52:4F 53:20 54:45 55:20 56:45 57:20 58:45 59:20 5A:45 5B:20 5C:45 5D:20 5E:45 5F:20 60:45 61:20 62:4E 63:42 64:5A 65:60 66:54 67:96 68:58 69:D8 6A:57 6B:08 6C:4F 6D:20 6E:45 6F:20 70:45 71:20 72:45 73:20 74:45 75:20 76:45 77:20 78:45 79:20 7A:45 7B:20 7C:4E 7D:42 7E:5A 7F:60 80:54 81:96 82:58 83:D8 84:57 85:08 86:4F 87:20 88:45 89:20 8A:45 8B:20 8C:45 8D:20 8E:45 8F:20 90:45 91:20 92:45 93:20 94:45 95:20 96:4E 97:42 98:5A 99:60 9A:54 9B:96 9C:58 9D:D8 9E:57 9F:08 A0:4F A1:20 A2:45 A3:20 A4:45 A5:20 A6:45 A7:20 A8:45 A9:20 AA:45 AB:20 AC:45 AD:20 AE:45 AF:20 B0:4E B1:42 B2:5A B3:60 B4:54 B5:96 B6:58 B7:D8 B8:57 B9:0E BA:4F BB:20 BC:45 BD:20 BE:45 BF:20 C0:45 C1:20 C2:45 C3:20 C4:45 C5:20 C6:45 C7:20 C8:45 C9:20 CA:12 CB:21 CC:2D CD:0F CE:1E CF:1E 
+     2021-09-23 08:12:06   ValvePosition   0
+     2021-09-23 08:12:06   boostTime       -
+     2021-09-22 20:03:12   cfgState        PeerIncom
+     2021-09-22 17:40:33   commState       CMDs_done
+     2021-09-23 08:12:06   controlMode     manual
+     2021-09-23 08:12:06   desired-temp    off
+     2021-09-23 08:12:06   measured-temp   21.9
+     2021-09-23 08:12:06   partyEnd        -
+     2021-09-23 08:12:06   partyStart      -
+     2021-09-23 08:12:06   partyTemp       -
+     2021-09-22 20:03:25   peerList        Thermostat_Wohnzimmer_SSO_ClimaTeam
+     2021-08-24 23:57:23   recentStateType ack
+     2021-09-23 08:12:06   state           T: 21.9 desired: off valve: 0
+     2021-09-22 20:10:54   tempTmplSet     none
+     2021-08-23 23:55:56   trigLast        fhem:81
+   helper:
+     peerFriend peerRTteam2
+     peerIDsState complete
+     peerOpt    p:thermostat
+     regLst     1,7
+     tmplChg    0
+     cfgChk:
+       idPz00     fail
+     cmds:
+       TmplKey    Thermostat_Wohnzimmer_SSO_ClimaTeam:1632333785:1632333805.71002
+       TmplTs     1632333805.71002
+       cmdKey     1:0:0::Thermostat_Wohnzimmer_SSW:0095:04:Thermostat_Wohnzimmer_SSO_ClimaTeam
+       cmdLst:
+         burstXmit  noArg
+         clear      [(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]
+         controlManu (on|off|5.0..30.0;0.5)
+         controlMode (auto|manual|boost|day|night)
+         controlParty -temp- -startDate- -startTime- -endDate- -endTime-
+         desired-temp (on|off|5.0..30.0;0.5)
+         getConfig  noArg
+         getRegRaw  (List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]
+         inhibit    [(on|{off})]
+         peerBulk   -peer1,peer2,...- [({set}|unset)]
+         peerSmart  -peerOpt-
+         regBulk    -list-.-peerChn- -addr1:data1- [-addr2:data2-]...
+         regSet     [(prep|{exec})] -regName- -value- [-peerChn-]
+         sign       [(on|{off})]
+         sysTime    noArg
+         tempListFri [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListMon [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListSat [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListSun [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListThu [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListTmpl [({verify}|restore)] [[-file-:]-templateName-]
+         tempListTue [(prep|{exec})] -HH:MM- -temp- [...]
+         tempListWed [(prep|{exec})] -HH:MM- -temp- [...]
+         tempTmplSet -tempTmpl-
+         tplDel     -tplDel-
+         tplSet_0   -tplChan-
+         tplSet_Thermostat_Wohnzimmer_SSO_ClimaTeam -tplPeer-
+       lst:
+         condition  slider,0,1,255
+         peer       Thermostat_Wohnzimmer_SSO_ClimaTeam
+         peerOpt    Thermostat_Bad_OG_ClimaTeam,Thermostat_Buero_ClimaTeam,Thermostat_Chillraum_ClimaTeam,Thermostat_Esszimmer_Gang_ClimaTeam,Thermostat_Esszimmer_Wand_ClimaTeam,Thermostat_Flur_ClimaTeam,Thermostat_Kind1_ClimaTeam,Thermostat_Lucie_hinten_ClimaTeam,Thermostat_Lucie_vorne_ClimaTeam,Thermostat_Schlafzimmer_ClimaTeam,Thermostat_WZ_OG_ClimaTeam,Thermostat_Wohnzimmer_ClimaTeam,Thermostat_Wohnzimmer_SSO_ClimaTeam
+         tplChan    
+         tplDel     
+         tplPeer    
+       rtrvLst:
+         cmdList    [({short}|long)]
+         deviceInfo [({short}|long)]
+         list       [({normal}|full)]
+         param      -param-
+         reg        -addr- -list- [-peerChn-]
+         regList    noArg
+         regTable   noArg
+         regVal     -addr- -list- [-peerChn-]
+         saveConfig [-filename-]
+         tplInfo    noArg
+     expert:
+       def        1
+       det        0
+       raw        1
+       tpl        0
+     peerIDsH:
+       00000000   broadcast
+       2E832C05   Thermostat_Wohnzimmer_SSO_ClimaTeam
+     role:
+       chn        1
+     shRegR:
+       07         00
+     shadowReg:
+     tmpl:
+Attributes:
+   alias      HK Wohnen SSW
+   devStateIcon {devStateIcon_Clima($name)}
+   genericDeviceType thermostat
+   group      Heizung
+   icon       hm-cc-rt-dn
+   model      HM-CC-RT-DN
+   peerIDs    00000000,2E832C05
+   rhasspyName heizkörper südwest
+   rhasspyRoom wohnzimmer
+   room       Steuerung->Heizung,Wohnzimmer
+   tempListTmpl none
+   userattr   weekprofile
+   webCmd     desired-temp
+   weekprofile Wohnzimmer
+   widgetOverride desired-temp:knob,min:4.5,max:31.5,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+
+
+   Internals:
+   .AttrList  .devInfo .mId .stc IODev IOgrp actCycle actStatus aesCommReq:1,0 aesKey:5,4,3,2,1,0 autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly burstAccess:0_off,1_auto commStInCh:on,off do_not_notify:1,0 dummy:1,0 event-aggregator event-min-interval event-on-change-reading event-on-update-reading expert:multiple,defReg,allReg,rawReg,templ,none firmware hmKey hmKey2 hmKey3 hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ignore:1,0 model modelForce:ACTIONDETECTOR,ACTIONDETECTOR,ASH550,ASH550I,CCU-FHEM,CMM,DORMA_ATENT,DORMA_BRC-H,DORMA_RC-H,HM-CC-RT-DN,HM-CC-RT-DN-BOM,HM-CC-SCD,HM-CC-TC,HM-CC-VD,HM-DIS-EP-WM55,HM-DIS-TD-T,HM-DIS-WM55,HM-DW-WM,HM-ES-PMSW1-DR,HM-ES-PMSW1-PL,HM-ES-PMSW1-PL-DN-R1,HM-ES-PMSW1-PL-DN-R2,HM-ES-PMSW1-PL-DN-R3,HM-ES-PMSW1-PL-DN-R4,HM-ES-PMSW1-PL-DN-R5,HM-ES-PMSW1-SM,HM-ES-TX-WM,HM-HM-LC-DW-WM,HM-LC-AO-SM,HM-LC-BL1-FM,HM-LC-BL1-FM-2,HM-LC-BL1-PB-FM,HM-LC-BL1-SM,HM-LC-BL1-SM-2,HM-LC-BL1PBU-FM,HM-LC-DDC1-PCB,HM-LC-DIM1L-CV,HM-LC-DIM1L-CV-2,HM-LC-DIM1L-CV-644,HM-LC-DIM1L-PL,HM-LC-DIM1L-PL-2,HM-LC-DIM1L-PL-3,HM-LC-DIM1L-PL-644,HM-LC-DIM1PWM-CV,HM-LC-DIM1PWM-CV-2,HM-LC-DIM1T-CV,HM-LC-DIM1T-CV-2,HM-LC-DIM1T-CV-644,HM-LC-DIM1T-DR,HM-LC-DIM1T-FM,HM-LC-DIM1T-FM-2,HM-LC-DIM1T-FM-644,HM-LC-DIM1T-FM-LF,HM-LC-DIM1T-PL,HM-LC-DIM1T-PL-2,HM-LC-DIM1T-PL-3,HM-LC-DIM1T-PL-644,HM-LC-DIM1TPBU-FM,HM-LC-DIM1TPBU-FM-2,HM-LC-DIM2L-CV,HM-LC-DIM2L-SM,HM-LC-DIM2L-SM-2,HM-LC-DIM2L-SM-644,HM-LC-DIM2T-SM,HM-LC-DIM2T-SM,HM-LC-DIM2T-SM-2,HM-LC-JA1PBU-FM,HM-LC-RGBW-WM,HM-LC-SW1-BA-PCB,HM-LC-SW1-DR,HM-LC-SW1-FM,HM-LC-SW1-FM-2,HM-LC-SW1-PB-FM,HM-LC-SW1-PCB,HM-LC-SW1-PL,HM-LC-SW1-PL-3,HM-LC-SW1-PL-CT-R1,HM-LC-SW1-PL-CT-R2,HM-LC-SW1-PL-CT-R3,HM-LC-SW1-PL-CT-R4,HM-LC-SW1-PL-CT-R5,HM-LC-SW1-PL-DN-R1,HM-LC-SW1-PL-DN-R2,HM-LC-SW1-PL-DN-R3,HM-LC-SW1-PL-DN-R4,HM-LC-SW1-PL-DN-R5,HM-LC-SW1-PL-OM54,HM-LC-SW1-PL2,HM-LC-SW1-SM,HM-LC-SW1-SM-2,HM-LC-SW1-SM-ATMEGA168,HM-LC-SW1PBU-FM,HM-LC-SW2-DR,HM-LC-SW2-DR-2,HM-LC-SW2-FM,HM-LC-SW2-FM-2,HM-LC-SW2-PB-FM,HM-LC-SW2-SM,HM-LC-SW2PBU-FM,HM-LC-SW4-BA-PCB,HM-LC-SW4-DR,HM-LC-SW4-DR-2,HM-LC-SW4-PCB,HM-LC-SW4-PCB-2,HM-LC-SW4-SM,HM-LC-SW4-SM-2,HM-LC-SW4-SM-ATMEGA168,HM-LC-SW4-WM,HM-LC-SW4-WM-2,HM-MOD-EM-8,HM-MOD-EM-8BIT,HM-MOD-RE-8,HM-OU-CF-PL,HM-OU-CFM-PL,HM-OU-CFM-TW,HM-OU-CM-PCB,HM-OU-LED16,HM-PB-2-FM,HM-PB-2-WM,HM-PB-2-WM55,HM-PB-2-WM55-2,HM-PB-4-WM,HM-PB-4DIS-WM,HM-PB-4DIS-WM-2,HM-PB-6-WM55,HM-PBI-4-FM,HM-RC-12,HM-RC-12-B,HM-RC-12-SW,HM-RC-19,HM-RC-19-B,HM-RC-19-SW,HM-RC-2-PBU-FM,HM-RC-2-PBU-FM-2,HM-RC-4,HM-RC-4-2,HM-RC-4-3,HM-RC-4-3-D,HM-RC-4-B,HM-RC-8,HM-RC-DIS-H-X-EU,HM-RC-KEY3,HM-RC-KEY3-B,HM-RC-KEY4-2,HM-RC-KEY4-3,HM-RC-P1,HM-RC-SEC3,HM-RC-SEC3-B,HM-RC-SEC4-2,HM-RC-SEC4-3,HM-SCI-3-FM,HM-SEC-CEN,HM-SEC-KEY,HM-SEC-KEY-O,HM-SEC-KEY-S,HM-SEC-MDIR,HM-SEC-MDIR-2,HM-SEC-MDIR-3,HM-SEC-RHS,HM-SEC-RHS-2,HM-SEC-SC,HM-SEC-SC-2,HM-SEC-SCO,HM-SEC-SD,HM-SEC-SD-2,HM-SEC-SFA-SM,HM-SEC-SIR-WM,HM-SEC-TIS,HM-SEC-WDS,HM-SEC-WDS-2,HM-SEC-WIN,HM-SEN-DB-PCB,HM-SEN-EP,HM-SEN-LI-O,HM-SEN-MDIR-O,HM-SEN-MDIR-O-2,HM-SEN-MDIR-O-3,HM-SEN-MDIR-SM,HM-SEN-MDIR-WM55,HM-SEN-RD-O,HM-SEN-WA-OD,HM-SWI-3-FM,HM-SYS-SRP-PL,HM-TC-IT-WM-W-EU,HM-WDC7000,HM-WDS10-TH-O,HM-WDS100-C6-O,HM-WDS100-C6-O-2,HM-WDS20-TH-O,HM-WDS30-OT2-SM,HM-WDS30-OT2-SM-2,HM-WDS30-T-O,HM-WDS40-TH-I,HM-WDS40-TH-I-2,HM-WS550,HM-WS550LCB,HM-WS550LCW,HM-WS550TECH,IS-WDS-TH-OD-S-R3,KFM-DISPLAY,KFM-SENSOR,KS550,KS550LC,KS550TECH,KS888,OLIGO-SMART-IQ-HM,PS-SWITCH,PS-TH-SENS,ROTO_ZEL-STG-RM-DWT-10,ROTO_ZEL-STG-RM-FDK,ROTO_ZEL-STG-RM-FEP-230V,ROTO_ZEL-STG-RM-FFK,ROTO_ZEL-STG-RM-FSA,ROTO_ZEL-STG-RM-FSS-UP3,ROTO_ZEL-STG-RM-FST-UP4,ROTO_ZEL-STG-RM-FWT,ROTO_ZEL-STG-RM-FZS,ROTO_ZEL-STG-RM-FZS-2,ROTO_ZEL-STG-RM-HS-4,ROTO_ZEL-STG-RM-WT-2,S550IA,SCHUECO_263-130,SCHUECO_263-131,SCHUECO_263-132,SCHUECO_263-133,SCHUECO_263-134,SCHUECO_263-135,SCHUECO_263-144,SCHUECO_263-145,SCHUECO_263-146,SCHUECO_263-147,SCHUECO_263-155,SCHUECO_263-157,SCHUECO_263-158,SCHUECO_263-160,SCHUECO_263-162,SCHUECO_263-167,SCHUECO_263-XXX,SENSOTIMER-ST-6,VIRTUAL,WDF-SOLAR,WS888 msgRepeat oldreadings param readOnly:0,1 readingOnDead:multiple,noChange,state,periodValues,periodString,channels rssiLog:1,0 serialNr showtime:1,0 stateFormat:textField-long subType:AlarmControl,KFM100,THSensor,blindActuator,blindActuatorSol,dimmer,display,keyMatic,motionAndBtn,motionDetector,no,outputUnit,powerMeter,powerSensor,pushButton,remote,repeater,rgb,senBright,sensRain,sensor,singleButton,siren,smokeDetector,swi,switch,thermostat,threeStateSensor,timer,tipTronic,virtual,winMatic timestamp-on-change-reading
+   CUL_0_MSGCNT 283
+   CUL_0_RAWMSG A0FB986102E7A9B0000000A24DB0C0040::-58.5:CUL_0
+   CUL_0_RSSI -58.5
+   CUL_0_TIME 2021-09-23 08:12:06
+   DEF        2E7A9B
+   FUUID      5c432275-f33f-d171-6897-f39cc59ddb494c7b
+   IODev      CUL_0
+   LASTInputDev CUL_0
+   MSGCNT     849
+   NAME       Thermostat_Wohnzimmer_SSW
+   NR         81
+   NTFY_ORDER 50-Thermostat_Wohnzimmer_SSW
+   STATE      CMDs_done
+   TYPE       CUL_HM
+   channel_01 Thermostat_Wohnzimmer_SSW_Weather
+   channel_02 Thermostat_Wohnzimmer_SSW_Climate
+   channel_03 Thermostat_Wohnzimmer_SSW_WindowRec
+   channel_04 Thermostat_Wohnzimmer_SSW_Clima
+   channel_05 Thermostat_Wohnzimmer_ClimaTeam
+   channel_06 Thermostat_Wohnzimmer_SSW_remote
+   disableNotifyFn 1
+   lastMsg    No:B9 - t:10 s:2E7A9B d:000000 0A24DB0C0040
+   mapleCUN1_MSGCNT 284
+   mapleCUN1_RAWMSG A0FB986102E7A9B0000000A24DB0C0040::-43.5:mapleCUN1
+   mapleCUN1_RSSI -43.5
+   mapleCUN1_TIME 2021-09-23 08:12:06
+   myHmUART_MSGCNT 282
+   myHmUART_RAWMSG 05000045B986102E7A9B0000000A24DB0C0040
+   myHmUART_RSSI -69
+   myHmUART_TIME 2021-09-23 08:12:06
+   protLastRcv 2021-09-23 08:12:06
+   protRcv    284 last_at:2021-09-23 08:12:06
+   rssi_at_CUL_0 cnt:283 min:-62 max:-55 avg:-58.93 lst:-58.5 
+   rssi_at_mapleCUN1 cnt:284 min:-44 max:-42.5 avg:-43.49 lst:-43.5 
+   rssi_at_myHmUART cnt:282 min:-73 max:-65 avg:-67.73 lst:-69 
+   .attraggr:
+   .attrminint:
+   Helper:
+     DBLOG:
+       Activity:
+         LogDB:
+           TIME       1632334400.82208
+           VALUE      alive
+       actuator:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      0
+       battery:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      ok
+       batteryLevel:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      2.7
+       desired-temp:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      off
+       measured-temp:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      21.9
+       motorErr:
+         LogDB:
+           TIME       1632377526.62989
+           VALUE      ok
+   READINGS:
+     1900-01-01 00:00:01   .D-devInfo      00FFFF
+     1900-01-01 00:00:01   .D-stc          59
+     2021-09-22 20:03:05   .R-btnLock      off
+     2021-09-22 20:03:05   .R-globalBtnLock off
+     2021-09-22 20:03:05   .R-localResDis  off
+     2021-09-22 20:03:05   .R-lowBatLimitRT 2.1 V
+     2021-09-22 20:03:05   .R-modusBtnLock off
+     2021-09-22 20:03:25   .associatedWith Thermostat_Wohnzimmer_ClimaTeam,Thermostat_Wohnzimmer_SSW,Thermostat_Wohnzimmer_SSW_Clima,Thermostat_Wohnzimmer_SSW_Climate,Thermostat_Wohnzimmer_SSW_Weather,Thermostat_Wohnzimmer_SSW_WindowRec,Thermostat_Wohnzimmer_SSW_remote,Thermostat_Wohnzimmer_SSW
+     2021-09-23 08:12:06   .protLastRcv    20210923081206
+     2021-09-22 20:13:20   Activity        alive
+     2021-09-21 20:42:33   CommandAccepted yes
+     from archivexx        D-firmware      1.5
+     from archivexx        D-serialNr      LEQ0848601
+     2021-09-22 20:03:23   IODev           CUL_0
+     2021-02-14 17:25:40   PairedTo        0x425EE2
+     2021-09-22 20:03:05   R-backOnTime    10 s
+     2021-09-22 20:03:05   R-burstRx       on
+     2021-09-22 20:03:05   R-cyclicInfoMsg on
+     2021-09-22 20:03:05   R-cyclicInfoMsgDis 0
+     2021-09-22 20:03:05   R-pairCentral   0x425EE2
+     2021-01-19 20:36:31   RegL_00.        00:00 01:01 02:01 09:01 0A:42 0B:5E 0C:E2 0E:0A 0F:00 11:00 12:15 16:00 18:00 19:00 1A:00 
+     2021-02-14 23:59:55   RegL_07.        
+     2021-09-23 08:12:06   actuator        0
+     2021-09-23 08:12:06   battery         ok
+     2021-09-23 08:12:06   batteryLevel    2.7
+     2021-09-22 20:03:12   cfgState        ok
+     2021-09-22 17:40:33   commState       CMDs_done
+     2021-09-17 22:00:48   controlMode     manual
+     2021-09-23 08:12:06   desired-temp    off
+     2021-09-23 08:12:06   measured-temp   21.9
+     2021-09-23 08:12:06   motorErr        ok
+     2021-02-14 17:20:21   powerOn         2021-02-14 17:20:21
+     2021-02-14 17:20:21   recentStateType info
+     2021-09-22 17:40:33   state           CMDs_done
+     2021-09-22 17:40:33   time-request    -
+   helper:
+     HM_CMDNR   185
+     cfgStateUpdt 0
+     lastMsgTm  1632377526.62678
+     mId        0095
+     peerFriend -
+     peerOpt    -:thermostat
+     regLst     0
+     rxType     140
+     supp_Pair_Rep 0
+     tmplChg    0
+     cmds:
+       TmplKey    :1632333785:1632333805.63702
+       TmplTs     1632333805.63702
+       cmdKey     0:1:0::Thermostat_Wohnzimmer_SSW:0095:01:
+       cmdLst:
+         assignHmKey noArg
+         burstXmit  noArg
+         clear      [(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]
+         deviceRename -newName-
+         fwUpdate   -filename- [-bootTime-]
+         getConfig  noArg
+         getDevInfo noArg
+         getRegRaw  (List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]
+         inhibit    [(on|{off})]
+         raw        -data- [...]
+         regBulk    -list-.-peerChn- -addr1:data1- [-addr2:data2-]...
+         regSet     [(prep|{exec})] -regName- -value- [-peerChn-]
+         reset      noArg
+         sysTime    noArg
+         tplDel     -tplDel-
+         unpair     noArg
+       lst:
+         condition  slider,0,1,255
+         peer       
+         peerOpt    
+         tplChan    
+         tplDel     
+         tplPeer    
+       rtrvLst:
+         cmdList    [({short}|long)]
+         deviceInfo [({short}|long)]
+         list       [({normal}|full)]
+         param      -param-
+         reg        -addr- -list- [-peerChn-]
+         regList    noArg
+         regTable   noArg
+         regVal     -addr- -list- [-peerChn-]
+         saveConfig [-filename-]
+         tplInfo    noArg
+     expert:
+       def        1
+       det        0
+       raw        1
+       tpl        0
+     io:
+       flgs       0
+       newChn     +2E7A9B,00,00,00
+       nextSend   1632377526.72647
+       rxt        2
+       vccu       VCCU
+       p:
+         2E7A9B
+         00
+         00
+         00
+       prefIO:
+     mRssi:
+       mNo        B9
+       io:
+         CUL_0:
+           -52.5
+           -52.5
+         mapleCUN1:
+           -43.5
+           -43.5
+         myHmUART:
+           -69
+           -69
+     peerIDsH:
+     prt:
+       bErr       0
+       sProc      0
+     q:
+       qReqConf   
+       qReqStat   
+     role:
+       dev        1
+       prs        1
+     rssi:
+       at_CUL_0:
+         avg        -58.9381625441696
+         cnt        283
+         lst        -58.5
+         max        -55
+         min        -62
+       at_mapleCUN1:
+         avg        -43.4982394366197
+         cnt        284
+         lst        -43.5
+         max        -42.5
+         min        -44
+       at_myHmUART:
+         avg        -67.7375886524823
+         cnt        282
+         lst        -69
+         max        -65
+         min        -73
+     shRegW:
+       07         04
+     tmpl:
+Attributes:
+   .mId       0095
+   IOgrp      VCCU
+   actCycle   000:10
+   actStatus  alive
+   autoReadReg 4_reqStatus
+   expert     defReg,rawReg
+   firmware   1.5
+   group      Heizung
+   icon       hm-cc-rt-dn
+   model      HM-CC-RT-DN
+   room       Steuerung->Heizung
+   serialNr   LEQ0848601
+   subType    thermostat
+   webCmd     getConfig:clear msgEvents:burstXmit
+
