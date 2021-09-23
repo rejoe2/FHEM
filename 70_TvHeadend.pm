@@ -1,11 +1,14 @@
-#based on https://forum.fhem.de/index.php/topic,85932.0.html
+# based on https://forum.fhem.de/index.php/topic,85932.0.html
+# https://github.com/Quantum1337/70_Tvheadend.pm
+# tvheadend api is available at https://github.com/dave-p/TVH-API-docs/wiki
+# $Id: 70_TvHeadend.pm 2021-09-23 Beta-User$
 
 package TvHeadend; ##no critic qw(Package)
 
 use strict;
 use warnings;
 use Carp qw(carp);
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Encode;
 use HttpUtils;
 use utf8;
@@ -14,73 +17,46 @@ use POSIX qw(strftime);
 use GPUtils qw(:all);
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
-sub ::Tvheadend_Initialize { goto &Initialize }
-#my $state = 0;
+sub ::TvHeadend_Initialize { goto &Initialize }
 
-my %Tvheadend_sets = (
-    DVREntryCreate => "",
+my %sets = (
+    DVREntryCreate => [],
+    EPG            => [qw(noArg)],
+    password       => [],
+    removepassword => [qw(noArg)]
 );
 
-my %Tvheadend_gets = (
-    EPGQuery => "",
-    ChannelQuery:noArg => "",
-    ConnectionQuery:noArg => "",
+my %gets = (
+    EPGQuery        => [],
+    ChannelQuery    => [qw(noArg)],
+    ConnectionQuery => [qw(noArg)]
 );
 
 BEGIN {
 
   GP_Import(qw(
     addToAttrList
+    addToDevAttrList
     delFromDevAttrList
-    delFromAttrList
-    readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
     readingsEndUpdate
-    readingsDelete
     Log3
     defs
-    attr
-    cmds
-    L
-    DAYSECONDS
-    HOURSECONDS
-    MINUTESECONDS
     init_done
     InternalTimer
     RemoveInternalTimer
-    AssignIoPort
     CommandAttr
-    CommandDeleteAttr
-    IOWrite
+    CommandDeleteReading
     readingFnAttributes
     IsDisabled
     AttrVal
-    InternalVal
     ReadingsVal
-    ReadingsNum
     devspec2array
     gettimeofday
-    toJSON
-    setVolume
-    AnalyzeCommandChain
-    AnalyzeCommand
-    CommandDefMod
-    CommandDelete
-    EvalSpecials
-    AnalyzePerlCommand
-    perlSyntaxCheck
-    parseParams
-    ResolveDateWildcards
+    HttpUtils_BlockingGet
     HttpUtils_NonblockingGet
-    FmtDateTime
-    makeReadingName
-    FileRead
-    getAllSets
-    trim
   ))
-    #round
-
 };
 
 sub Initialize {
@@ -89,17 +65,15 @@ sub Initialize {
     $hash->{DefFn}       = \&Define;
     $hash->{UndefFn}     = \&Undefine;
     $hash->{DeleteFn}    = \&Delete;
-    #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{GetFn}       = \&Get';
-    #$hash->{NotifyFn}   = 'Tvheadend_Notify';
+    $hash->{GetFn}       = \&Get;
     $hash->{RenameFn}    = \&Rename;
     $hash->{parseParams} = 1;
     $hash->{AttrList} =
-            "HTTPTimeout EPGVisibleItems:multiple-strict,Title,Subtitle,Summary,Description,ChannelName,ChannelNumber,StartTime,StopTime " .
+            "HTTPTimeout Username EPGVisibleItems:multiple-strict,Title,Subtitle,Summary,Description,ChannelName,ChannelNumber,StartTime,StopTime " .
             "PollingQueries:multiple-strict,ConnectionQuery " .
-            "PollingIntervall " .
+            "PollingInterval " .
             "EPGChannelList:multiple-strict,all " .
           $readingFnAttributes;
     return;
@@ -117,7 +91,7 @@ sub Define {
     return "Usage: define <NAME> $hash->{TYPE} <IP>:[<PORT>] [<USERNAME> <PASSWORD>]" if !@{$anon} && !keys %$h;
     my $address  = $h->{baseUrl}  // shift @{$anon} // q{http://127.0.0.1:9981};
     my $user     = $h->{user}     // shift @{$anon};
-    my $password = $h->{password} // shift @{$anon} // q{};
+    my $password = $h->{password} // shift @{$anon};
 
     my @addr = split q{:}, $address;
 
@@ -125,21 +99,17 @@ sub Define {
     $hash->{helper}{http}{ip} = $addr[0];
 
     if ( defined $addr[1]){
-        return "The specified port is not valid" if $address[1] !~ m{\A[0-9]+\z};
-        $hash->{helper}{http}{port} = $address[1];
+        return "The specified port is not valid" if $addr[1] !~ m{\A[0-9]+\z};
+        $hash->{helper}{http}{port} = $addr[1];
     } else {
         $hash->{helper}{http}{port} = '9981';
     }
 
     if ( defined $user ){
-        #$hash->{helper}{http}{username} = $user
-        my ($passResp,$passErr);
-        ($passResp,$passErr) = $passwdObj->setStorePassword($user,$password);
-        return $passErr if $passErr;
-        $hash->{DEF} = baseUrl=$address;
+        $hash->{DEF} = "baseUrl=$address";
+        CommandAttr($hash, "name Username $user");
+        $hash->{helper}{'.pw'} = $password if $password;
     }
-
-    #$state = 0;
 
     return $init_done ? firstInit($hash) : InternalTimer(time+10, \&firstInit, $hash );
 =pod    
@@ -174,135 +144,156 @@ sub firstInit {
 
     return InternalTimer(time+1, \&firstInit, $hash ) if !$init_done;
     RemoveInternalTimer($hash);
-    Tvheadend_EPG($hash);
+
+    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
+
+    my $password = $hash->{helper}{'.pw'};
+
+    if ( defined $password ) {
+        my ($passResp,$passErr);
+        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,$password);
+        return $passErr if $passErr;
+        delete $hash->{helper}{'.pw'};
+    }
+
+    TvHeadend_EPG($hash);
 
     if ( AttrVal($name,'PollingQueries','') =~ m{ConnectionQuery} ) {
-        InternalTimer(gettimeofday(),\&Tvheadend_ConnectionQuery,$hash);
-        my $interval = AttrVal($name,'PollingIntervall',60);
-        Log3( $hash,3,"$name - ConnectionQuery will be polled with an intervall of $interval s");
+        InternalTimer(gettimeofday(),\&TvHeadend_ConnectionQuery,$hash);
+        my $interval = AttrVal($name,'PollingInterval',60);
+        Log3( $hash,3,"$name - ConnectionQuery will be polled with an interval of $interval s");
     }
 
     return;
 }
 
-sub Tvheadend_Undef($$) {
-	my ($hash, $arg) = @_;
-
-	RemoveInternalTimer($hash,"Tvheadend_EPG");
-	RemoveInternalTimer($hash,"Tvheadend_ConnectionQuery");
-
-	return undef;
+sub Undefine {
+    my $hash = shift // return;
+    RemoveInternalTimer($hash);
+    
+    return;
 }
 
-sub Tvheadend_Set($$$) {
-	my ($hash, $name, $opt, @args) = @_;
+sub Set {
+    my $hash    = shift;
+    my $anon    = shift;
+    my $h       = shift;
+    #parseParams: my ( $hash, $a, $h ) = @_;
+    my $name    = shift @{$anon};
+    my $command = shift @{$anon} // q{};
+    my @values  = @{$anon};
+    return "Unknown argument $command, choose one of " 
+        . join(q{ }, map {
+            @{$sets{$_}} ? $_
+                          .q{:}
+                          .join q{,}, @{$sets{$_}} : $_} sort keys %sets)
 
-	if($opt eq "EPG"){
-		InternalTimer(gettimeofday(),"Tvheadend_EPG",$hash);
-	}elsif($opt eq "DVREntryCreate"){
-		if($args[0] =~ /^[0-9]+$/){
-			&Tvheadend_DVREntryCreate($hash,@args);
-		}else{
-			return "EventId must be numeric"
-		}
-	}else{
-		my @cList = keys %Tvheadend_sets;
-		return "Unknown command $opt, choose one of " . join(" ", @cList);
-	}
+        if !defined $sets{$command};
 
+    if($command eq 'EPG'){
+        return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
+    }
+    if($command eq 'DVREntryCreate'){
+        return "EventId must be numeric" if $values[0] !~ m{\A[0-9]+\z};
+        return DVREntryCreate($hash,@values);
+    }
+    
+    if ( $command eq 'password' ) {
+        return q{please set attribute Username first}
+            if !defined AttrVal( $name, 'Username', undef);
+        my $pw = $h->{pass} // shift @{$anon};
+        return qq(usage: $command pass=<password> or $command <password>) if !defined $pw;
+        my ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,$pw);
+        return $passErr;
+    }
+
+    if ( $command eq 'removepassword' ) {
+        return "usage: $command" if @{$anon};
+        my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
+        return qq{error while saving the password - $passErr} if $passErr;
+        return q{password successfully removed} if $passResp;
+    }
+
+    return;
 }
 
-sub Tvheadend_Get($$$) {
-	my ($hash, $name, $opt, @args) = @_;
+sub Get {
+    my $hash    = shift;
+    my $anon    = shift;
+    my $h       = shift;
+    #parseParams: my ( $hash, $a, $h ) = @_;
+    my $name    = shift @{$anon};
+    my $command = shift @{$anon} // return;
+    my @values  = @{$anon};
+    return "Unknown argument $command, choose one of " 
+        . join(q{ }, map {
+            @{$gets{$_}} ? $_
+                          .q{:}
+                          .join q{,}, @{$gets{$_}} : $_} sort keys %gets)
 
-	if($opt eq "EPGQuery"){
-		return &Tvheadend_EPGQuery($hash,@args);
-	}elsif($opt eq "ChannelQuery"){
-		return &Tvheadend_ChannelQuery($hash);
-	}elsif($opt eq "ConnectionQuery"){
-		return &Tvheadend_ConnectionQuery($hash);
-	}else{
-		my @cList = keys %Tvheadend_gets;
-		return "Unknown command $opt, choose one of " . join(" ", @cList);
-	}
+        if !defined $gets{$command};
 
+    return EPGQuery($hash,@values)          if $command eq 'EPGQuery'; 
+    return ChannelQuery($hash)              if $command eq 'ChannelQuery';
+    return TvHeadend_ConnectionQuery($hash) if $command eq 'ConnectionQuery';
+    return;
 }
 
-sub Tvheadend_Attr(@) {
-	my ($cmd,$name,$attr_name,$attr_value) = @_;
+sub Attr {
+    my $command = shift;
+    my $name = shift;
+    my $attribute = shift // return;
+    my $value = shift;
+    my $hash = $defs{$name} // return;
 
-	if($cmd eq "set") {
+    if ( $command eq 'set' ) {
 
-		if($attr_name eq "EPGVisibleItems"){
-			if($attr_value !~ /^.*Title.*$/){
-				fhem("deletereading $name epg[0-9]+TitleNow");
-				fhem("deletereading $name epg[0-9]+TitleNext");
-			}
-			if($attr_value !~ /^.*Subtitle.*$/){
-				fhem("deletereading $name epg[0-9]+SubtitleNow");
-				fhem("deletereading $name epg[0-9]+SubtitleNext");
-			}
-			if($attr_value !~ /^.*Summary.*$/){
-				fhem("deletereading $name epg[0-9]+SummaryNow");
-				fhem("deletereading $name epg[0-9]+SummaryNext");
-			}
-			if($attr_value !~ /^.*Description.*$/){
-				fhem("deletereading $name epg[0-9]+DescriptionNow");
-				fhem("deletereading $name epg[0-9]+DescriptionNext");
-			}
-			if($attr_value !~ /^.*StartTime.*$/){
-				fhem("deletereading $name epg[0-9]+StartTimeNow");
-				fhem("deletereading $name epg[0-9]+StartTimeNext");
-			}
-			if($attr_value !~ /^.*StopTime.*$/){
-				fhem("deletereading $name epg[0-9]+StopTimeNow");
-				fhem("deletereading $name epg[0-9]+StopTimeNext");
-			}
-			if($attr_value !~ /^.*ChannelName.*$/){
-				fhem("deletereading $name epg[0-9]+ChannelName");
-			}
-			if($attr_value !~ /^.*ChannelNumber.*$/){
-				fhem("deletereading $name epg[0-9]+ChannelNumber");
-			}
-		}elsif($attr_name eq "PollingQueries"){
-			my $hash = $defs{$name};
+        if($attribute eq 'EPGVisibleItems'){
+            for my $items (qw(Title Subtitle Summary Description StartTime StopTime)) {
+                next if $value !~ m{$items};
+                CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Next");
+                CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Now");
+            }
+            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelName")   if $value !~ m{ChannelName};
+            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelNumber") if $value !~ m{ChannelNumber};
+            return;
+        }
 
-			if($attr_value =~ /^.*ConnectionQuery.*$/){
-				if($init_done){
-					InternalTimer(gettimeofday(),"Tvheadend_ConnectionQuery",$hash);
-					Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - ConnectionQuery will be polled with an intervall of ".AttrVal($hash->{NAME},"PollingIntervall",60)."s");
-				}
-			}elsif($attr_value !~ /^.*ConnectionQuery.*$/){
-				fhem("deletereading $name connections.*");
-				RemoveInternalTimer($hash,"Tvheadend_ConnectionQuery");
-				Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - ConnectionQuery won't be polled anymore");
-			}
-		}elsif($attr_name eq "HTTPTimeout"){
-			if(($attr_value !~ /^[0-9]+$/) || ($attr_value < 1 || $attr_value > 60)){
-				return "$attr_name must be nummeric an between 5 and 60 seconds"
-			}
-		}
+        if($attribute eq 'PollingQueries'){
+            if ( $value =~ m{ConnectionQuery} ){
+                return if !$init_done;
+                InternalTimer(gettimeofday(),\&TvHeadend_ConnectionQuery,$hash);
+                my $periode = AttrVal($name,'PollingInterval',60);
+                return Log3($hash,3,"$name - ConnectionQuery will be polled with an interval of $periode s");
+            }
+            CommandDeleteReading($hash, "$name -q connections.*");
+            RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+            return Log3($hash,3,"$name - ConnectionQuery won't be polled anymore");
+        }
+        
+        if($attribute eq 'HTTPTimeout'){
+            return "$attribute must be nummeric and between 1 and 60 seconds" 
+                if !looks_like_number($value) || ($value < 1 || $value > 60);
+        }
+        return;
+    }
 
-	}elsif($cmd eq "del"){
-		if($attr_name eq "EPGVisibleItems"){
-			fhem("deletereading $name epg[0-9]+.*");
-		}
-		if($attr_name eq "PollingQueries"){
-			my $hash = $defs{$name};
-			fhem("deletereading $name connections.*");
-			RemoveInternalTimer($hash,"Tvheadend_ConnectionQuery");
-			Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - ConnectionQuery won't be polled anymore");
-		}
-	}
-
-	return undef
+    if ( $command eq 'del' ) {
+        return CommandDeleteReading($hash, "$name -q epg[0-9]+.*") if $attribute eq 'EPGVisibleItems';
+        if ( $attribute eq 'PollingQueries' ){
+            RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+            Log3($hash,3,"$name - ConnectionQuery won't be polled anymore");
+            return CommandDeleteReading($hash, "$name -q connections.*");
+        }
+    }
+    return;
 }
 
 sub Rename {
     my $new     = shift;
     my $old     = shift;
    
-    my $hash    = $::defs{$new};
+    my $hash    = $defs{$new};
 
     my ($passResp,$passErr);
     ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
@@ -316,93 +307,97 @@ sub Rename {
     return;
 }
 
-sub Tvheadend_EPG($){
-	my ($hash) = @_;
+sub Delete {
+    my $hash = shift // return;
+    my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($hash->{NAME});
+    return;
+}
 
-	#Get Channels
-	if($state == 0){
-		Tvheadend_ChannelQuery($hash);
-		if($hash->{helper}{epg}{count} == 0){
-			Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Can't get EPG data, because no channels defined");
-			return;
-		}else{
-			Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Set State 1");
-			$state = 1;
-			InternalTimer(gettimeofday(),"Tvheadend_EPG",$hash);
-		}
+sub TvHeadend_EPG {
+    my $hash = shift // return;
+    my $name = $hash->{NAME};
 
-	#Get Now
-	}elsif($state == 1){
-		my $count = $hash->{helper}{epg}{count};
-		my @entriesNow = ();
+    #Get Channels
+    if ( !$hash->{EPGQuery_state} ){
+        ChannelQuery($hash);
+        return Log3($name ,3,"$name - Can't get EPG data, because no channels defined") 
+            if $hash->{helper}{epg}{count} == 0;
+        Log3($name,4,"$name - Set State 1");
+        $hash->{EPGQuery_state} = 1;
+        return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
+    }
 
-		$hash->{helper}{http}{callback} = sub{
-			my ($param, $err, $data) = @_;
+    #Get Now
+    if($hash->{EPGQuery_state} == 1){
+        my $count = $hash->{helper}{epg}{count};
+        my @entriesNow = ();
+        $hash->{helper}{http}{callback} = sub{
+            my ($param, $err, $data) = @_;
+            my $hash = $param->{hash};
+            my $channels = $hash->{helper}{epg}{channels};
 
-			my $hash = $param->{hash};
-			my $channels = $hash->{helper}{epg}{channels};
-			my $entries;
+            (Log3($hash, 3,"$hash->{NAME} - $err"),$hash->{EPGQuery_state}=0,return) if $err;
+            (Log3($hash, 3,"$hash->{NAME} - Server needs authentication"),$hash->{EPGQuery_state}=0,return) if $data =~ m{401\sUnauthorized}xms;
+            (Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$hash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
 
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),$state=0,return) if($err);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Server needs authentication"),$state=0,return) if($data =~ /^.*401 Unauthorized.*/s);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$state=0,return) if($data =~ /^.*404 Not Found.*/s);
+            my $entries;
+            if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+                return Log3($hash, 1, "JSON decoding error: $@");
+            }
 
-			$entries = decode_json($data)->{entries};
-			if(!defined @$entries[0]){
-			  Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No current EPG information");
-				$count -=1;
-			}else{
-				@$entries[0]->{subtitle} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{subtitle});
-				@$entries[0]->{summary} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{summary});
-				@$entries[0]->{description} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{description});
+            if ( !defined $entries->[0] ){
+                Log3($hash, 4,"$hash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No current EPG information");
+                $count--;
+            } else {
+                for my $item (qw(title subtitle summary description)) {
+                    @$entries[0]->{$item} = encode('UTF-8',@$entries[0]->{$item});
+                }
 
-				@$entries[0]->{title} = encode('UTF-8',@$entries[0]->{title});
-				@$entries[0]->{subtitle} = encode('UTF-8',@$entries[0]->{subtitle});
-				@$entries[0]->{summary} = encode('UTF-8',@$entries[0]->{summary});
-				@$entries[0]->{description} = encode('UTF-8',@$entries[0]->{description});
+                for my $item (qw(subtitle summary description)) {
+                    @$entries[0]->{$item} = "Keine Informationen verfügbar" if !defined @$entries[0]->{$item};
+                }
 
-				@$entries[0]->{channelId} = $param->{id};
+                @$entries[0]->{channelId} = $param->{id};
 
-				push (@entriesNow,@$entries[0])
-			}
+                push (@entriesNow,@$entries[0])
+            }
 
-			if(int(@entriesNow) == $count){
+            if ( @entriesNow == $count ){
 
-				$hash->{helper}{epg}{now} = \@entriesNow;
-				$hash->{helper}{epg}{count} = $count;
+                $hash->{helper}{epg}{now} = \@entriesNow;
+                $hash->{helper}{epg}{count} = $count;
 
+                $hash->{helper}{epg}{update} = $entriesNow[0]->{stop};
+                for my $i (0..@entriesNow-1){
+                    $hash->{helper}{epg}{update} = $entriesNow[$i]->{stop} if $entriesNow[$i]->{stop} < $hash->{helper}{epg}{update};
+                }
 
-				$hash->{helper}{epg}{update} = $entriesNow[0]->{stop};
-				for (my $i=0;$i < int(@entriesNow);$i+=1){
-						$hash->{helper}{epg}{update} = $entriesNow[$i]->{stop} if($entriesNow[$i]->{stop} < $hash->{helper}{epg}{update});
-				}
+                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
+                Log3($hash, 4,"$hash->{NAME} - Set State 2");
+                $hash->{EPGQuery_state} = 2;
+            }
+            return;
+        };
 
-				InternalTimer(gettimeofday(),"Tvheadend_EPG",$hash);
-				Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Set State 2");
-				$state = 2;
-			}
+        Log3($hash, 4,"$name - Get EPG Now");
 
-		};
+        my $channels = $hash->{helper}{epg}{channels};
+        my $channelName;
+        my $ip = $hash->{helper}{http}{ip};
+        my $port = $hash->{helper}{http}{port};
 
-		Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Get EPG Now");
+        for my $i (0..$count-1){
+            $hash->{helper}{http}{id} = $channels->[$i]->{id};
+            $channelName = $channels->[$i]->{name};
+            $channelName =~ s/\x20/\%20/g;
+            $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=1&channel=$channelName";
+            TvHeadend_HttpGetNonblocking($hash);
+        }
+        return;
+    }
 
-		my $channels = $hash->{helper}{epg}{channels};
-		my $channelName = "";
-		my $ip = $hash->{helper}{http}{ip};
-		my $port = $hash->{helper}{http}{port};
-
-		for (my $i=0;$i < $count;$i+=1){
-			$hash->{helper}{http}{id} = @$channels[$i]->{id};
-			$channelName = @$channels[$i]->{name};
-			$channelName =~ s/\x20/\%20/g;
-			$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/grid?limit=1&channel=".$channelName;
-			&Tvheadend_HttpGetNonblocking($hash);
-		}
-
-		return;
-
-	## GET NEXT
-	}elsif($state == 2){
+    ## GET NEXT
+    if($hash->{EPGQuery_state} == 2){
 
 		my @entriesNext = ();
 		my $count = $hash->{helper}{epg}{count};
@@ -412,14 +407,16 @@ sub Tvheadend_EPG($){
 
 			my $hash = $param->{hash};
 			my $channels = $hash->{helper}{epg}{channels};
-			my $entries;
 
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),$state=0,return) if($err);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Server needs authentication"),$state=0,return) if($data =~ /^.*401 Unauthorized.*/s);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$state=0,return) if($data =~ /^.*404 Not Found.*/s);
+			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),$hash->{EPGQuery_state}=0,return) if($err);
+			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Server needs authentication"),$hash->{EPGQuery_state}=0,return) if($data =~ /^.*401 Unauthorized.*/s);
+			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$hash->{EPGQuery_state}=0,return) if($data =~ /^.*404 Not Found.*/s);
 
-			$entries = decode_json($data)->{entries};
-			if(!defined @$entries[0]){
+            my $entries;
+            if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+                return Log3($hash, 1, "JSON decoding error: $@");
+            }
+			if ( !defined $entries->[0] ){
 				Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No upcoming EPG information.");
 				$count -=1;
 			}else{
@@ -441,9 +438,9 @@ sub Tvheadend_EPG($){
 				$hash->{helper}{epg}{next} = \@entriesNext;
 				$hash->{helper}{epg}{count} = $count;
 
-				InternalTimer(gettimeofday(),"Tvheadend_EPG",$hash);
+				InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
 				Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Set State 3");
-				$state = 3;
+				$hash->{EPGQuery_state} = 3;
 			}
 		};
 
@@ -456,12 +453,12 @@ sub Tvheadend_EPG($){
 		for (my $i=0;$i < int(@$entries);$i+=1){
 			$hash->{helper}{http}{id} = @$entries[$i]->{channelId};
 			$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/load?eventId=".@$entries[$i]->{nextEventId};
-			&Tvheadend_HttpGetNonblocking($hash);
+			&TvHeadend_HttpGetNonblocking($hash);
 		}
 		return;
 
 	## SET READINGS
-	}elsif($state == 3){
+	}elsif($hash->{EPGQuery_state} == 3){
 		my $update = $hash->{helper}{epg}{update};
 		my $entriesNow = $hash->{helper}{epg}{now};
 		my $entriesNext = $hash->{helper}{epg}{next};
@@ -492,37 +489,38 @@ sub Tvheadend_EPG($){
 		readingsEndUpdate($hash, 1);
 
 		Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Next update: ".  strftime("%H:%M:%S",localtime($update)));
-		RemoveInternalTimer($hash,"Tvheadend_EPG");
-		InternalTimer($update + 1,"Tvheadend_EPG",$hash);
-		$state = 0;
+		RemoveInternalTimer($hash,\&TvHeadend_EPG);
+		InternalTimer($update + 1,\&TvHeadend_EPG,$hash);
+		$hash->{EPGQuery_state} = 0;
 	}
-
+    return;
 }
 
-sub Tvheadend_ChannelQuery($){
-	my ($hash) = @_;
+sub ChannelQuery {
+    my $hash = shift // return;
+    Log3($hash, 4,"$hash->{NAME} - Get Channels");
 
-	Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Get Channels");
+    my $ip = $hash->{helper}{http}{ip};
+    my $port = $hash->{helper}{http}{port};
+    my $response = "";
+    my @channelNames = ();
 
-	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
-	my $response = "";
-	my $entries;
-	my @channelNames = ();
+    $hash->{helper}{epg}{count} = 0;
+    delete $hash->{helper}{epg}{channels} if defined $hash->{helper}{epg}{channels};
 
-	$hash->{helper}{epg}{count} = 0;
-	delete $hash->{helper}{epg}{channels} if(defined $hash->{helper}{epg}{channels});
-
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/channel/grid";
-	my ($err, $data) = &Tvheadend_HttpGetBlocking($hash);
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/channel/grid";
+    
+    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
 	($response = $err,Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),return $err) if($err);
 	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
 	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
 
-	$entries = decode_json($data)->{entries};
-
+    my $entries;
+    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+        return Log3($hash, 1, "JSON decoding error: $@");
+    }
 	($response = "No Channels available",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if(int(@$entries) == 0);
-	@$entries = sort {$a->{number} <=> $b->{number}} @$entries;
+	@{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
 
 	for (my $i=0;$i < int(@$entries);$i+=1){
 		@$entries[$i]->{name} = encode('UTF-8',@$entries[$i]->{name});
@@ -530,17 +528,22 @@ sub Tvheadend_ChannelQuery($){
 		push(@channelNames,@$entries[$i]->{name});
 	}
 
+    return if !@channelNames;
 	my $channelNames = join(",",@channelNames);
 	$channelNames =~ s/ /\_/g;
-	$modules{Tvheadend}{AttrList} =~ s/EPGChannelList:multiple-strict.*/EPGChannelList:multiple-strict,all,$channelNames/;
+    ##review
+    
+	#$modules{TvHeadend}{AttrList} =~ s/EPGChannelList:multiple-strict.*/EPGChannelList:multiple-strict,all,$channelNames/;
+    delFromDevAttrList($hash->{NAME},'EPGChannelList');
+    addToDevAttrList($hash->{NAME},"EPGChannelList:multiple-strict,all,$channelNames",'TvHeadend');
 
-	$hash->{helper}{epg}{count} = @$entries;
+	$hash->{helper}{epg}{count} = @{$entries};
 	$hash->{helper}{epg}{channels} = $entries;
 
-	return join("\n",@channelNames);
+    return join q{\n}, @channelNames;
 }
 
-sub Tvheadend_EPGQuery($$){
+sub EPGQuery($$){
 	my ($hash,@args) = @_;
 
 	my $ip = $hash->{helper}{http}{ip};
@@ -554,7 +557,7 @@ sub Tvheadend_EPGQuery($$){
 
 	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/grid?limit=$args[0]&title=$args[1]";
 
-	my ($err, $data) = &Tvheadend_HttpGetBlocking($hash);
+	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
 	return $err if($err);
 	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
 	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
@@ -571,10 +574,10 @@ sub Tvheadend_EPGQuery($$){
 		$response .= "Channel: ".@$entries[$i]->{channelName} ."\n".
 								"Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',@$entries[$i]->{start})))." - ".
 								strftime("%H:%M:%S]",localtime(encode('UTF-8',@$entries[$i]->{stop})))."\n".
-								"Titel: ".encode('UTF-8',&Tvheadend_StringFormat(@$entries[$i]->{title},80))."\n".
-								"Subtitel: ".encode('UTF-8',&Tvheadend_StringFormat(@$entries[$i]->{subtitle},80))."\n".
-								"Summary: ".encode('UTF-8',&Tvheadend_StringFormat(@$entries[$i]->{summary},80)). "\n".
-								"Description: ".encode('UTF-8',&Tvheadend_StringFormat(@$entries[$i]->{description},80)). "\n".
+								"Titel: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{title},80))."\n".
+								"Subtitel: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{subtitle},80))."\n".
+								"Summary: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{summary},80)). "\n".
+								"Description: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{description},80)). "\n".
 								"EventId: " . @$entries[$i]->{eventId}."\n";
 	}
 
@@ -582,24 +585,28 @@ sub Tvheadend_EPGQuery($$){
 
 }
 
-sub Tvheadend_ConnectionQuery($){
+sub TvHeadend_ConnectionQuery($){
 	my ($hash,@args) = @_;
+    my $name = $hash->{NAME};
 
-	Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Query connections");
+    Log3($hash,4,"$name - Query connections");
 
 
 	my $ip = $hash->{helper}{http}{ip};
 	my $port = $hash->{helper}{http}{port};
-	my $entries;
+	
 	my $response = "";
 
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/status/connections";
-	my ($err, $data) = &Tvheadend_HttpGetBlocking($hash);
-	return $err if($err);
-	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
-	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/status/connections";
+	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    return $err if $err;
+	($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+	($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
-	$entries = decode_json($data)->{entries};
+    my $entries;
+    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+        return Log3($hash, 1, "JSON decoding error: $@");
+    }
 
 	if(!defined @$entries[0]){
 		$response = "ConnectedPeers: 0";
@@ -614,8 +621,8 @@ sub Tvheadend_ConnectionQuery($){
 			readingsBulkUpdateIfChanged($hash, "connectionsType", "-");
 			readingsEndUpdate($hash, 1);
 
-			RemoveInternalTimer($hash,"Tvheadend_ConnectionQuery");
-			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingIntervall",60),"Tvheadend_ConnectionQuery",$hash);
+			RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingInterval",60),\&TvHeadend_ConnectionQuery,$hash);
 		}
 	}else{
 		@$entries = sort {$a->{started} <=> $b->{started}} @$entries;
@@ -641,54 +648,57 @@ sub Tvheadend_ConnectionQuery($){
 			readingsBulkUpdateIfChanged($hash, "connectionsType", encode('UTF-8',join(",",(my @type = map {$_->{type}}@$entries))));
 			readingsEndUpdate($hash, 1);
 
-			RemoveInternalTimer($hash,"Tvheadend_ConnectionQuery");
-			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingIntervall",60),"Tvheadend_ConnectionQuery",$hash);
+			RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingInterval",60),\&TvHeadend_ConnectionQuery,$hash);
 		}
 	}
 
 	return $response;
 }
 
-sub Tvheadend_DVREntryCreate($$){
+sub DVREntryCreate($$){
 	my ($hash,@args) = @_;
 
 	my $ip = $hash->{helper}{http}{ip};
 	my $port = $hash->{helper}{http}{port};
-	my $entries;
 	my $response = "";
 
 	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/load?eventId=".$args[0];
-	my ($err, $data) = &Tvheadend_HttpGetBlocking($hash);
+	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
 	return $err if($err);
 	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
 	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
 
-	$entries = decode_json($data)->{entries};
-	($response = "EventId is not valid",return $response) if(!defined @$entries[0]);
+    my $entries;
+    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+        return Log3($hash, 1, "JSON decoding error: $@");
+    }
 
-	my %record = (
-    "start"  => @$entries[0]->{start},
-    "stop" => @$entries[0]->{stop},
-		"title"  => {
-			"ger" => @$entries[0]->{title},
-		},
-    "subtitle"  => {
-			"ger" => @$entries[0]->{subtitle},
-		},
-		"description"  => {
-			"ger" => @$entries[0]->{description},
-		},
-		"channelname"  => @$entries[0]->{channelName},
-	);
+    ($response = "EventId is not valid",return $response) if !defined $entries->[0];
+
+    my %record = (
+        start  => $entries->[0]->{start},
+        stop => $entries->[0]->{stop},
+            title  => {
+                ger => $entries->[0]->{title},
+            },
+        subtitle  => {
+                ger => $entries->[0]->{subtitle},
+            },
+            description  => {
+                ger => $entries->[0]->{description},
+            },
+            channelname  => $entries->[0]->{channelName},
+    );
 
 	my $jasonData = encode_json(\%record);
 
 	$jasonData =~ s/\x20/\%20/g;
 	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/dvr/entry/create?conf=".$jasonData;
-	($err, $data) = &Tvheadend_HttpGetBlocking($hash);
+	($err, $data) = &TvHeadend_HttpGetBlocking($hash);
 }
 
-sub Tvheadend_StringFormat($$){
+sub TvHeadend_StringFormat($$){
 
 	my ($string, $maxLength) = @_;
 
@@ -706,144 +716,181 @@ sub Tvheadend_StringFormat($$){
     $result .= $tempString;
     $rowLength += length($tempString);
     if (int(@words) > 0){
-	    $result .= ' ';
-  	  $rowLength += 1;
+        $result .= ' ';
+        $rowLength++;
     }
   }
 
-	return $result;
+    return $result;
 }
 
-sub Tvheadend_HttpGetNonblocking($){
-	my ($hash) = @_;
+sub TvHeadend_HttpGetNonblocking {
+    my $hash = shift // return;
 
-	HttpUtils_NonblockingGet(
-		{
-				method     => "GET",
-				url        => $hash->{helper}{http}{url},
-				timeout    => AttrVal($hash->{NAME},"HTTPTimeout","5"),
-				user			 => $hash->{helper}{http}{username},
-				pwd				 => $hash->{helper}{http}{password},
-				noshutdown => "1",
-				hash			 => $hash,
-				id				 => $hash->{helper}{http}{id},
-				callback   => $hash->{helper}{http}{callback}
-		});
+    my $name = $hash->{NAME};
+    my $pw = $hash->{helper}->{passObj}->getReadPassword($name) // q{};
 
+    return HttpUtils_NonblockingGet(
+        {
+            method     => 'GET',
+            url        => $hash->{helper}{http}{url},
+            timeout    => AttrVal($name,'HTTPTimeout','5'),
+            user       => AttrVal($name,'Username',''),
+            pwd        => $pw,
+            noshutdown => '1',
+            hash       => $hash,
+            id         => $hash->{helper}{http}{id},
+            callback   => $hash->{helper}{http}{callback}
+        });
 }
 
-sub Tvheadend_HttpGetBlocking($){
-	my ($hash) = @_;
+sub TvHeadend_HttpGetBlocking {
+    my $hash = shift // return;
+    my $name = $hash->{NAME};
+    my $pw = $hash->{helper}->{passObj}->getReadPassword($name) // q{};
 
-	HttpUtils_BlockingGet(
-		{
-				method     => "GET",
-				url        => $hash->{helper}{http}{url},
-				timeout    => AttrVal($hash->{NAME},"HTTPTimeout","5"),
-				user			 => $hash->{helper}{http}{username},
-				pwd				 => $hash->{helper}{http}{password},
-				noshutdown => "1",
-		});
-
+    return HttpUtils_BlockingGet(
+        {
+            method     => 'GET',
+            url        => $hash->{helper}{http}{url},
+            timeout    => AttrVal($name,'HTTPTimeout','5'),
+            user       => AttrVal($name,'Username',''),
+            pwd        => $pw,
+            noshutdown => '1',
+        });
 }
 
 1;
 
+__END__
+
 =pod
+=item device
+=item summary Control your TvHeadend server
+=item summary_DE Steuerung eines TvHeadend Servers
 =begin html
 
-<a name="Tvheadend"></a>
-<h3>Tvheadend</h3>
+<a id="TvHeadend"></a>
+<h3>TvHeadend</h3>
 <ul>
-    <i>Tvheadend</i> is a TV streaming server for Linux supporting
-		DVB-S, DVB-S2, DVB-C, DVB-T, ATSC, IPTV,SAT>IP and other formats through
-		the unix pipe as input sources. For further informations, take a look at the
-		<a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.
-		This module module makes use of Tvheadends JSON API.
+    <i>TvHeadend</i> is a TV streaming server for Linux supporting
+        DVB-S, DVB-S2, DVB-C, DVB-T, ATSC, IPTV,SAT>IP and other formats through
+        the unix pipe as input sources. For further informations, take a look at the
+        <a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.
+        This module module makes use of TvHeadends JSON API.
     <br><br>
-    <a name="Tvheadenddefine"></a>
-    <b>Define</b>
+    <a id="TvHeadend-define"></a>
+    <h4>Define</h4>
     <ul>
-        <code>define &lt;name&gt; Tvheadend &lt;IP&gt;:[&lt;PORT&gt;] [&lt;USERNAME&gt; &lt;PASSWORD&gt;]</code>
+        <code>define &lt;name&gt; TvHeadend &lt;IP&gt;:[&lt;PORT&gt;] [&lt;USERNAME&gt; &lt;PASSWORD&gt;]</code>
         <br><br>
-        Example: <code>define tvheadend Tvheadend 192.168.0.10</code><br>
-        Example: <code>define tvheadend Tvheadend 192.168.0.10 max securephrase</code>
+        Example: <code>define tvheadend TvHeadend 192.168.0.10</code><br>
+        Example: <code>define tvheadend TvHeadend 192.168.0.10 max securephrase</code>
         <br><br>
-				When &lt;PORT&gt; is not set, the module will use Tvheadends standard port 9981.
-				If the definition is successfull, the module will automatically query the EPG
-				for tv shows playing now and next. The query is based on Channels mapped in Configuration/Channel.
-				The module will automatically query again, when a tv show ends.
+            When &lt;PORT&gt; is not set, the module will use TvHeadends standard port 9981.
+            If the definition is successfull, the module will automatically query the EPG
+            for tv shows playing now and next. The query is based on Channels mapped in Configuration/Channel.
+            The module will automatically query again when a tv show ends.<br>
+        NOTE: USERNAME and/or PASSWORD will not be permanently stored in DEF. USERNAME will be transfered to attribute <i>Username</i>, PASSWORD will be stored in central keystore and may be changed or removed by <i>set</i> commands.
     </ul>
     <br>
-    <a name="Tvheadendset"></a>
-    <b>Set</b><br>
+    <a id="TvHeadend-set"></a>
+    <h4>Set</h4><br>
     <ul>
         <code>set &lt;name&gt; &lt;command&gt; &lt;parameter&gt;</code>
         <br><br>
-				&lt;command&gt; can be one of the following:
+        &lt;command&gt; can be one of the following:
         <br><br>
         <ul>
-              <li><i>DVREntryCreate</i><br>
-                  Creates a DVR entry, derived from the EventId given with &lt;parameter&gt;.
-							</li>
+          <a id="TvHeadend-set-EPG"></a>
+          <li>EPG<br>
+              Immediately reinitiate an EPG scan.
+          </li>
+          <a id="TvHeadend-set-DVREntryCreate"></a>
+          <li>DVREntryCreate<br>
+              Creates a DVR entry, derived from the EventId given with &lt;parameter&gt;.
+          </li>
+          <a id="TvHeadend-set-password"></a>
+          <li>password<br>
+              Set a password to access your TvHeadend server.
+          </li>
+          <a id="TvHeadend-set-removepassword"></a>
+          <li>removepassword<br>
+              Remove the sored password from keystore.
+          </li>
         </ul>
     </ul>
     <br>
 
-    <a name="Tvheadendget"></a>
-    <b>Get</b><br>
+    <a id="TvHeadend-get"></a>
+    <h4>Get</h4><br>
     <ul>
         <code>get &lt;name&gt; &lt;command&gt; &lt;parameter&gt;</code>
         <br><br>
-				&lt;command&gt; can be one of the following:
-				<br><br>
+            &lt;command&gt; can be one of the following:
+            <br><br>
         <ul>
-              <li><i>EPGQuery</i><br>
-                  Queries the EPG. Returns results, matched with &lt;parameter&gt; and the title of a show.
-									Have not to be an exact match and is not case sensitive. The result includes i.a. the EventId.
-									<br><br>
-									Example: get &lt;name&gt; EPGQuery 3:tagessch<br>
-									This command will query the first three results in upcoming order, including
-									"tagessch" in the title of a tv show.
-							</li>
-							<li><i>ChannelQuery</i><br>
-									Queries the channel informations. Returns channels known by tvheadend. Furthermore this command
-									will update the internal channel database.
-							</li>
-							<li><i>ConnectionQuery</i><br>
-									Queries informations about active connections. Returns the count of actual connected peers and some
-									additional informations of each peer.
-							</li>
+          <a id="TvHeadend-get-EPGQuery"></a>
+          <li>EPGQuery<br>
+            Queries the EPG. Returns results, matched with &lt;parameter&gt; and the title of a show.
+            Have not to be an exact match and is not case sensitive. The result includes i.a. the EventId.
+            <br><br>
+            Example: get &lt;name&gt; EPGQuery 3:tagessch<br>
+            This command will query the first three results in upcoming order, including
+            "tagessch" in the title of a tv show.
+          </li>
+          <a id="TvHeadend-get-ChannelQuery"></a>
+          <li>ChannelQuery<br>
+            Queries the channel informations. Returns channels known by tvheadend. Furthermore this command
+            will update the internal channel database.
+          </li>
+          <a id="TvHeadend-get-ConnectionQuery"></a>
+          <li>ConnectionQuery<br>
+            Queries informations about active connections. Returns the count of actual connected peers and some
+            additional informations of each peer.
+          </li>
         </ul>
     </ul>
     <br>
 
-    <a name="TVheadendattr"></a>
-    <b>Attributes</b>
+    <a id="TvHeadend-attr"></a>
+    <h4>Attributes</h4>
     <ul>
         <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
         <br><br>
         &lt;attribute&gt; can be one of the following:
         <ul>
-            <li><i>HTTPTimeout</i><br>
-                HTTP timeout in seconds.<br>
-								Standardvalue: 5s<br>
-								Range: 1s-60s
-            </li>
-						<li><i>EPGVisibleItems</i><br>
-                Selectable list of epg items. Items selected will generate
-								readings. The readings will be generated, next time the EPG is triggered.
-								When an item becomes unselected, the specific readings will be deleted.
-            </li>
-						<li><i>PollingQueries</i><br>
+          <a id="TvHeadend-attr-HTTPTimeout"></a>
+          <li>HTTPTimeout<br>
+            HTTP timeout in seconds.<br>
+            default value: 5s<br>
+            Range: 1s-60s
+          </li>
+          <a id="TvHeadend-attr-EPGVisibleItems"></a>
+          <li>EPGVisibleItems<br>
+            Selectable list of epg items. Items selected will generate
+            readings. The readings will be generated, next time the EPG is triggered.
+            When an item becomes unselected, the specific readings will be deleted.
+          </li>
+          <a id="TvHeadend-attr-EPGChannelList"></a>
+          <li>EPGChannelList<br>
+            Selectable list of epg channels to querry.
+          </li>
+          <a id="TvHeadend-attr-PollingQueries"></a>
+          <li>PollingQueries<br>
                 Selectable list of queries, that can be polled. When enabled the polling of the specific
-								query starts immediately with an intervall given with the attribute PollingIntervall.
-								When a query is in polling mode, readings will be created. When the polling will be disabled,
-								the readings will be deleted.
+                query starts immediately with an interval given with the attribute PollingInterval.
+                When a query is in polling mode, readings will be created. When the polling will be disabled,
+                the readings will be deleted.
             </li>
-						<li><i>PollingIntervalls</i><br>
-								Intervall of polling a query. See PollingQueries for further details.<br>
-								Standardvalue: 60s
+            <a id="TvHeadend-attr-PollingInterval"></a>
+            <li>PollingInterval<br>
+              Interval of polling a query. See PollingQueries for further details.<br>
+              default value: 60s
+            </li>
+            <a id="TvHeadend-attr-Username"></a>
+            <li>Username<br>
+              User name to log in to your TvHeadend server.
             </li>
         </ul>
     </ul>

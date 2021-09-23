@@ -248,6 +248,7 @@ BEGIN {
 
   GP_Import(qw(
     addToAttrList
+    addToDevAttrList
     delFromDevAttrList
     delFromAttrList
     readingsSingleUpdate
@@ -348,7 +349,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.40';
+    $hash->{MODULE_VERSION} = '0.4.41';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -436,20 +437,25 @@ sub initialize_prefix {
     addToAttrList("${prefix}Name",'RHASSPY');
     addToAttrList("${prefix}Room",'RHASSPY');
     addToAttrList("${prefix}Mapping:textField-long",'RHASSPY');
-    #addToAttrList("${prefix}Channels:textField-long");
-    #addToAttrList("${prefix}Colors:textField-long");
     addToAttrList("${prefix}Group:textField",'RHASSPY');
     addToAttrList("${prefix}Specials:textField-long",'RHASSPY');
+    for (devspec2array("${prefix}Colors=.+")) {
+        addToDevAttrList($_, "${prefix}Colors:textField-long",'RHASSPY');
+    }
+    for (devspec2array("${prefix}Channels=.+")) {
+        addToDevAttrList($_, "${prefix}Channels:textField-long",'RHASSPY');
+    }
 
     return if !$init_done || !defined $old_prefix;
     my @devs = devspec2array("$hash->{devspec}");
     my @rhasspys = devspec2array("TYPE=RHASSPY:FILTER=prefix=$old_prefix");
 
-    for my $detail (qw( Name Room Mapping Group Specials)) { 
+    for my $detail ( qw( Name Room Mapping Group Specials Channels Colors ) ) { 
         for my $device (@devs) {
-            my $aval = AttrVal($device, "${old_prefix}$detail", undef);
+            my $aval = AttrVal($device, "${old_prefix}$detail", undef); 
             CommandAttr($hash, "$device ${prefix}$detail $aval") if $aval;
             CommandDeleteAttr($hash, "$device ${old_prefix}$detail") if @rhasspys < 2;
+            delFromDevAttrList($device,"${old_prefix}$detail") if @rhasspys < 2 && ($detail eq "Channels" || $detail eq "Colors");
         }
         delFromAttrList("${old_prefix}$detail") if @rhasspys < 2;
     }
