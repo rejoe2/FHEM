@@ -2473,7 +2473,7 @@ __END__
 
 <a id="MSG"></a>
 <h3>msg</h3>
-For documentation in german see <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a> or <a href="https://wiki.fhem.de/wiki/Msg">FHEM Wiki</a>
+  <p>For documentation in german see <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a> or <a href="https://wiki.fhem.de/wiki/Msg">FHEM Wiki</a></p>
   Syntax is:<br>
   <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
   <br><br>
