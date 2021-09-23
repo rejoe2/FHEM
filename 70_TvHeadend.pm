@@ -40,6 +40,7 @@ BEGIN {
     delFromDevAttrList
     readingsBeginUpdate
     readingsBulkUpdate
+    readingsBulkUpdateIfChanged
     readingsEndUpdate
     Log3
     defs
@@ -107,7 +108,7 @@ sub Define {
 
     if ( defined $user ){
         $hash->{DEF} = "baseUrl=$address";
-        CommandAttr($hash, "name Username $user");
+        CommandAttr($hash, "$name Username $user");
         $hash->{helper}{'.pw'} = $password if $password;
     }
 
@@ -547,7 +548,7 @@ sub EPGQuery($$){
 	my ($hash,@args) = @_;
 
 	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
+	my $port = $hash->{helper}{http}{port} // '9981';
 	my $entries;
 	my $response = "";
 
@@ -555,7 +556,7 @@ sub EPGQuery($$){
 	($args[1] = $args[0], $args[0] = 1)if(!defined $args[1]);
 	($args[0] = 1)if(defined $args[1] && $args[0] !~ /^[0-9]+$/);
 
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/grid?limit=$args[0]&title=$args[1]";
+	$hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=$args[0]&title=$args[1]";
 
 	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
 	return $err if($err);
@@ -593,14 +594,16 @@ sub TvHeadend_ConnectionQuery($){
 
 
 	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
+	my $port = $hash->{helper}{http}{port} // '9981';
 	
 	my $response = "";
 
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/status/connections";
-	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+	my ($err, $data) = TvHeadend_HttpGetBlocking($hash);
     return $err if $err;
 	($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+	($response = "Forbidden... User needs admin privelegs for access.",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{403\sForbidden}xms;
+
 	($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
@@ -608,7 +611,7 @@ sub TvHeadend_ConnectionQuery($){
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
-	if(!defined @$entries[0]){
+	if ( !defined $entries->[0] ){
 		$response = "ConnectedPeers: 0";
 
 		if(AttrVal($hash->{NAME},"PollingQueries","") =~ /^.*ConnectionQuery.*$/){
@@ -765,9 +768,9 @@ sub TvHeadend_HttpGetBlocking {
 __END__
 
 =pod
-=item device
-=item summary Control your TvHeadend server
+=item summary    Control your TvHeadend server
 =item summary_DE Steuerung eines TvHeadend Servers
+=item device
 =begin html
 
 <a id="TvHeadend"></a>
@@ -776,7 +779,7 @@ __END__
     <i>TvHeadend</i> is a TV streaming server for Linux supporting
         DVB-S, DVB-S2, DVB-C, DVB-T, ATSC, IPTV,SAT>IP and other formats through
         the unix pipe as input sources. For further informations, take a look at the
-        <a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.
+        <a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.<br>
         This module module makes use of TvHeadends JSON API.
     <br><br>
     <a id="TvHeadend-define"></a>
@@ -787,8 +790,7 @@ __END__
         Example: <code>define tvheadend TvHeadend 192.168.0.10</code><br>
         Example: <code>define tvheadend TvHeadend 192.168.0.10 max securephrase</code>
         <br><br>
-            When &lt;PORT&gt; is not set, the module will use TvHeadends standard port 9981.
-            If the definition is successfull, the module will automatically query the EPG
+            When &lt;PORT&gt; is not set, the module will use TvHeadends standard port 9981. If the definition is successfull, the module will automatically query the EPG 
             for tv shows playing now and next. The query is based on Channels mapped in Configuration/Channel.
             The module will automatically query again when a tv show ends.<br>
         NOTE: USERNAME and/or PASSWORD will not be permanently stored in DEF. USERNAME will be transfered to attribute <i>Username</i>, PASSWORD will be stored in central keystore and may be changed or removed by <i>set</i> commands.
@@ -896,4 +898,5 @@ __END__
     </ul>
 </ul>
 =end html
+
 =cut
