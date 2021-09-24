@@ -112,29 +112,6 @@ sub Define {
     }
 
     return $init_done ? firstInit($hash) : InternalTimer(time+10, \&firstInit, $hash );
-=pod    
-    ### create password object to handle pass keystore
-    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
-    
-    
-    ## kann nach einiger Zeit gelöscht werden genauso wie auch ReadPassword und DeletePassword
-    if ( defined( ReadPassword( $hash, $name ) ) ) {
-        my ($passResp,$passErr);
-        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,ReadPassword( $hash, $name ));
-        
-        ::Log3($name, 1,
-qq(TeslaPowerwall2AC ($name) - error while saving the password - $passErr))
-          if ( !defined($passResp)
-           and defined($passErr) );
-
-        ::Log3($name, 1,
-qq(TeslaPowerwall2AC ($name) - password successfully saved))
-          if ( defined($passResp)
-           and !defined($passErr) );
-           
-        DeletePassword($hash);
-    }
-=cut
 }
 
 sub firstInit {
@@ -170,7 +147,6 @@ sub firstInit {
 sub Undefine {
     my $hash = shift // return;
     RemoveInternalTimer($hash);
-    
     return;
 }
 
@@ -328,25 +304,25 @@ sub TvHeadend_EPG {
     }
 
     #Get Now
-    if($hash->{EPGQuery_state} == 1){
+    if ( $hash->{EPGQuery_state} == 1 ){
         my $count = $hash->{helper}{epg}{count};
         my @entriesNow = ();
         $hash->{helper}{http}{callback} = sub{
             my ($param, $err, $data) = @_;
-            my $hash = $param->{hash};
-            my $channels = $hash->{helper}{epg}{channels};
+            my $cbhash = $param->{hash};
+            my $channels = $cbhash->{helper}{epg}{channels};
 
-            (Log3($hash, 3,"$hash->{NAME} - $err"),$hash->{EPGQuery_state}=0,return) if $err;
-            (Log3($hash, 3,"$hash->{NAME} - Server needs authentication"),$hash->{EPGQuery_state}=0,return) if $data =~ m{401\sUnauthorized}xms;
-            (Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$hash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
+            (Log3($cbhash, 3,"$cbhash->{NAME} - $err"),$cbhash->{EPGQuery_state}=0,return) if $err;
+            (Log3($cbhash, 3,"$cbhash->{NAME} - Server needs authentication"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{401\sUnauthorized}xms;
+            (Log3($cbhash->{NAME},3,"$cbhash->{NAME} - Requested interface not found"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
 
             my $entries;
             if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
-                return Log3($hash, 1, "JSON decoding error: $@");
+                return Log3($cbhash, 1, "JSON decoding error: $@");
             }
 
             if ( !defined $entries->[0] ){
-                Log3($hash, 4,"$hash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No current EPG information");
+                Log3($cbhash, 4,"$cbhash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No current EPG information");
                 $count--;
             } else {
                 for my $item (qw(title subtitle summary description)) {
@@ -364,17 +340,17 @@ sub TvHeadend_EPG {
 
             if ( @entriesNow == $count ){
 
-                $hash->{helper}{epg}{now} = \@entriesNow;
-                $hash->{helper}{epg}{count} = $count;
+                $cbhash->{helper}{epg}{now} = \@entriesNow;
+                $cbhash->{helper}{epg}{count} = $count;
 
-                $hash->{helper}{epg}{update} = $entriesNow[0]->{stop};
+                $cbhash->{helper}{epg}{update} = $entriesNow[0]->{stop};
                 for my $i (0..@entriesNow-1){
-                    $hash->{helper}{epg}{update} = $entriesNow[$i]->{stop} if $entriesNow[$i]->{stop} < $hash->{helper}{epg}{update};
+                    $cbhash->{helper}{epg}{update} = $entriesNow[$i]->{stop} if $entriesNow[$i]->{stop} < $cbhash->{helper}{epg}{update};
                 }
 
-                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
-                Log3($hash, 4,"$hash->{NAME} - Set State 2");
-                $hash->{EPGQuery_state} = 2;
+                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$cbhash);
+                Log3($cbhash, 4,"$cbhash->{NAME} - Set State 2");
+                $cbhash->{EPGQuery_state} = 2;
             }
             return;
         };
@@ -397,286 +373,284 @@ sub TvHeadend_EPG {
     }
 
     ## GET NEXT
-    if($hash->{EPGQuery_state} == 2){
+    if ( $hash->{EPGQuery_state} == 2 ){
+        my @entriesNext = ();
+        my $count = $hash->{helper}{epg}{count};
 
-		my @entriesNext = ();
-		my $count = $hash->{helper}{epg}{count};
+        $hash->{helper}{http}{callback} = sub{
+            my ($param, $err, $data) = @_;
 
-		$hash->{helper}{http}{callback} = sub{
-			my ($param, $err, $data) = @_;
+            my $cbhash = $param->{hash};
+            my $channels = $cbhash->{helper}{epg}{channels};
 
-			my $hash = $param->{hash};
-			my $channels = $hash->{helper}{epg}{channels};
-
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),$hash->{EPGQuery_state}=0,return) if($err);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Server needs authentication"),$hash->{EPGQuery_state}=0,return) if($data =~ /^.*401 Unauthorized.*/s);
-			(Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Requested interface not found"),$hash->{EPGQuery_state}=0,return) if($data =~ /^.*404 Not Found.*/s);
+            (Log3($cbhash,3,"$cbhash->{NAME} - $err"),$cbhash->{EPGQuery_state}=0,return) if $err;
+            (Log3($cbhash, 3,"$cbhash->{NAME} - Server needs authentication"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{401\sUnauthorized}xms;
+            (Log3($cbhash,3,"$cbhash->{NAME} - Requested interface not found"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
 
             my $entries;
             if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
-                return Log3($hash, 1, "JSON decoding error: $@");
+                return Log3($cbhash, 1, "JSON decoding error: $@");
             }
-			if ( !defined $entries->[0] ){
-				Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No upcoming EPG information.");
-				$count -=1;
-			}else{
-				@$entries[0]->{subtitle} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{subtitle});
-				@$entries[0]->{summary} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{summary});
-				@$entries[0]->{description} = "Keine Informationen verfügbar" if(!defined @$entries[0]->{description});
+            if ( !defined $entries->[0] ){
+                Log3($cbhash,4,"$cbhash->{NAME} - Skipping $channels->[$param->{id}]->{number}:$channels->[$param->{id}]->{name}. No upcoming EPG information.");
+                $count--;
+            }else{
+                for my $items (qw( title subtitle summary description )) {
+                    $entries->[0]->{$items} = "Keine Informationen verfügbar" if !defined $entries->[0]->{$items} && $items ne 'title';
+                    $entries->[0]->{$items} = encode('UTF-8',$entries->[0]->{$items});
+                }
+                $entries->[0]->{channelId} = $param->{id};
+                push @entriesNext,$entries->[0];
+            }
 
-				@$entries[0]->{title} = encode('UTF-8',@$entries[0]->{title});
-				@$entries[0]->{subtitle} = encode('UTF-8',@$entries[0]->{subtitle});
-				@$entries[0]->{summary} = encode('UTF-8',@$entries[0]->{summary});
-				@$entries[0]->{description} = encode('UTF-8',@$entries[0]->{description});
+            if ( @entriesNext == $count ){
+                $cbhash->{helper}{epg}{next} = \@entriesNext;
+                $cbhash->{helper}{epg}{count} = $count;
 
-				@$entries[0]->{channelId} = $param->{id};
+                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$cbhash);
+                Log3($cbhash,4,"$cbhash->{NAME} - Set State 3");
+                $cbhash->{EPGQuery_state} = 3;
+            }
+        };
 
-				push (@entriesNext,@$entries[0])
-			}
+        Log3($hash,4,"$name - Get EPG Next");
 
-			if(int(@entriesNext) == $count){
-				$hash->{helper}{epg}{next} = \@entriesNext;
-				$hash->{helper}{epg}{count} = $count;
+        my $entries = $hash->{helper}{epg}{now};
+        my $ip = $hash->{helper}{http}{ip};
+        my $port = $hash->{helper}{http}{port} // '9981';
 
-				InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
-				Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Set State 3");
-				$hash->{EPGQuery_state} = 3;
-			}
-		};
+        for my $i (0..@$entries-1) {
+            $hash->{helper}{http}{id} = $entries->[$i]->{channelId};
+            $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/load?eventId=$entries->[$i]->{nextEventId}";
+            &TvHeadend_HttpGetNonblocking($hash);
+        }
+        return;
+    }
 
-		Log3($hash->{NAME},4,"$hash->{TYPE} $hash->{NAME} - Get EPG Next");
+    ## SET READINGS
+    if ( $hash->{EPGQuery_state} == 3 ){
+        my $update = $hash->{helper}{epg}{update};
+        my $entriesNow = $hash->{helper}{epg}{now};
+        my $entriesNext = $hash->{helper}{epg}{next};
+        my $channels = $hash->{helper}{epg}{channels};
+        my $items = AttrVal($hash->{NAME},'EPGVisibleItems','');
 
-		my $entries = $hash->{helper}{epg}{now};
-		my $ip = $hash->{helper}{http}{ip};
-		my $port = $hash->{helper}{http}{port};
+        readingsBeginUpdate($hash);
+        for my $i (0..@$channels-1) {
+            readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $channels->[$i]->{id})."ChannelName", $channels->[$i]->{name}) if $items =~ m{ChannelName};
+            readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $channels->[$i]->{id})."ChannelNumber", $channels->[$i]->{number}) if $items =~ m{ChannelNumber};
+        }
+        for my $i (0..@$entriesNow-1) {
+            for my $el (qw( Title Subtitle Summary Description )) {
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}Now", $entriesNow->[$i]->{lc $el}) if $items =~ m{$el};
+            }
+            for my $el (qw( Start Stop )) {
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}TimeNow", strftime("%H:%M:%S",localtime($entriesNow->[$i]->{lc $el}))) if $items =~ m{${el}Time};
+            }
+        }
 
-		for (my $i=0;$i < int(@$entries);$i+=1){
-			$hash->{helper}{http}{id} = @$entries[$i]->{channelId};
-			$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/load?eventId=".@$entries[$i]->{nextEventId};
-			&TvHeadend_HttpGetNonblocking($hash);
-		}
-		return;
+        for my $i (0..@$entriesNext-1) {
+            for my $el (qw( Title Subtitle Summary Description )) {
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}Next", $entriesNext->[$i]->{lc $el}) if $items =~ m{$el};
+            }
+            for my $el (qw( Start Stop )) {
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}TimeNext", strftime("%H:%M:%S",localtime($entriesNext->[$i]->{lc $el}))) if $items =~ m{${el}Time};
+            }
+        }
+        readingsEndUpdate($hash, 1);
 
-	## SET READINGS
-	}elsif($hash->{EPGQuery_state} == 3){
-		my $update = $hash->{helper}{epg}{update};
-		my $entriesNow = $hash->{helper}{epg}{now};
-		my $entriesNext = $hash->{helper}{epg}{next};
-		my $channels = $hash->{helper}{epg}{channels};
-		my $items = AttrVal($hash->{NAME},"EPGVisibleItems","");
-
-		readingsBeginUpdate($hash);
-		for (my $i=0;$i < int(@$channels);$i+=1){
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$channels[$i]->{id})."ChannelName", @$channels[$i]->{name}) if($items =~ /^.*ChannelName.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$channels[$i]->{id})."ChannelNumber", @$channels[$i]->{number}) if($items =~ /^.*ChannelNumber.*$/);
-		}
-		for (my $i=0;$i < int(@$entriesNow);$i+=1){
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."TitleNow", @$entriesNow[$i]->{title}) if($items =~ /^.*Title.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."StartTimeNow", strftime("%H:%M:%S",localtime(@$entriesNow[$i]->{start}))) if($items =~ /^.*StartTime.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."StopTimeNow", strftime("%H:%M:%S",localtime(@$entriesNow[$i]->{stop}))) if($items =~ /^.*StopTime.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."DescriptionNow", @$entriesNow[$i]->{description}) if($items =~ /^.*Description.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."SummaryNow", @$entriesNow[$i]->{summary}) if($items =~ /^.*Summary.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNow[$i]->{channelId})."SubtitleNow", @$entriesNow[$i]->{subtitle}) if($items =~ /^.*Subtitel.*$/);
-		}
-		for (my $i=0;$i < int(@$entriesNext);$i+=1){
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."DescriptionNext", @$entriesNext[$i]->{description}) if($items =~ /^.*Description.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."SummaryNext", @$entriesNext[$i]->{summary}) if($items =~ /^.*Summary.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."SubtitleNext", @$entriesNext[$i]->{subtitle}) if($items =~ /^.*Subtitel.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."TitleNext", @$entriesNext[$i]->{title}) if($items =~ /^.*Title.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."StartTimeNext", strftime("%H:%M:%S",localtime(@$entriesNext[$i]->{start}))) if($items =~ /^.*StartTime.*$/);
-			readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", @$entriesNext[$i]->{channelId})."StopTimeNext", strftime("%H:%M:%S",localtime(@$entriesNext[$i]->{stop}))) if($items =~ /^.*StopTime.*$/);
-		}
-		readingsEndUpdate($hash, 1);
-
-		Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - Next update: ".  strftime("%H:%M:%S",localtime($update)));
-		RemoveInternalTimer($hash,\&TvHeadend_EPG);
-		InternalTimer($update + 1,\&TvHeadend_EPG,$hash);
-		$hash->{EPGQuery_state} = 0;
-	}
+        Log3($name,3,"$name - Next update: ".  strftime("%H:%M:%S",localtime($update)));
+        RemoveInternalTimer($hash,\&TvHeadend_EPG);
+        InternalTimer($update + 1,\&TvHeadend_EPG,$hash);
+        $hash->{EPGQuery_state} = 0;
+    }
     return;
 }
 
 sub ChannelQuery {
     my $hash = shift // return;
-    Log3($hash, 4,"$hash->{NAME} - Get Channels");
+    my $name = $hash->{NAME};
+    Log3($hash, 4,"$name - Get Channels");
 
     my $ip = $hash->{helper}{http}{ip};
-    my $port = $hash->{helper}{http}{port};
-    my $response = "";
-    my @channelNames = ();
+    my $port = $hash->{helper}{http}{port} // '9981';
+    my $response;
+    my @channelNames;
 
     $hash->{helper}{epg}{count} = 0;
     delete $hash->{helper}{epg}{channels} if defined $hash->{helper}{epg}{channels};
 
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/channel/grid";
-    
+
     my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
-	($response = $err,Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $err"),return $err) if($err);
-	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
-	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
+    ($response = $err,Log3($hash, 3,"$name - $err"),return $err) if $err;
+    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
     if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
-	($response = "No Channels available",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if(int(@$entries) == 0);
-	@{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
+    ($response = "No Channels available",Log3($hash,3,"$name - $response"),return $response) if !@{$entries};
 
-	for (my $i=0;$i < int(@$entries);$i+=1){
-		@$entries[$i]->{name} = encode('UTF-8',@$entries[$i]->{name});
-		@$entries[$i]->{id} = $i;
-		push(@channelNames,@$entries[$i]->{name});
-	}
+    @{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
+
+    for my $i (0..@$entries-1) {
+        $entries->[$i]->{name} = encode('UTF-8',$entries->[$i]->{name});
+        $entries->[$i]->{id} = $i;
+        push @channelNames, $entries->[$i]->{name};
+    }
 
     return if !@channelNames;
-	my $channelNames = join(",",@channelNames);
-	$channelNames =~ s/ /\_/g;
-    ##review
-    
-	#$modules{TvHeadend}{AttrList} =~ s/EPGChannelList:multiple-strict.*/EPGChannelList:multiple-strict,all,$channelNames/;
+    my $channelNames = join q{,}, @channelNames;
+    $channelNames =~ s{ }{\_}g;
+
+    #$modules{TvHeadend}{AttrList} =~ s/EPGChannelList:multiple-strict.*/EPGChannelList:multiple-strict,all,$channelNames/;
     delFromDevAttrList($hash->{NAME},'EPGChannelList');
     addToDevAttrList($hash->{NAME},"EPGChannelList:multiple-strict,all,$channelNames",'TvHeadend');
 
-	$hash->{helper}{epg}{count} = @{$entries};
-	$hash->{helper}{epg}{channels} = $entries;
+    $hash->{helper}{epg}{count} = @{$entries};
+    $hash->{helper}{epg}{channels} = $entries;
 
     return join q{\n}, @channelNames;
 }
 
-sub EPGQuery($$){
-	my ($hash,@args) = @_;
+sub EPGQuery {
+    my $hash = shift // return;
+    my @args = shift // carp q[No arguments provided!] && return;
 
-	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
-	my $entries;
-	my $response = "";
+    my $name = $hash->{NAME};
+    my $ip = $hash->{helper}{http}{ip};
+    my $port = $hash->{helper}{http}{port} // '9981';
+    my $response;
 
-	@args = split(":",join("%20", @args));
-	($args[1] = $args[0], $args[0] = 1)if(!defined $args[1]);
-	($args[0] = 1)if(defined $args[1] && $args[0] !~ /^[0-9]+$/);
+    @args = split q{:},join q{%20}, @args;
+    ($args[1] = $args[0], $args[0] = 1) if !defined $args[1];
+    $args[0] = 1 if defined $args[1] && $args[0] !~ m{\A[0-9]+\z};
 
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/grid?limit=$args[0]&title=$args[1]";
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=$args[0]&title=$args[1]";
 
-	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
-	return $err if($err);
-	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
-	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
+    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    return $err if $err;
+    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
+    my $entries;
+    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+        return Log3($hash, 1, "JSON decoding error: $@");
+    }
 
-	$entries = decode_json($data)->{entries};
-	($response = "No Results",return $response) if(!defined @$entries[0]);
+    return 'No Results' if !defined $entries->[0];
 
-	for (my $i=0;$i < int(@$entries);$i+=1){
-		@$entries[$i]->{subtitle} = "Keine Informationen verfügbar" if(!defined @$entries[$i]->{subtitle});
-		@$entries[$i]->{description} = "Keine Informationen verfügbar" if(!defined @$entries[$i]->{description});
-		@$entries[$i]->{summary} = "Keine Informationen verfügbar" if(!defined @$entries[$i]->{summary});
+    for my $i (0..@$entries-1) {
+        for my $items (qw( subtitle summary description )) {
+            $entries->[$i]->{$items} = "Keine Informationen verfügbar" if !defined $entries->[$i]->{$items};
+        }
+        $response .= "Channel: $entries->[$i]->{channelName}\n"
+                  ."Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{start})))." - "
+                  .strftime("%H:%M:%S]",localtime(encode('UTF-8',$entries->[$i]->{stop})))."\n"
+                  ."Titel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{title},80))."\n"
+                  ."Subtitel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{subtitle},80))."\n"
+                  ."Summary: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{summary},80)). "\n"
+                  ."Description: ".encode('UTF-8',&LewLineStringing(@$entries[$i]->{description},80)). "\n"
+                  ."EventId: $entries->[$i]->{eventId}\n";
+    }
 
-		$response .= "Channel: ".@$entries[$i]->{channelName} ."\n".
-								"Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',@$entries[$i]->{start})))." - ".
-								strftime("%H:%M:%S]",localtime(encode('UTF-8',@$entries[$i]->{stop})))."\n".
-								"Titel: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{title},80))."\n".
-								"Subtitel: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{subtitle},80))."\n".
-								"Summary: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{summary},80)). "\n".
-								"Description: ".encode('UTF-8',&TvHeadend_StringFormat(@$entries[$i]->{description},80)). "\n".
-								"EventId: " . @$entries[$i]->{eventId}."\n";
-	}
-
-	return $response;
-
+    return $response;
 }
 
-sub TvHeadend_ConnectionQuery($){
-	my ($hash,@args) = @_;
-    my $name = $hash->{NAME};
+sub TvHeadend_ConnectionQuery {
+    my $hash = shift // return;
+    my @args = shift // carp q[No arguments provided!] && return;
 
+    my $name = $hash->{NAME};
     Log3($hash,4,"$name - Query connections");
 
+    my $ip = $hash->{helper}{http}{ip};
+    my $port = $hash->{helper}{http}{port} // '9981';
 
-	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
-	
-	my $response = "";
+    my $response;
 
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/status/connections";
-	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
     return $err if $err;
-	($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
-	($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
+    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
     if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
-	if(!defined @$entries[0]){
-		$response = "ConnectedPeers: 0";
+    if ( !defined $entries->[0] ){
+        if(AttrVal($hash->{NAME},'PollingQueries','') =~ m{ConnectionQuery}){
+            readingsBeginUpdate($hash);
+            readingsBulkUpdateIfChanged($hash, "connectionsTotal", "0");
+            for ( qw ( connectionsId connectionsUser connectionsStartTime connectionsPeer connectionsType ) ) {
+                readingsBulkUpdateIfChanged($hash, $_, '-');
+            }
+            readingsEndUpdate($hash, 1);
 
-		if(AttrVal($hash->{NAME},"PollingQueries","") =~ /^.*ConnectionQuery.*$/){
-			readingsBeginUpdate($hash);
-			readingsBulkUpdateIfChanged($hash, "connectionsTotal", "0");
-			readingsBulkUpdateIfChanged($hash, "connectionsId", "-");
-			readingsBulkUpdateIfChanged($hash, "connectionsUser", "-");
-			readingsBulkUpdateIfChanged($hash, "connectionsStartTime", "-");
-			readingsBulkUpdateIfChanged($hash, "connectionsPeer", "-");
-			readingsBulkUpdateIfChanged($hash, "connectionsType", "-");
-			readingsEndUpdate($hash, 1);
+            RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+            InternalTimer(gettimeofday()+AttrVal($name,'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
+        }
+        return 'ConnectedPeers: 0';
+    }
+    
+    @{$entries} = sort {$a->{started} <=> $b->{started}} @{$entries};
 
-			RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
-			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingInterval",60),\&TvHeadend_ConnectionQuery,$hash);
-		}
-	}else{
-		@$entries = sort {$a->{started} <=> $b->{started}} @$entries;
+    $response = "ConnectedPeers: @{$entries}\n"
+                ."-------------------------\n";
+    for my $i (0..@$entries-1) {
+        $response .= "Id: $entries->[$i]->{id} \n"
+                  ."User: ".encode('UTF-8',$entries->[$i]->{user})."\n"
+                  ."StartTime: ".strftime("%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{started}))) ." Uhr\n"
+                  ."Peer: ".encode('UTF-8',$entries->[$i]->{peer})."\n"
+                  ."Type: ".encode('UTF-8',$entries->[$i]->{type})."\n"
+                  ."-------------------------\n";
+    }
 
-		$response = "ConnectedPeers: ".@$entries."\n".
-								"-------------------------"."\n";
-		for (my $i=0;$i < int(@$entries);$i+=1){
-		$response .= "Id: ".@$entries[$i]->{id} ."\n".
-								"User: ".encode('UTF-8',@$entries[$i]->{user})."\n".
-								"StartTime: ".strftime("%H:%M:%S",localtime(encode('UTF-8',@$entries[$i]->{started}))) ." Uhr\n".
-								"Peer: ".encode('UTF-8',@$entries[$i]->{peer})."\n".
-								"Type: ".encode('UTF-8',@$entries[$i]->{type})."\n".
-								"-------------------------"."\n";
-		}
+    if ( AttrVal($name,'PollingQueries','') =~ m{ConnectionQuery} ) {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, 'connectionsTotal', @{$entries} );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsId', join q{,}, my @ids = map {$_->{id}} @{$entries} );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsUser', encode('UTF-8', join q{,}, my @users = map {$_->{user}} @{$entries} ) );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsStartTime', encode('UTF-8', join q{,}, my @startTimes = map {$_->{started}} @{$entries} ));
+        readingsBulkUpdateIfChanged( $hash, 'connectionsPeer', encode('UTF-8',join q{,}, my @peer = map {$_->{peer}} @{$entries} ) );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsType', encode('UTF-8',join q{,}, my @type = map {$_->{type}} @{$entries} ) );
+        readingsEndUpdate($hash, 1);
 
-		if(AttrVal($hash->{NAME},"PollingQueries","") =~ /^.*ConnectionQuery.*$/){
-			readingsBeginUpdate($hash);
-			readingsBulkUpdateIfChanged($hash, "connectionsTotal", @$entries);
-			readingsBulkUpdateIfChanged($hash, "connectionsId", join(",",(my @ids = map {$_->{id}}@$entries)));
-			readingsBulkUpdateIfChanged($hash, "connectionsUser", encode('UTF-8',join(",",(my @users = map {$_->{user}}@$entries))));
-			readingsBulkUpdateIfChanged($hash, "connectionsStartTime", encode('UTF-8',join(",",(my @startTimes = map {$_->{started}}@$entries))));
-			readingsBulkUpdateIfChanged($hash, "connectionsPeer", encode('UTF-8',join(",",(my @peer = map {$_->{peer}}@$entries))));
-			readingsBulkUpdateIfChanged($hash, "connectionsType", encode('UTF-8',join(",",(my @type = map {$_->{type}}@$entries))));
-			readingsEndUpdate($hash, 1);
+        RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
+        InternalTimer(gettimeofday()+AttrVal($name, 'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
+    }
 
-			RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
-			InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"PollingInterval",60),\&TvHeadend_ConnectionQuery,$hash);
-		}
-	}
-
-	return $response;
+    return $response;
 }
 
-sub DVREntryCreate($$){
-	my ($hash,@args) = @_;
+sub DVREntryCreate {
+    my $hash = shift // return;
+    my @args = shift // carp q[No arguments provided!] && return;
 
-	my $ip = $hash->{helper}{http}{ip};
-	my $port = $hash->{helper}{http}{port};
-	my $response = "";
+    my $name = $hash->{NAME};
 
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/epg/events/load?eventId=".$args[0];
-	my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
-	return $err if($err);
-	($response = "Server needs authentication",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*401 Unauthorized.*/s);
-	($response = "Requested interface not found",Log3($hash->{NAME},3,"$hash->{TYPE} $hash->{NAME} - $response"),return $response) if($data =~ /^.*404 Not Found.*/s);
+    my $ip = $hash->{helper}{http}{ip};
+    my $port = $hash->{helper}{http}{port} // '9981';
+    my $response;
+
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/load?eventId=$args[0]";
+    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    return $err if $err;
+    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
     if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
-    ($response = "EventId is not valid",return $response) if !defined $entries->[0];
+    return 'EventId is not valid' if !defined $entries->[0];
 
-    my %record = (
+    my %recording = (
         start  => $entries->[0]->{start},
         stop => $entries->[0]->{stop},
             title  => {
@@ -691,36 +665,39 @@ sub DVREntryCreate($$){
             channelname  => $entries->[0]->{channelName},
     );
 
-	my $jasonData = encode_json(\%record);
+    my $jsonData;
+    if ( !eval { $jsonData  = encode_json(\%recording) ; 1 } ) {
+        return Log3($hash, 1, "JSON encoding error: $@");
+    }
 
-	$jasonData =~ s/\x20/\%20/g;
-	$hash->{helper}{http}{url} = "http://".$ip.":".$port."/api/dvr/entry/create?conf=".$jasonData;
-	($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    $jsonData =~ s{\x20}{\%20}g;
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/dvr/entry/create?conf=$jsonData";
+	#($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    return &TvHeadend_HttpGetBlocking($hash);
 }
 
-sub TvHeadend_StringFormat($$){
+sub LewLineStringing {
+    my $string    = shift // carp q[No string provided!]     && return;
+    my $maxLength = shift // carp q[No limitation provided!] && return;
 
-	my ($string, $maxLength) = @_;
-
-  my @words = split(/ /, $string);
-  my $rowLength = 0;
-  my $result = "";
-  while (int(@words) > 0) {
-  	my $tempString = shift @words;
-    if ($rowLength > 0){
-    	if (($rowLength + length($tempString)) > $maxLength){
-      	$rowLength = 0;
-        $result .= "\n";
-      }
+    my @words = split q{ }, $string;
+    my $rowLength = 0;
+    my $result = "";
+    while ( @words ) {
+        my $tempString = shift @words;
+        if ($rowLength > 0){
+            if (($rowLength + length($tempString)) > $maxLength){
+                $rowLength = 0;
+                $result .= "\n";
+            }
+        }
+        $result .= $tempString;
+        $rowLength += length($tempString);
+        if ( @words ){
+            $result .= ' ';
+            $rowLength++;
+        }
     }
-    $result .= $tempString;
-    $rowLength += length($tempString);
-    if (int(@words) > 0){
-        $result .= ' ';
-        $rowLength++;
-    }
-  }
-
     return $result;
 }
 
