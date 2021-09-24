@@ -2479,7 +2479,7 @@ __END__
   <br><br>
   Except for <i>message</i> all parameters are optional, for configuration of the entire messageing logics see also <a href="#msgConfig">msgConfig</a>.<br>
   <br>
-  Basic idea behind the command (and msgConfig) is to establish a central logic for dispatching messages to be sent to the user, so e.g. in case an address of an recipient changes, you only have to change one single point in your entire configuration.<br><br>
+  Basic idea behind the command (and msgConfig) is to establish a central logic for dispatching messages to be sent to the user, so e.g. in case an address of an recipient changes, you only have to change one single point in your entire configuration.<br>
   Parameters are as follows:<br>
   <ul>
     <li>type<br>
