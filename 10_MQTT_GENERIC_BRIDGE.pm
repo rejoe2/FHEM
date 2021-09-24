@@ -22,7 +22,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id: 10_MQTT_GENERIC_BRIDGE.pm 24759 2021-07-16 14:04:57Z hexenmeister $
+# $Id: 10_MQTT_GENERIC_BRIDGE.pm 24759 IODev fixes 2021-09-24 Beta-User $
 #
 ###############################################################################
 
@@ -677,14 +677,14 @@ sub refreshUserAttr {
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
 sub retrieveIODevName {
   my $hash = shift // return;
-  my $iodn = InternalVal($hash->{NAME}, 'IODev',AttrVal($hash->{NAME}, 'IODev',ReadingsVal($hash->{NAME}, 'IODev', undef)));
+  my $iodn = InternalVal($hash->{NAME}, 'IODev',undef)->{NAME} // AttrVal($hash->{NAME}, 'IODev',ReadingsVal($hash->{NAME}, 'IODev', undef));
   return $iodn;
 }
 
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
 sub retrieveIODevType {
   my $hash = shift // return;
-  
+
   return $hash->{+HELPER}->{+IO_DEV_TYPE} if defined $hash->{+HELPER}->{+IO_DEV_TYPE};
 
   my $iodn = retrieveIODevName($hash);
@@ -692,7 +692,7 @@ sub retrieveIODevType {
   if(defined($iodn) and defined($defs{$iodn})) {
     $iodt = $defs{$iodn}{TYPE};
   }
-  $hash->{+HELPER}->{+IO_DEV_TYPE} =  $iodt;
+  $hash->{+HELPER}->{+IO_DEV_TYPE} = $iodt if defined $iodt;
   return $iodt;
 }
 
@@ -2721,9 +2721,10 @@ sub Attr {
   if ($attribute eq "IODev") {
       my $ioDevType = undef;
       $ioDevType = $defs{$value}{TYPE} if defined ($value) and defined ($defs{$value});
-      $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
+      #$hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
       
       if ($command eq "set") {
+        $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
         my $oldValue = retrieveIODevName($hash); #$attr{$name}{IODev};
         if ($init_done) {
           #unless (defined ($oldValue) and ($oldValue eq $value) ) {
@@ -2737,6 +2738,7 @@ sub Attr {
         }
       } else {
         MQTT::client_stop($hash) if $init_done && defined $ioDevType && $ioDevType eq 'MQTT';
+        delete $hash->{+HELPER}->{+IO_DEV_TYPE};
       }
     return;
   }
