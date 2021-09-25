@@ -677,7 +677,7 @@ sub refreshUserAttr {
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
 sub retrieveIODevName {
   my $hash = shift // return;
-  my $iodn = InternalVal($hash->{NAME}, 'IODev',undef)->{NAME} // AttrVal($hash->{NAME}, 'IODev',ReadingsVal($hash->{NAME}, 'IODev', undef));
+  my $iodn = defined InternalVal($hash->{NAME}, 'IODev',undef) ? InternalVal($hash->{NAME}, 'IODev',undef)->{NAME} : AttrVal($hash->{NAME}, 'IODev',ReadingsVal($hash->{NAME}, 'IODev', undef));
   return $iodn;
 }
 

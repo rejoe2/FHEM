@@ -40,6 +40,7 @@ BEGIN {
     delFromDevAttrList
     readingsBeginUpdate
     readingsBulkUpdate
+    readingsBulkUpdateIfChanged
     readingsEndUpdate
     Log3
     defs
@@ -107,7 +108,7 @@ sub Define {
 
     if ( defined $user ){
         $hash->{DEF} = "baseUrl=$address";
-        CommandAttr($hash, "name Username $user");
+        CommandAttr($hash, "$name Username $user");
         $hash->{helper}{'.pw'} = $password if $password;
     }
 
@@ -304,7 +305,7 @@ sub TvHeadend_EPG {
     }
 
     #Get Now
-    if ( $hash->{EPGQuery_state} == 1 ){
+    if($hash->{EPGQuery_state} == 1){
         my $count = $hash->{helper}{epg}{count};
         my @entriesNow = ();
         $hash->{helper}{http}{callback} = sub{
@@ -322,20 +323,20 @@ sub TvHeadend_EPG {
             }
 
             if ( !defined $entries->[0] ){
-                Log3($cbhash, 4,"$cbhash->{NAME} - Skipping @$channels[$param->{id}]->{number}:@$channels[$param->{id}]->{name}. No current EPG information");
+                Log3($cbhash, 4,"$cbhash->{NAME} - Skipping $channels->[$param->{id}]->{number}:$channels->[$param->{id}]->{name}. No current EPG information");
                 $count--;
             } else {
                 for my $item (qw(title subtitle summary description)) {
-                    @$entries[0]->{$item} = encode('UTF-8',@$entries[0]->{$item});
+                    $entries->[0]->{$item} = encode('UTF-8',$entries->[0]->{$item});
                 }
 
                 for my $item (qw(subtitle summary description)) {
-                    @$entries[0]->{$item} = "Keine Informationen verfügbar" if !defined @$entries[0]->{$item};
+                    @$entries[0]->{$item} = encode('UTF-8',"Keine Informationen verfügbar") if !defined $entries->[0]->{$item};
                 }
 
-                @$entries[0]->{channelId} = $param->{id};
+                $entries->[0]->{channelId} = $param->{id};
 
-                push (@entriesNow,@$entries[0])
+                push @entriesNow, $entries->[0];
             }
 
             if ( @entriesNow == $count ){
@@ -360,12 +361,12 @@ sub TvHeadend_EPG {
         my $channels = $hash->{helper}{epg}{channels};
         my $channelName;
         my $ip = $hash->{helper}{http}{ip};
-        my $port = $hash->{helper}{http}{port};
+        my $port = $hash->{helper}{http}{port} // '9981';
 
         for my $i (0..$count-1){
             $hash->{helper}{http}{id} = $channels->[$i]->{id};
             $channelName = $channels->[$i]->{name};
-            $channelName =~ s/\x20/\%20/g;
+            $channelName =~ s{\x20}{\%20}g;
             $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=1&channel=$channelName";
             TvHeadend_HttpGetNonblocking($hash);
         }
@@ -394,7 +395,7 @@ sub TvHeadend_EPG {
             if ( !defined $entries->[0] ){
                 Log3($cbhash,4,"$cbhash->{NAME} - Skipping $channels->[$param->{id}]->{number}:$channels->[$param->{id}]->{name}. No upcoming EPG information.");
                 $count--;
-            }else{
+            } else {
                 for my $items (qw( title subtitle summary description )) {
                     $entries->[0]->{$items} = "Keine Informationen verfügbar" if !defined $entries->[0]->{$items} && $items ne 'title';
                     $entries->[0]->{$items} = encode('UTF-8',$entries->[0]->{$items});
@@ -440,9 +441,9 @@ sub TvHeadend_EPG {
             readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $channels->[$i]->{id})."ChannelName", $channels->[$i]->{name}) if $items =~ m{ChannelName};
             readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $channels->[$i]->{id})."ChannelNumber", $channels->[$i]->{number}) if $items =~ m{ChannelNumber};
         }
-        for my $i (0..@$entriesNow-1) {
+        for my $i (0..@{$entriesNow}-1) {
             for my $el (qw( Title Subtitle Summary Description )) {
-                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}Now", $entriesNow->[$i]->{lc $el}) if $items =~ m{$el};
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}Now",$entriesNow->[$i]->{lc $el}) if $items =~ m{$el};
             }
             for my $el (qw( Start Stop )) {
                 readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}TimeNow", strftime("%H:%M:%S",localtime($entriesNow->[$i]->{lc $el}))) if $items =~ m{${el}Time};
@@ -544,7 +545,7 @@ sub EPGQuery {
 
     for my $i (0..@$entries-1) {
         for my $items (qw( subtitle summary description )) {
-            $entries->[$i]->{$items} = "Keine Informationen verfügbar" if !defined $entries->[$i]->{$items};
+            $entries->[$i]->{$items} = encode('UTF-8',"Keine Informationen verfügbar") if !defined $entries->[$i]->{$items};
         }
         $response .= "Channel: $entries->[$i]->{channelName}\n"
                   ."Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{start})))." - "
@@ -742,9 +743,9 @@ sub TvHeadend_HttpGetBlocking {
 __END__
 
 =pod
-=item device
-=item summary Control your TvHeadend server
+=item summary    Control your TvHeadend server
 =item summary_DE Steuerung eines TvHeadend Servers
+=item device
 =begin html
 
 <a id="TvHeadend"></a>
@@ -753,7 +754,7 @@ __END__
     <i>TvHeadend</i> is a TV streaming server for Linux supporting
         DVB-S, DVB-S2, DVB-C, DVB-T, ATSC, IPTV,SAT>IP and other formats through
         the unix pipe as input sources. For further informations, take a look at the
-        <a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.
+        <a href="https://github.com/tvheadend/tvheadend">repository</a> on GitHub.<br>
         This module module makes use of TvHeadends JSON API.
     <br><br>
     <a id="TvHeadend-define"></a>
@@ -764,8 +765,7 @@ __END__
         Example: <code>define tvheadend TvHeadend 192.168.0.10</code><br>
         Example: <code>define tvheadend TvHeadend 192.168.0.10 max securephrase</code>
         <br><br>
-            When &lt;PORT&gt; is not set, the module will use TvHeadends standard port 9981.
-            If the definition is successfull, the module will automatically query the EPG
+            When &lt;PORT&gt; is not set, the module will use TvHeadends standard port 9981. If the definition is successfull, the module will automatically query the EPG 
             for tv shows playing now and next. The query is based on Channels mapped in Configuration/Channel.
             The module will automatically query again when a tv show ends.<br>
         NOTE: USERNAME and/or PASSWORD will not be permanently stored in DEF. USERNAME will be transfered to attribute <i>Username</i>, PASSWORD will be stored in central keystore and may be changed or removed by <i>set</i> commands.
@@ -873,4 +873,5 @@ __END__
     </ul>
 </ul>
 =end html
+
 =cut
