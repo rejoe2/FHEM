@@ -1,7 +1,7 @@
 # based on https://forum.fhem.de/index.php/topic,85932.0.html
 # https://github.com/Quantum1337/70_Tvheadend.pm
 # tvheadend api is available at https://github.com/dave-p/TVH-API-docs/wiki
-# $Id: 70_TvHeadend.pm 2021-09-23 Beta-User$
+# $Id: 70_TvHeadend.pm 2021-09-24 Beta-User$
 
 package TvHeadend; ##no critic qw(Package)
 
@@ -54,11 +54,11 @@ BEGIN {
     AttrVal
     ReadingsVal
     devspec2array
-    gettimeofday
     HttpUtils_BlockingGet
     HttpUtils_NonblockingGet
   ))
 };
+#HttpUtils_Connect vorab als "ping"-Ersatz?
 
 sub Initialize {
     my $hash = shift // return;
@@ -137,7 +137,7 @@ sub firstInit {
     TvHeadend_EPG($hash);
 
     if ( AttrVal($name,'PollingQueries','') =~ m{ConnectionQuery} ) {
-        InternalTimer(gettimeofday(),\&TvHeadend_ConnectionQuery,$hash);
+        InternalTimer(time,\&TvHeadend_ConnectionQuery,$hash);
         my $interval = AttrVal($name,'PollingInterval',60);
         Log3( $hash,3,"$name - ConnectionQuery will be polled with an interval of $interval s");
     }
@@ -168,10 +168,10 @@ sub Set {
         if !defined $sets{$command};
 
     if($command eq 'EPG'){
-        return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
+        return InternalTimer(time,\&TvHeadend_EPG,$hash);
     }
     if($command eq 'DVREntryCreate'){
-        return "EventId must be numeric" if $values[0] !~ m{\A[0-9]+\z};
+        return 'EventId must be numeric' if $values[0] !~ m{\A[0-9]+\z};
         return DVREntryCreate($hash,@values);
     }
     
@@ -225,8 +225,9 @@ sub Attr {
 
     if ( $command eq 'set' ) {
 
-        if($attribute eq 'EPGVisibleItems'){
-            for my $items (qw(Title Subtitle Summary Description StartTime StopTime)) {
+        if ( $attribute eq 'EPGVisibleItems' ) {
+            return if !$init_done;
+            for my $items ( qw( Title Subtitle Summary Description StartTime StopTime ) ) {
                 next if $value !~ m{$items};
                 CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Next");
                 CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Now");
@@ -236,10 +237,10 @@ sub Attr {
             return;
         }
 
-        if($attribute eq 'PollingQueries'){
-            if ( $value =~ m{ConnectionQuery} ){
+        if ( $attribute eq 'PollingQueries' ) {
+            if ( $value =~ m{ConnectionQuery} ) {
                 return if !$init_done;
-                InternalTimer(gettimeofday(),\&TvHeadend_ConnectionQuery,$hash);
+                InternalTimer(time,\&TvHeadend_ConnectionQuery,$hash);
                 my $periode = AttrVal($name,'PollingInterval',60);
                 return Log3($hash,3,"$name - ConnectionQuery will be polled with an interval of $periode s");
             }
@@ -248,7 +249,7 @@ sub Attr {
             return Log3($hash,3,"$name - ConnectionQuery won't be polled anymore");
         }
         
-        if($attribute eq 'HTTPTimeout'){
+        if ( $attribute eq 'HTTPTimeout' ) {
             return "$attribute must be nummeric and between 1 and 60 seconds" 
                 if !looks_like_number($value) || ($value < 1 || $value > 60);
         }
@@ -276,11 +277,10 @@ sub Rename {
     ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
    
     Log3($new, 1, qq(TvHeadend \(${new}\) - error while change the password hash after rename - $passErr))
-        if !defined $passResp && defined $passErr;
+        if $passErr;
 
-    Log3($new, 1, qq(TvHeadend \(${new}\) - change password hash after rename successfully))
-        if defined $passResp && !defined $passErr;
-
+    Log3($new, 3, qq(TvHeadend \(${new}\) - change password hash after rename successfully))
+        if $passResp;
     return;
 }
 
@@ -301,7 +301,7 @@ sub TvHeadend_EPG {
             if $hash->{helper}{epg}{count} == 0;
         Log3($name,4,"$name - Set State 1");
         $hash->{EPGQuery_state} = 1;
-        return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
+        return InternalTimer(time,\&TvHeadend_EPG,$hash);
     }
 
     #Get Now
@@ -349,7 +349,7 @@ sub TvHeadend_EPG {
                     $cbhash->{helper}{epg}{update} = $entriesNow[$i]->{stop} if $entriesNow[$i]->{stop} < $cbhash->{helper}{epg}{update};
                 }
 
-                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$cbhash);
+                InternalTimer(time,\&TvHeadend_EPG,$cbhash);
                 Log3($cbhash, 4,"$cbhash->{NAME} - Set State 2");
                 $cbhash->{EPGQuery_state} = 2;
             }
@@ -408,7 +408,7 @@ sub TvHeadend_EPG {
                 $cbhash->{helper}{epg}{next} = \@entriesNext;
                 $cbhash->{helper}{epg}{count} = $count;
 
-                InternalTimer(gettimeofday(),\&TvHeadend_EPG,$cbhash);
+                InternalTimer(time,\&TvHeadend_EPG,$cbhash);
                 Log3($cbhash,4,"$cbhash->{NAME} - Set State 3");
                 $cbhash->{EPGQuery_state} = 3;
             }
@@ -593,7 +593,7 @@ sub TvHeadend_ConnectionQuery {
             readingsEndUpdate($hash, 1);
 
             RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
-            InternalTimer(gettimeofday()+AttrVal($name,'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
+            InternalTimer(time+AttrVal($name,'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
         }
         return 'ConnectedPeers: 0';
     }
@@ -622,7 +622,7 @@ sub TvHeadend_ConnectionQuery {
         readingsEndUpdate($hash, 1);
 
         RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
-        InternalTimer(gettimeofday()+AttrVal($name, 'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
+        InternalTimer(time+AttrVal($name, 'PollingInterval',60),\&TvHeadend_ConnectionQuery,$hash);
     }
 
     return $response;
