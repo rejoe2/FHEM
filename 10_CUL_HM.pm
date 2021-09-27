@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-21 +Beta-User-Patches martinp876 $
+# $Id: 10_CUL_HM.pm 24961 2021-09-27 +Beta-User-Patches + sort/reverse$
 
 package main;
 
@@ -4923,14 +4923,14 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
     
     if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}           };
     if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      }keys %{$culHmGlobalSetsVrtDev}     };
-    if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}keys %{$culHmSubTypeDevSets->{$st}}};
-    if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         }keys %{$culHmGlobalSetsChn}        };
-    if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   }keys %{$culHmSubTypeSets->{$st}}   };
-    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }keys %{$culHmModelSets->{$md}}     };
-    if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} }keys %{$culHmChanSets->{$md."00"}} };
-    if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }keys %{$culHmChanSets->{$md."xx"}} };
-    if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} }keys %{$culHmChanSets->{$md.$chn}} };
-    if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    }keys %{$culHmFunctSets->{$fkt}}    };
+    if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}} sort keys %{$culHmSubTypeDevSets->{$st}}};
+    if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         } sort keys %{$culHmGlobalSetsChn}        };
+    if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   } sort keys %{$culHmSubTypeSets->{$st}}   };
+    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }sort keys %{$culHmModelSets->{$md}}     };
+    if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} }sort keys %{$culHmChanSets->{$md."00"}} };
+    if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }sort keys %{$culHmChanSets->{$md."xx"}} };
+    if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} } sort keys %{$culHmChanSets->{$md.$chn}} };
+    if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    } sort keys %{$culHmFunctSets->{$fkt}}    };
 
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
@@ -4981,7 +4981,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
 
   my $tmplStamp = CUL_HM_getTemplateModify();
   my $tmplAssTs = (defined $hash->{helper}{cmds}{TmplTs} ? $hash->{helper}{cmds}{TmplTs}:"noAssTs");# template assign timestamp
-  my $peerLst = InternalVal($name,"peerList","");
+  my $peerLst = InternalVal($name,"peerList",""); #Beta-User: might need a different default?
   if($hash->{helper}{cmds}{TmplKey} ne $peerLst.":$tmplStamp:$tmplAssTs" ){
     my @arr1 =  map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name));
     delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
@@ -9288,11 +9288,11 @@ sub CUL_HMTmplSetCmd($){
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
-    foreach my $t(keys %HMConfig::culHmTpl){
+    foreach my $t(reverse sort keys %HMConfig::culHmTpl){
       next if (not scalar (keys %{$HMConfig::culHmTpl{$t}{reg}}));
       my $f = 0;
       my $typShLg=0;
-      foreach my $r(keys %{$HMConfig::culHmTpl{$t}{reg}}){
+      foreach my $r(reverse sort keys %{$HMConfig::culHmTpl{$t}{reg}}){
         if(!defined $b{$r} && !defined $b{"sh".$r}){$f = 1;last;}
         $typShLg = defined $b{"sh".$r} ? 1 : 0;
       }
@@ -10827,7 +10827,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       ($iom) =    ((sort {@{$hh->{mRssi}{io}{$b}}[0] <=>     # This is the best choice
                             @{$hh->{mRssi}{io}{$a}}[0] } 
                           (grep { defined @{$hh->{mRssi}{io}{$_}}[0]} @ioccu))
-                         ,(grep {!defined @{$hh->{mRssi}{io}{$_}}[0]} @ioccu))      if(@ioccu);
+                         ,(grep {!defined @{$hh->{mRssi}{io}{$_}}
+                         [0]} @ioccu))      if(@ioccu);
     } 
     ($iom) = grep{defined $defs{$_}} @{$hh->{io}{prefIO}}                           if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep{defined $defs{$_}} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}}  if(!$iom && @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}});
@@ -11329,7 +11330,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my %dlf = (1=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              2=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              3=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0});
-  return "unused" if ($template =~ m/^(none|0) *$/);
+  return "unused" if ($template =~ m/^(none|0) *$/); #Beta-User: "unused" is needed for HMinfo_configCheck()
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
