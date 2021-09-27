@@ -5313,7 +5313,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($result){
       return $result;
     }
-    $hash->{device} = $newName;
+    $hash->{device} = $newName; #Beta-User: for deviceRename see https://forum.fhem.de/index.php/topic,123131.0.html
  
     if ($roleV){
       foreach(1..50){
