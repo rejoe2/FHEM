@@ -4923,12 +4923,12 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
     
     if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}           };
     if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      }keys %{$culHmGlobalSetsVrtDev}     };
-    if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}} sort keys %{$culHmSubTypeDevSets->{$st}}};
+    if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}} sort keys %{$culHmSubTypeDevSets->{$st}}}; #Beta-User: sorting keys avoids erratic behaviour wrt. to setters and e.g. tempListTmpl attribute, see https://forum.fhem.de/index.php/topic,122422.msg1176621.html#msg1176621
     if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         } sort keys %{$culHmGlobalSetsChn}        };
     if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   } sort keys %{$culHmSubTypeSets->{$st}}   };
-    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }sort keys %{$culHmModelSets->{$md}}     };
-    if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} }sort keys %{$culHmChanSets->{$md."00"}} };
-    if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }sort keys %{$culHmChanSets->{$md."xx"}} };
+    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     } sort keys %{$culHmModelSets->{$md}}     };
+    if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} } sort keys %{$culHmChanSets->{$md."00"}} };
+    if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} } sort keys %{$culHmChanSets->{$md."xx"}} };
     if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} } sort keys %{$culHmChanSets->{$md.$chn}} };
     if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    } sort keys %{$culHmFunctSets->{$fkt}}    };
 
@@ -4981,7 +4981,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
 
   my $tmplStamp = CUL_HM_getTemplateModify();
   my $tmplAssTs = (defined $hash->{helper}{cmds}{TmplTs} ? $hash->{helper}{cmds}{TmplTs}:"noAssTs");# template assign timestamp
-  my $peerLst = InternalVal($name,"peerList",""); #Beta-User: might need a different default?
+  my $peerLst = InternalVal($name,"peerList","");
   if($hash->{helper}{cmds}{TmplKey} ne $peerLst.":$tmplStamp:$tmplAssTs" ){
     my @arr1 =  map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name));
     delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
@@ -5313,6 +5313,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($result){
       return $result;
     }
+    $hash->{device} = $newName;
  
     if ($roleV){
       foreach(1..50){
@@ -5334,12 +5335,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
     }
     my @results;
+    my @renamed;
     foreach my $cd (grep /^channel_/,keys %{$hash}){
       my $cName = InternalVal($newName,$cd,"");
       my $no = hex(substr($cd,8));
       $result = CommandRename(undef,$cName.' '.$chLst[$no]);
+      $hash->{"channel_".sprintf "%02X",$no} = $chLst[$no];     #reference in device as well
+      $defs{$chLst[$no]}->{device} = $newName;
+      push @renamed, $chLst[$no];
       push @results,"rename $cName failed: $result" if ($result);
     }
+    CUL_HM_setAssotiat($newName);
+    for (@renamed) { CUL_HM_setAssotiat($_); }
     return "channel rename failed:\n".join("\n",@results) if (scalar @results);
   }
   elsif($cmd eq "tempListTmpl") { #############################################
@@ -9288,7 +9295,7 @@ sub CUL_HMTmplSetCmd($){
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
-    foreach my $t(reverse sort keys %HMConfig::culHmTpl){
+    foreach my $t(reverse sort keys %HMConfig::culHmTpl){ #Beta-User: reverse sorting keys for tempListTmpl attribute, see https://forum.fhem.de/index.php/topic,122422.msg1176621.html#msg1176621
       next if (not scalar (keys %{$HMConfig::culHmTpl{$t}{reg}}));
       my $f = 0;
       my $typShLg=0;
