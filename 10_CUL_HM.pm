@@ -911,7 +911,9 @@ sub CUL_HM_Attr(@) {#################################
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
         $updtReq = 1;
         #Beta-User# sonst braucht man nach dem define einen Neustart?
-        CUL_HM_AttrInit($hash,'CCU-FHEM');
+        #CUL_HM_AttrInit($hash,'CCU-FHEM'); #so sicher nicht, eher:
+        #CUL_HM_AttrInit($modules{CUL_HM});
+        CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
     }
     else{
@@ -7667,6 +7669,7 @@ sub CUL_HM_infoUpdtDevData($$$$) {#autoread config
                               ".D-devInfo:$devInfo",
                               ".D-stc:$stc");
 }
+
 sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite modelForce
   my($name,$model,$fromUpdate) = @_;
   my $hash = $defs{$name};
