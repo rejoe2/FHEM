@@ -4917,7 +4917,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
     if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
         next if (!defined $culHmReglSets->{$rl});
-        foreach(sort keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
+        foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
       }
     }
     
@@ -9287,8 +9287,8 @@ sub CUL_HMTmplSetCmd($){
   my %tpl;
   my $helper = $defs{$name}{helper};
   
-  my   @peers = map{$helper->{peerIDsH}{$_}} grep !/^(00000000|$devId)/,reverse sort keys %{$helper->{peerIDsH}};
-  push @peers,  map{"self".substr($_,-2)}    grep /^$devId/            ,reverse sort keys %{$helper->{peerIDsH}};
+  my   @peers = map{$helper->{peerIDsH}{$_}} grep !/^(00000000|$devId)/,keys %{$helper->{peerIDsH}};
+  push @peers,  map{"self".substr($_,-2)}    grep /^$devId/            ,keys %{$helper->{peerIDsH}};
   foreach my $peer($peers[0],"0"){ 
     next if (!defined $peer);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
