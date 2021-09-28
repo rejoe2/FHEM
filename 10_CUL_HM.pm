@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-27 +Beta-User-Patches + sort/reverse$
+# $Id: 10_CUL_HM.pm 24961 2021-09-28 +Beta-User-Patches + sort II$
 
 package main;
 
