@@ -4917,12 +4917,12 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
     if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
         next if (!defined $culHmReglSets->{$rl});
-        foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
+        foreach(sort keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
       }
     }
     
-    if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}           };
-    if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      }keys %{$culHmGlobalSetsVrtDev}     };
+    if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            } sort keys %{$culHmGlobalSets}           };
+    if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      } sort keys %{$culHmGlobalSetsVrtDev}     };
     if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}} sort keys %{$culHmSubTypeDevSets->{$st}}}; #Beta-User: sorting keys avoids erratic behaviour wrt. to setters and e.g. tempListTmpl attribute, see https://forum.fhem.de/index.php/topic,122422.msg1176621.html#msg1176621
     if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         } sort keys %{$culHmGlobalSetsChn}        };
     if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   } sort keys %{$culHmSubTypeSets->{$st}}   };
@@ -4936,9 +4936,9 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
    
     my @cond = ();
-    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}}         if (defined $lvlStr{md}{$md});
-    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{mdCh}{"$md$chn"}} if (defined $lvlStr{mdCh}{"$md$chn"});
-    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{st}{$st}}         if (defined $lvlStr{st}{$st});
+    push @cond,map{$lvlStr{md}{$md}{$_}}         sort keys%{$lvlStr{md}{$md}}         if (defined $lvlStr{md}{$md});
+    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} sort keys%{$lvlStr{mdCh}{"$md$chn"}} if (defined $lvlStr{mdCh}{"$md$chn"});
+    push @cond,map{$lvlStr{st}{$st}{$_}}         sort keys%{$lvlStr{st}{$st}}         if (defined $lvlStr{st}{$st});
     push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
@@ -9287,8 +9287,8 @@ sub CUL_HMTmplSetCmd($){
   my %tpl;
   my $helper = $defs{$name}{helper};
   
-  my   @peers = map{$helper->{peerIDsH}{$_}} grep !/^(00000000|$devId)/,keys %{$helper->{peerIDsH}};
-  push @peers,  map{"self".substr($_,-2)}    grep /^$devId/            ,keys %{$helper->{peerIDsH}};
+  my   @peers = map{$helper->{peerIDsH}{$_}} grep !/^(00000000|$devId)/,reverse sort keys %{$helper->{peerIDsH}};
+  push @peers,  map{"self".substr($_,-2)}    grep /^$devId/            ,reverse sort keys %{$helper->{peerIDsH}};
   foreach my $peer($peers[0],"0"){ 
     next if (!defined $peer);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
@@ -9299,7 +9299,7 @@ sub CUL_HMTmplSetCmd($){
       next if (not scalar (keys %{$HMConfig::culHmTpl{$t}{reg}}));
       my $f = 0;
       my $typShLg=0;
-      foreach my $r(reverse sort keys %{$HMConfig::culHmTpl{$t}{reg}}){
+      foreach my $r(keys %{$HMConfig::culHmTpl{$t}{reg}}){
         if(!defined $b{$r} && !defined $b{"sh".$r}){$f = 1;last;}
         $typShLg = defined $b{"sh".$r} ? 1 : 0;
       }
@@ -9655,7 +9655,7 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     }
     else     { # success - now update some datafiels
       Log3 undef, 3, "additional HM config file loaded: $file";
-      foreach (keys %{$culHmModel}){
+      foreach (sort keys %{$culHmModel}){
         next if(!$_);
         $culHmModel2Id->{$culHmModel->{$_}{name}} = $_ ;
         $culHmModel->{$_}{alias} = $culHmModel->{$_}{name} if (!defined $culHmModel->{$_}{alias});
