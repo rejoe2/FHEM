@@ -522,10 +522,9 @@ sub CUL_HM_updateConfig($){##########################
     }
     $attr{$name}{webCmd} = $webCmd if ($webCmd);
 
-    CUL_HM_SetList($name,"") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
     #remove invalid attributes. After set commands fot templist
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
-    foreach(keys %{$attr{$name}}){
+    foreach(sort keys %{$attr{$name}}){
       delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  #Beta-User: fixes missing tempListTmpl, see also noansi => https://forum.fhem.de/index.php/topic,122107.msg1166930.html#msg1166930
     }
     CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
@@ -1412,6 +1411,7 @@ sub CUL_HM_AttrInit($;$) {#############################
   }
   return;
 }
+
 sub CUL_HM_AttrAssign($) {###########################
   #define the list of valid attributes per entity
   #remove attributes that are illegal
@@ -1419,6 +1419,7 @@ sub CUL_HM_AttrAssign($) {###########################
   my $entH = $defs{$name};
   my $modH = $modules{CUL_HM};
   return undef if (!$init_done); # we cannot determine now. if attributes are missing
+  #CUL_HM_SetList($name,"") if ($defs{$name}{helper}{cmds}{cmdKey} eq "" || $defs{$name}->{helper}{cmds}{TmplKey} eq "" || !defined $defs{$name}{helper}{cmds}{cmdList});
   my   @attrGrp = ('glb'); # global for all CUL_HM
   push @attrGrp,'dev'         if ($entH->{helper}{role}{dev});
   push @attrGrp,'devPhy'      if ($entH->{helper}{role}{dev} && !$entH->{helper}{role}{vrt});
@@ -4310,6 +4311,7 @@ sub CUL_HM_queueUpdtCfg($){
   RemoveInternalTimer("updateConfig");
   InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
 }
+
 sub CUL_HM_parseSDteam(@){#handle SD team events
   my ($mTp,$sId,$dId,$p) = @_;
   
@@ -5008,12 +5010,12 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
 
   return;
 }
+
 sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++
   my($name,$findCmd)=@_;
-  CUL_HM_SetList($name,"") if ($defs{$name}{helper}{cmds}{cmdKey} eq "");
+  CUL_HM_SetList($name,"") if ($defs{$name}{helper}{cmds}{cmdKey} eq ""); # || $defs{$name}->{helper}{cmds}{TmplKey} eq "" || !defined $defs{$name}{helper}{cmds}{cmdList});
   return defined $defs{$name}{helper}{cmds}{cmdLst}{$findCmd} ? 1 : 0;
 }
-
 
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
@@ -5220,7 +5222,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     foreach my $sect (@sectL){
       if   ($sect eq "readings"){
         my @cH = ($hash);
-        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,sort keys %{$hash});
         delete $_->{READINGS} foreach (@cH);
         delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
         CUL_HM_complConfig($_->{NAME}) foreach (@cH);
@@ -5235,7 +5237,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
       elsif($sect eq "register"){
         my @cH = ($hash);
-        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,sort keys %{$hash});
       
         foreach my $h(@cH){
           delete $h->{READINGS}{$_}
@@ -5338,7 +5340,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     my @results;
     my @renamed;
-    foreach my $cd (grep /^channel_/,keys %{$hash}){
+    foreach my $cd (grep /^channel_/,sort keys %{$hash}){
       my $cName = InternalVal($newName,$cd,"");
       my $no = hex(substr($cd,8));
       $result = CommandRename(undef,$cName.' '.$chLst[$no]);
@@ -7678,7 +7680,7 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
   delete $hash->{helper}{rxType};
   CUL_HM_getRxType($hash); #will update rxType
   my $mId = CUL_HM_getMId($hash);# set helper valiable and use result
-  return if(!defined $mId or $mId eq "");
+  return if(!defined $mId or $mId eq "" or $mId eq "none");
   # autocreate undefined channels
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
@@ -7686,6 +7688,8 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
     $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
   }
   else{
+    CUL_HM_SetList($name,'') if $fromUpdate || !defined $defs{$name}{helper}{cmds}{cmdLst};
+    CUL_HM_AttrAssign($name) if $fromUpdate;
     my @chanTypesList = split(',',$culHmModel->{$mId}{chn});
     foreach my $chantype (@chanTypesList){# check all regulat channels
       my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
@@ -7703,6 +7707,7 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
           $attr{CUL_HM_id2Name($chnId)}{model} = $model ;
           $chanExist{$chnId} = 1; # mark this channel as required
         }
+        CUL_HM_SetList(CUL_HM_id2Name($chnId),"") if $fromUpdate; #!defined $defs{CUL_HM_id2Name($chnId)}{helper}{cmds}{cmdLst};
         CUL_HM_AttrAssign(CUL_HM_id2Name($chnId));
         $chnNoTyp++;
       }
@@ -8921,7 +8926,7 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
   if ($defs{$name}){
     push @chnN,$name;
     my $hash = $defs{$name};
-    push @chnN,$hash->{$_} foreach (grep /^channel_/, keys %{$hash});
+    push @chnN,$hash->{$_} foreach (grep /^channel_/, sort keys %{$hash});
   }
   return sort(@chnN);
 }
@@ -11305,6 +11310,7 @@ sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
     $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
   }
 }
+
 sub CUL_HM_configUpdate($)   {# mark entities with changed data for archive
   my $name = shift;
   $modules{CUL_HM}{helper}{confUpdt}{$name} = 1;
