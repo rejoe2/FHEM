@@ -1391,7 +1391,7 @@ sub CUL_HM_AttrInit($;$) {#############################
         $hash->{ModulAttr}{$atDef}{$atTyp} = 1;
       }
     }
-    $hash->{AttrList} = join(" ",sort #Beta-User: double sorting in map and noDup seems to bind empty preselection for param to VIRTUAL channel (textfield)
+    $hash->{AttrList} = join(" ",sort #Beta-User: double sorting in map and noDup seems to bind empty preselection for param to VIRTUAL channel (textfield); https://forum.fhem.de/index.php/topic,123136.msg1177100.html#msg1177100
                                  map{my ($foo) = sort keys %{$hash->{ModulAttr}{$_}}; # use first option
                                        my $val = $hash->{AttrX}{$foo}{$_};
                                        $_.($val ? ':'.$val                         # add colon
