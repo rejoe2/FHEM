@@ -1338,7 +1338,7 @@ sub CUL_HM_AttrInit($;$) {#############################
                           };
     $hash->{AttrX}{VIRTUAL} = {                        # model = virtual ###=> virtual {helper}{fkt} eq "vdCtrl" for VD
                            cyclicMsgOffset   => ''
-                          ,param             => '' 
+                          ,param             => ''
                           };
 
     $hash->{AttrX}{'blindActuator'} = {                # subType
@@ -1391,13 +1391,13 @@ sub CUL_HM_AttrInit($;$) {#############################
         $hash->{ModulAttr}{$atDef}{$atTyp} = 1;
       }
     }
-    $hash->{AttrList} = join(" ",sort 
-                                 map{my ($foo) = keys %{$hash->{ModulAttr}{$_}}; # use first option
+    $hash->{AttrList} = join(" ",sort #Beta-User: double sorting in map and noDup seems to bind empty preselection for param to VIRTUAL channel (textfield)
+                                 map{my ($foo) = sort keys %{$hash->{ModulAttr}{$_}}; # use first option
                                        my $val = $hash->{AttrX}{$foo}{$_};
                                        $_.($val ? ':'.$val                         # add colon
                                                 : '')
                                       }    
-                                 CUL_HM_noDup(keys %{$hash->{ModulAttr}})         # each attr just once
+                                 CUL_HM_noDup(sort keys %{$hash->{ModulAttr}})         # each attr just once
                              );
   }
   # update dependant
