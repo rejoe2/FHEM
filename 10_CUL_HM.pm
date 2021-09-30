@@ -5056,7 +5056,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $cmd = "pct";
   }
 
-  if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd} && defined $hash->{helper}{cmds}{cmdKey}) { ### unknown - return the commandlist if initialisation is done
+  if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd}) { ### unknown - return the commandlist
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
       my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
@@ -7483,8 +7483,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   else{
-    return "$cmd not implemented - contact sysop" if defined $hash->{helper}{cmds}{cmdKey};
-    return "command $cmd not implemeted, but issued in startup phase";
+    return "$cmd not implemented - contact sysop";
   }
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
