@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-28 +Beta-User-Patches + sort II$
+# $Id: 10_CUL_HM.pm 24961 2021-09-30 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase$
 
 package main;
 
@@ -5056,7 +5056,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $cmd = "pct";
   }
 
-  if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd}) { ### unknown - return the commandlist
+  if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd} && defined $hash->{helper}{cmds}{cmdLst}{cmdKey}) { ### unknown - return the commandlist if initialisation is done
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
       my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
@@ -7483,7 +7483,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   else{
-    return "$cmd not implemented - contact sysop";
+    return "$cmd not implemented - contact sysop" if defined $hash->{helper}{cmds}{cmdLst}{cmdKey};
+    return "command $cmd not implemeted, but issued in startup phase";
   }
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
