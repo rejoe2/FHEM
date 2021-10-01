@@ -113,10 +113,15 @@ sub DialogueTest{
 __END__
 
 =pod
+
+=encoding utf8
+=item summary    demonstrate how to hand over parameters from RHASSPY
+=item summary_DE Beispiele wie man Parameter aus RHASSPY heraus übergibt
+
 =begin html
 
-<a name="RHASSPY_Demo_Utils"></a>
-<h3>RHASSPY_Demo_Utils</h3>
+<a id="RHASSPY_Utils_Demo"></a>
+<h3>RHASSPY_Utils_Demo</h3>
 <ul>
   <b>Routines to demonstrate how to handle function calls from within Custom intents in RHASSPY context</b><br> 
   <li>BasicTest</li>

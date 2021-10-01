@@ -4075,7 +4075,7 @@ __END__
           </ul>
       </li>
       <li><a id="HMinfo-set-saveConfig"></a>saveConfig <a href="#HMinfo-Filter">[filter] [&lt;file&gt;]</a><br>
-          Sichert alle HM Registerwerte und Peers. Siehe <a href="#CUL_HM-set-saveConfig">CUL_HM saveConfig</a>.<br>
+          Sichert alle HM Registerwerte und Peers. Siehe <a href="#CUL_HM-get-saveConfig">CUL_HM saveConfig</a>.<br>
           <a href="#HMinfo-set-purgeConfig">purgeConfig</a> wird automatisch ausgef&uuml;hrt, wenn die Datenmenge 1 MByte &uuml;bersteigt.<br>
       </li>
       <li><a id="HMinfo-set-archConfig"></a>archConfig <a href="#HMinfo-Filter">[filter]</a> [&lt;file&gt;]<br>
@@ -4096,7 +4096,7 @@ __END__
       <li><a id="HMinfo-set-purgeConfig"></a>purgeConfig <a href="#HMinfo-Filter">[filter]</a> [&lt;file&gt;]<br>
           Bereinigt die gespeicherte Konfigurationsdatei. Durch die kumulative Speicherung der Registerwerte bleiben die
           zuletzt gespeicherten Werte erhalten und alle &auml;lteren werden gel&ouml;scht.
-          Siehe <a href="#CUL_HM-set-saveConfig">CUL_HM saveConfig</a>.
+          Siehe <a href="#CUL_HM-get-saveConfig">CUL_HM saveConfig</a>.
       </li>
       <li><a id="HMinfo-set-verifyConfig"></a>verifyConfig <a href="#HMinfo-Filter">[filter]</a> [&lt;file&gt;]<br>
           Vergleicht die aktuellen Daten mit dem configFile und zeigt Unterschiede auf. 
