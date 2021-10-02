@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 24960 2021-09-12 06:43:51Z martinp876 $
+# $Id: 98_HMinfo.pm 24960 2021-09-12 + cref + other Beta-User $
 package main;
 use strict;
 use warnings;
@@ -69,7 +69,7 @@ sub HMinfo_Initialize($$) {####################################################
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
   $modules{HMinfo}{helper}{initDone} = 0;
-  HMinfo_init();
+  HMinfo_init(); #Beta-User: doppelt gemoppelt zu Define?
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -104,6 +104,8 @@ sub HMinfo_Define($$){#########################################################
 }
 sub HMinfo_Undef($$){##########################################################
   my ($hash, $name) = @_;
+  RemoveInternalTimer("sUpdt:".$name);
+  RemoveInternalTimer($name,"HMinfo_getCfgDefere");
   return undef;
 }
 sub HMinfo_Attr(@) {###########################################################
@@ -4235,7 +4237,7 @@ __END__
   <br>
 
 
-  <a id="HMinfo-attr"></a><h4>Attributes</h4>
+  <a id="HMinfo-attr"></a><h4>Attribute</h4>
    <ul>
     <a id="HMinfo-attr-sumStatus"></a>
     <li>sumStatus<br>

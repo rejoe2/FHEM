@@ -209,6 +209,9 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{primary} = ""; # primary is one device in CUL_HM.It will be used for module notification. 
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
+  InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
+  #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+  return;
 }
 
 sub CUL_HM_updateConfig($){##########################
@@ -219,7 +222,7 @@ sub CUL_HM_updateConfig($){##########################
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(0.1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -411,6 +414,7 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
+      CUL_HM_ID2PeerList($name,'peerUnread',1) if !defined $defs{$name}{helper}{peerIDsH}; #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -422,8 +426,8 @@ sub CUL_HM_updateConfig($){##########################
           $hash->{helper}{vd}{idh} = 0;
         }
         if ($hash->{helper}{fkt} eq "vdCtrl"){
-          my $d = ReadingsVal($name,"valvePosTC","");
-          $d =~ s/ %//;
+          my $d = ReadingsNum($name,'valvePosTC','50');
+                   Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
           CUL_HM_Set($hash,$name,"valvePos",$d);
           CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if ($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
           RemoveInternalTimer("valvePos:$vId");
@@ -431,7 +435,8 @@ sub CUL_HM_updateConfig($){##########################
           InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
         }
         elsif($hash->{helper}{fkt} eq "virtThSens"){
-          my $d = ReadingsVal($name,"temperature","");
+                   Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
+          my $d = ReadingsNum($name,'temperature','20');
           CUL_HM_Set($hash,$name,"virtTemp",$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
           $d = ReadingsVal($name,"humidity","");
           CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
@@ -9515,17 +9520,18 @@ sub CUL_HM_cfgStateUpdate($) {#update cfgState
   my (undef,$name) = split(':',$tmrId,2);
   return if (!defined $defs{$name} );
   RemoveInternalTimer("cfgStateUpdate:$name") if($defs{$name}{helper}{cfgStateUpdt});#could be direct call or timeout
-  if (   !$evtDly                      #noansi: first Readings must be set, helps also not to disturb others
+  if (   !$evtDly && $init_done && $fhem_started + 30 < time      #noansi: first Readings must be set, helps also not to disturb others
       && !$defs{$name}{helper}{prt}{sProc} #not busy with commands?
       ){
     $defs{$name}{helper}{cfgStateUpdt} = 0;
     my ($hm) = devspec2array("TYPE=HMinfo");
     HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if (defined $hm);
   }
-  else{
+  else { 
     $defs{$name}{helper}{cfgStateUpdt} = 1;  # use to remove duplicate timer                                                                       
-    InternalTimer(gettimeofday() + 60, "CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0); # try later
+    InternalTimer(gettimeofday() + 60, "CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0) if $init_done || length(CUL_HM_name2Id($name)) == 6; # try later; #Beta-User: but only for main device if called before init_done
   }
+  return;
 }
 
 sub CUL_HM_rmOldRegs($$){ # remove register i outdated
