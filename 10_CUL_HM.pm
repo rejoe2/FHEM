@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-30 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase$
+# $Id: 10_CUL_HM.pm 24961 2021-10-03 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase$
 
 package main;
 
@@ -222,7 +222,7 @@ sub CUL_HM_updateConfig($){##########################
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(0.1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -1607,8 +1607,23 @@ sub CUL_HM_Notify(@){###############################
       return "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event" if $count;
       return;
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} &&  $evnt =~ m/INITIALIZED/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED|REREADCFG/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
+      #Beta-User: Perform HMinfo configCheck if possible, first for real Devices, then for VIRTUALs
+      Log3(undef,3,"debug: CUL_HM event $evnt");
+      my ($hm) = devspec2array("TYPE=HMinfo");
+      if ( defined $hm ) {
+        my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+        for (@hmdev){   
+          #next if AttrVal($_,'model','') =~ m{virtual}i;
+          Log3($_,3,"debug: initialize $_");
+          HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
+        }
+        #for (@hmdev){
+        #  next if AttrVal($_,'model','') !~ m{virtual}i;
+        #  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
+        #}
+      }
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
