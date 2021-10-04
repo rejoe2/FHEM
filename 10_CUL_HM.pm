@@ -1281,8 +1281,9 @@ sub CUL_HM_AttrCheck(@) {############################
   #Beta-User: fixes https://forum.fhem.de/index.php/topic,122423.0.html
   return undef if (!$attrOpt || $attrOpt =~ m/^multiple|textField-/); # any value allowed
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
+  #return undef if $attrFound && $attrName eq 'tempListTmpl'; #Beta-User: would "repair"  https://forum.fhem.de/index.php/topic,122726.msg1177787.html#msg1177787 - but not helpful, as HMinfo will only use the central file if set!
   
-  return "value $attrVal illegal. Choose one of:$attrOpt";
+  return "value $attrVal not allowed. Choose one of:$attrOpt";
 }
 sub CUL_HM_AttrInit($;$) {#############################
   # define attributes and their options that are relevant/defined/controlled by CUL_HM

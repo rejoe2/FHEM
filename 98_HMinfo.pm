@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 24960 2021-10-04 + cref + other Beta-User $
+# $Id: 98_HMinfo.pm 24960 2021-10-04 + cref + other + start HMinfo first Beta-User $
 package main;
 use strict;
 use warnings;
