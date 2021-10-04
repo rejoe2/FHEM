@@ -69,7 +69,7 @@ sub HMinfo_Initialize($$) {####################################################
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
   $modules{HMinfo}{helper}{initDone} = 0;
-  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, HMinfo is up and running prior to CUL_HM and to user code e.g. in notify
+  $hash->{NotifyOrderPrefix} = "49-"; #Beta-User: make sure, HMinfo is up and running after CUL_HM but prior to user code e.g. in notify
   #HMinfo_init(); #Beta-User: doppelt gemoppelt zu Define?
 }
 sub HMinfo_Define($$){#########################################################

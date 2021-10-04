@@ -209,7 +209,7 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{primary} = ""; # primary is one device in CUL_HM.It will be used for module notification. 
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
-  $hash->{NotifyOrderPrefix} = "49-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, but later than HMinfo
+  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, but later than HMinfo
   InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
   #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
   return;
@@ -415,7 +415,9 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      CUL_HM_ID2PeerList($name,'peerUnread',1) if !defined $defs{$name}{helper}{peerIDsH}; #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303
+      if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
+        CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
+      } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
