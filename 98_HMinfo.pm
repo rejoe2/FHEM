@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 24960 2021-09-12 + cref + other Beta-User $
+# $Id: 98_HMinfo.pm 24960 2021-10-04 + cref + other Beta-User $
 package main;
 use strict;
 use warnings;
@@ -69,7 +69,8 @@ sub HMinfo_Initialize($$) {####################################################
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
   $modules{HMinfo}{helper}{initDone} = 0;
-  HMinfo_init(); #Beta-User: doppelt gemoppelt zu Define?
+  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, HMinfo is up and running prior to CUL_HM and to user code e.g. in notify
+  #HMinfo_init(); #Beta-User: doppelt gemoppelt zu Define?
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -99,7 +100,8 @@ sub HMinfo_Define($$){#########################################################
   $hash->{nb}{cnt} = 0;
   $modules{HMinfo}{helper}{initDone} = 0;
   notifyRegexpChanged($hash,"global",0);
-  HMinfo_init();
+  #HMinfo_init(); Beta-User: do this in NotifyFn to be sure, all CUL_HM entities are already defined and readings and attr are available
+  LoadModule('CUL_HM'); #Beta-User: Make sure, code from CUL_HM is available when attributes are set
   return;
 }
 sub HMinfo_Undef($$){##########################################################
@@ -256,7 +258,7 @@ sub HMinfo_Notify(@){##########################################################
   if (grep /(SAVE|SHUTDOWN)/,@{$events}){# also save configuration
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
-  if (grep /INITIALIZED/,@{$events}){
+  if (grep /INITIALIZED|REREADCFG/,@{$events}){
     $modules{HMinfo}{helper}{initDone} = 0;
     HMinfo_init();
   }
@@ -265,6 +267,7 @@ sub HMinfo_Notify(@){##########################################################
 sub HMinfo_init(){#############################################################
   RemoveInternalTimer("HMinfo_init");# just to be secure...
   if ($init_done){
+    #Log3(undef,3,"debug: HMinfo_init");
     if (!$modules{HMinfo}{helper}{initDone}){ # && !$modules{HMinfo}{helper}{initDone}){
       my ($hm) = devspec2array("TYPE=HMinfo");
       if (substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0){

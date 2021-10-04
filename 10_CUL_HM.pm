@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-10-03 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase$
+# $Id: 10_CUL_HM.pm 24961 2021-10-04 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start HMinfo first $
 
 package main;
 
@@ -209,6 +209,7 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{primary} = ""; # primary is one device in CUL_HM.It will be used for module notification. 
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
+  $hash->{NotifyOrderPrefix} = "49-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, but later than HMinfo
   InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
   #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
   return;
@@ -657,6 +658,7 @@ sub CUL_HM_Define($$) {##############################
   
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
   notifyRegexpChanged($hash,"",1);# no notification required for this device
+  CUL_HM_primaryDev() if devspec2array('TYPE=CUL_HM') == 2; #Beta-User: we need at least one entity to initialize startup procedure
 
   #- - - - create auto-update - - - - - -
   CUL_HM_ActGetCreateHash() if($HMid eq '000000');#startTimer
@@ -1608,21 +1610,20 @@ sub CUL_HM_Notify(@){###############################
       return;
     }
     elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED|REREADCFG/){# grep the first initialize
-      CUL_HM_updateConfig("startUp");
       #Beta-User: Perform HMinfo configCheck if possible, first for real Devices, then for VIRTUALs
-      Log3(undef,3,"debug: CUL_HM event $evnt");
+      #Log3(undef,3,"debug: CUL_HM event $evnt");
+      CUL_HM_updateConfig("startUp");
       my ($hm) = devspec2array("TYPE=HMinfo");
       if ( defined $hm ) {
         my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
         for (@hmdev){   
-          #next if AttrVal($_,'model','') =~ m{virtual}i;
-          Log3($_,3,"debug: initialize $_");
+          next if AttrVal($_,'model','') =~ m{virtual}i;
           HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
         }
-        #for (@hmdev){
-        #  next if AttrVal($_,'model','') !~ m{virtual}i;
-        #  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
-        #}
+        for (@hmdev){
+          next if AttrVal($_,'model','') !~ m{virtual}i;
+          HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
+        }
       }
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
     }
