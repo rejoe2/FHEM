@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-10-04 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start HMinfo first $
+# $Id: 10_CUL_HM.pm 24961 2021-10-05 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
 
 package main;
 
@@ -421,13 +421,23 @@ sub CUL_HM_updateConfig($){##########################
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
-        $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
+        if (!defined $hash->{helper}{vd}{msgRed}) {
+            $hash->{helper}{vd}{msgRed}=0;
+            my $attrVal = AttrVal($name,'param','');
+            if ($attrVal =~ m/msgReduce/) {
+                my (undef,$rCnt) = split(":",$attrVal,2);
+                $rCnt=(defined $rCnt && $rCnt =~ m/^\d$/)?$rCnt:1;
+                $hash->{helper}{vd}{msgRed}=$rCnt;
+            }
+        }
         if(!defined $hash->{helper}{vd}{next}){
           ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
                     split(";",ReadingsVal($name,".next","0;".gettimeofday()));
           $hash->{helper}{vd}{idl} = 0;
           $hash->{helper}{vd}{idh} = 0;
         }
+        InternalTimer(time,'CUL_HM_initializeVirtuals', $hash,0); #Beta-User: make sure, CUL_HM is in toto up and running befor other devices want to use them, 
+=pod
         if ($hash->{helper}{fkt} eq "vdCtrl"){
           my $d = ReadingsNum($name,'valvePosTC','50');
                    Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
@@ -444,6 +454,7 @@ sub CUL_HM_updateConfig($){##########################
           $d = ReadingsVal($name,"humidity","");
           CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
         }
+=cut
 
         # delete - virtuals dont have regs 
         delete $attr{$name}{$_} foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
@@ -558,6 +569,29 @@ sub CUL_HM_updateConfig($){##########################
   Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
+}
+
+sub CUL_HM_initializeVirtuals {
+    my $hash = shift // return;
+    my $name = $hash->{NAME} // return;
+    my $vId = substr($hash->{DEF}."01",0,8);
+    if ($hash->{helper}{fkt} eq "vdCtrl"){
+        my $d = ReadingsNum($name,'valvePosTC','50');
+                   #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
+        CUL_HM_Set($hash,$name,"valvePos",$d);
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if ($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+        RemoveInternalTimer("valvePos:$vId");
+        RemoveInternalTimer("valveTmr:$vId");
+        InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+    }
+    elsif($hash->{helper}{fkt} eq "virtThSens"){
+               #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
+        my $d = ReadingsNum($name,'temperature','');
+        CUL_HM_Set($hash,$name,"virtTemp",$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+        $d = ReadingsNum($name,"humidity","");
+        CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+    }
+    return;
 }
 
 sub CUL_HM_primaryDev() {###########################
@@ -1283,6 +1317,7 @@ sub CUL_HM_AttrCheck(@) {############################
   #Beta-User: fixes https://forum.fhem.de/index.php/topic,122423.0.html
   return undef if (!$attrOpt || $attrOpt =~ m/^multiple|textField-/); # any value allowed
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
+  #return undef if $attrFound && $attrName eq 'param'; #Beta-User: might "repair" https://forum.fhem.de/index.php/topic,123136.msg1178013.html#msg1178013
   #return undef if $attrFound && $attrName eq 'tempListTmpl'; #Beta-User: would "repair"  https://forum.fhem.de/index.php/topic,122726.msg1177787.html#msg1177787 - but not helpful, as HMinfo will only use the central file if set!
   
   return "value $attrVal not allowed. Choose one of:$attrOpt";
@@ -1616,6 +1651,7 @@ sub CUL_HM_Notify(@){###############################
       #Beta-User: Perform HMinfo configCheck if possible, first for real Devices, then for VIRTUALs
       #Log3(undef,3,"debug: CUL_HM event $evnt");
       CUL_HM_updateConfig("startUp");
+=pod      
       my ($hm) = devspec2array("TYPE=HMinfo");
       if ( defined $hm ) {
         my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
@@ -1628,6 +1664,7 @@ sub CUL_HM_Notify(@){###############################
           HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
         }
       }
+=cut
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
