@@ -209,7 +209,7 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{primary} = ""; # primary is one device in CUL_HM.It will be used for module notification. 
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
-  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, but later than HMinfo
+  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, and also prior to HMinfo
   InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
   #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
   return;
