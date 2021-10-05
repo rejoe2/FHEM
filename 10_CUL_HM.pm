@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-09-30 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase$
+# $Id: 10_CUL_HM.pm 24961 2021-10-04 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start HMinfo first $
 
 package main;
 
@@ -209,6 +209,7 @@ sub CUL_HM_Initialize($) {
   $hash->{helper}{primary} = ""; # primary is one device in CUL_HM.It will be used for module notification. 
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
+  $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, and also prior to HMinfo
   InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
   #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
   return;
@@ -222,7 +223,7 @@ sub CUL_HM_updateConfig($){##########################
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(0.1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -414,7 +415,9 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      CUL_HM_ID2PeerList($name,'peerUnread',1) if !defined $defs{$name}{helper}{peerIDsH}; #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303
+      if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
+        CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
+      } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -657,6 +660,7 @@ sub CUL_HM_Define($$) {##############################
   
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
   notifyRegexpChanged($hash,"",1);# no notification required for this device
+  CUL_HM_primaryDev() if devspec2array('TYPE=CUL_HM') == 2; #Beta-User: we need at least one entity to initialize startup procedure
 
   #- - - - create auto-update - - - - - -
   CUL_HM_ActGetCreateHash() if($HMid eq '000000');#startTimer
@@ -1279,8 +1283,9 @@ sub CUL_HM_AttrCheck(@) {############################
   #Beta-User: fixes https://forum.fhem.de/index.php/topic,122423.0.html
   return undef if (!$attrOpt || $attrOpt =~ m/^multiple|textField-/); # any value allowed
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
+  #return undef if $attrFound && $attrName eq 'tempListTmpl'; #Beta-User: would "repair"  https://forum.fhem.de/index.php/topic,122726.msg1177787.html#msg1177787 - but not helpful, as HMinfo will only use the central file if set!
   
-  return "value $attrVal illegal. Choose one of:$attrOpt";
+  return "value $attrVal not allowed. Choose one of:$attrOpt";
 }
 sub CUL_HM_AttrInit($;$) {#############################
   # define attributes and their options that are relevant/defined/controlled by CUL_HM
@@ -1607,8 +1612,22 @@ sub CUL_HM_Notify(@){###############################
       return "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event" if $count;
       return;
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} &&  $evnt =~ m/INITIALIZED/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED|REREADCFG/){# grep the first initialize
+      #Beta-User: Perform HMinfo configCheck if possible, first for real Devices, then for VIRTUALs
+      #Log3(undef,3,"debug: CUL_HM event $evnt");
       CUL_HM_updateConfig("startUp");
+      my ($hm) = devspec2array("TYPE=HMinfo");
+      if ( defined $hm ) {
+        my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+        for (@hmdev){   
+          next if AttrVal($_,'model','') =~ m{virtual}i;
+          HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
+        }
+        for (@hmdev){
+          next if AttrVal($_,'model','') !~ m{virtual}i;
+          HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
+        }
+      }
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
