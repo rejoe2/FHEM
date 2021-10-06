@@ -2382,7 +2382,7 @@ attr DEVICE readingList TELETOPIC/LWT:.* LWT\
   STATTOPIC/things/thermostat/properties:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/things/logging/properties:.* { json2nameValue($EVENT,'log_',$JSONMAP) }\
   STATTOPIC/things/clock/properties:.* { json2nameValue($EVENT,'clock_',$JSONMAP) }\
-  STATTOPIC/things/thermostat/deviceOn:.* state\
+  STATTOPIC/things/thermostat/deviceOn:.* {{state => $EVENT eq 'false' ? 'off' : 'on'}}\
   STATTOPIC/things/thermostat/targetTemperature:.* desired-temp
 attr DEVICE setList on:noArg CMNDTOPIC/things/thermostat/properties/deviceOn true\
   off:noArg CMNDTOPIC/things/thermostat/properties/deviceOn false\
