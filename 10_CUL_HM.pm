@@ -415,9 +415,9 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
-        CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
-      } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
+      #if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
+      #  CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
+      #} #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -436,7 +436,7 @@ sub CUL_HM_updateConfig($){##########################
           $hash->{helper}{vd}{idl} = 0;
           $hash->{helper}{vd}{idh} = 0;
         }
-        InternalTimer(time,'CUL_HM_initializeVirtuals', $hash,0); #Beta-User: make sure, CUL_HM is in toto up and running befor other devices want to use them, 
+        InternalTimer(time+10,'CUL_HM_initializeVirtuals', $hash,0); #Beta-User: make sure, CUL_HM is in toto up and running befor other devices want to use them, 
 =pod
         if ($hash->{helper}{fkt} eq "vdCtrl"){
           my $d = ReadingsNum($name,'valvePosTC','50');
@@ -953,8 +953,6 @@ sub CUL_HM_Attr(@) {#################################
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
         $updtReq = 1;
         #Beta-User# sonst braucht man nach dem define einen Neustart?
-        #CUL_HM_AttrInit($hash,'CCU-FHEM'); #so sicher nicht, eher:
-        #CUL_HM_AttrInit($modules{CUL_HM});
         CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
     }
@@ -1112,11 +1110,13 @@ sub CUL_HM_Attr(@) {#################################
       if ($prefIO){
         my @ioOpts = split(",",$ioLst);
         return "$ioCCU not a valid CCU with IOs assigned" if (!scalar @ioOpts);
-        push @ioOpts, 'none' if $ioLst !~ m{none}; #Beta-User: Might fix #2 from https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
+        push @ioOpts, 'none'; #Beta-User: Might fix #2 from https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
         @prefIOarr = split(",",$prefIO);
         foreach my $pIO (@prefIOarr){
-          return "$pIO is not an allowed value for preferred IO list. Leave unassigned or choose one or more of ".join(",",@ioOpts) if(1 != grep/$pIO/,@ioOpts);
+          return "$pIO is not an allowed value for preferred IO list. Leave unassigned or choose one or more of ".join(",",@ioOpts) if(1 != grep m{\A$pIO\z},@ioOpts);
+          return "'none' may not be used without precedent other IO and has to be last!" if $prefIO eq 'none' || $prefIO =~ m{\bnone[\b]*.+\z};
         }
+        pop @prefIOarr if $prefIOarr[-1] eq 'none';
       }
       else{
         @prefIOarr = ();
@@ -7748,7 +7748,13 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
   if ($attr{$name}{subType} eq "virtual"){# do not apply all possible channels for virtual
-    $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
+    for my $chanid (keys %chanExist) {
+        my $chann = CUL_HM_id2Name($chanid);
+        $attr{$chann}{model} = $model;
+        if ( $fromUpdate && AttrVal($chann,'peerIDs',undef) && !keys %{$defs{$chann}{helper}{peerIDsH}}) {
+            CUL_HM_ID2PeerList($chann,$_,1) for ('peerUnread',split q{,},AttrVal($chann,'peerIDs',''));
+        } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
+    }
   }
   else{
     CUL_HM_SetList($name,'') if $fromUpdate || !defined $defs{$name}{helper}{cmds}{cmdLst};
