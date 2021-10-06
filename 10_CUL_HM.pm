@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-10-05 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
+# $Id: 10_CUL_HM.pm 24961 2021-10-06 + various Beta-User+frank-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
 
 package main;
 
@@ -317,7 +317,7 @@ sub CUL_HM_updateConfig($){##########################
       # move certain attributes to readings for future handling
       my $aName = $rName;
       $aName =~ s/D-//;
-      my $aVal = AttrVal($name,$aName,undef);      
+      my $aVal = AttrVal($name,$aName,undef);
       CUL_HM_UpdtReadSingle($hash,$rName,$aVal,0)
            if (!defined ReadingsVal($name,$rName,undef) && defined($aVal));
     }
@@ -1110,11 +1110,12 @@ sub CUL_HM_Attr(@) {#################################
       return "vccu $ioCCU is no vccu with IOs assigned. It can't be used as IO" if (!$ioLst);# implicitely checks also for correct vccu
       my @prefIOarr;
       if ($prefIO){
-        my @ioOpts = split(",",AttrVal($ioCCU,"IOList",""));
+        my @ioOpts = split(",",$ioLst);
         return "$ioCCU not a valid CCU with IOs assigned" if (!scalar @ioOpts);
+        push @ioOpts, 'none' if $ioLst !~ m{none}; #Beta-User: Might fix #2 from https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
         @prefIOarr = split(",",$prefIO);
         foreach my $pIO (@prefIOarr){
-          return "$pIO is not part if VCCU IOs:$ioLst".join(",",@ioOpts) if(1 != grep/$pIO/,@ioOpts);
+          return "$pIO is not an allowed value for preferred IO list. Leave unassigned or choose one or more of ".join(",",@ioOpts) if(1 != grep/$pIO/,@ioOpts);
         }
       }
       else{
@@ -4849,6 +4850,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
                keys %defs;
       my @rl;
       foreach (@dl){
+        next if IsIgnored($_) || IsDummy($_); #frank: https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
         my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
         $pref =  "---" if (!$pref);
         my $IODev = $defs{$_}{IODev}->{NAME}?$defs{$_}{IODev}->{NAME}:"---";
