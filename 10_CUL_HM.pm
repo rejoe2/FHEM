@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-10-06 + various Beta-User+frank-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
+# $Id: 10_CUL_HM.pm 24961 2021-10-07 + various Beta-User+frank-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
 
 package main;
 
@@ -217,8 +217,8 @@ sub CUL_HM_Initialize($) {
 
 sub CUL_HM_updateConfig($){##########################
   my $type = shift;
-  # this routine is called 5 sec after the last define of a restart
-  # this gives FHEM sufficient time to fill in attributes
+  # this routine is called immedately after INITALIZED or REREADCFG 
+  # so all attributes and stateFile content has been read.
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
@@ -231,9 +231,11 @@ sub CUL_HM_updateConfig($){##########################
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
-    #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+    
     for (@hmdev){
-      CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef);
+      delete $attr{$_}{IODev} if AttrVal($?,'IOgrp','') ne '' && defined $attr{$_}{IODev}; #Beta-User: might fix https://forum.fhem.de/index.php/topic,123257.msg1178337.html#msg1178337
+      CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+      #Beta-User: might have to be executed again after startup?
     }
     
     foreach my $name  (@hmdev){
@@ -250,7 +252,7 @@ sub CUL_HM_updateConfig($){##########################
       }
       CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",AttrVal($name,"model","")),1) if($attr{$name}{".mId"});
       # update IOdev
-      CUL_HM_Attr("set",$name,"IOgrp",AttrVal($name,"IOgrp","")) if(AttrVal($name,"IOgrp","") ne "");# update helper by set attr again
+      CUL_HM_Attr("set",$name,"IOgrp",AttrVal($name,"IOgrp","")) if(AttrVal($name,"IOgrp","") ne "");# update helper by set attr again #Beta-User: might be to early in first notify loop?
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
                                               && defined($h->{helper}{io}{restoredIO})
@@ -1116,7 +1118,6 @@ sub CUL_HM_Attr(@) {#################################
           return "$pIO is not an allowed value for preferred IO list. Leave unassigned or choose one or more of ".join(",",@ioOpts) if(1 != grep m{\A$pIO\z},@ioOpts);
           return "'none' may not be used without precedent other IO and has to be last!" if $prefIO eq 'none' || $prefIO =~ m{\bnone[\b]*.+\z};
         }
-        pop @prefIOarr if $prefIOarr[-1] eq 'none';
       }
       else{
         @prefIOarr = ();
@@ -4960,7 +4961,7 @@ sub CUL_HM_getTemplateModify(){
 }
 sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
   my($name,$cmdKey)=@_;
-  my $hash = $defs{$name};
+  my $hash = $defs{$name} // return; #Beta-User: workaround for uninitialized-Problem mentionned in https://forum.fhem.de/index.php/topic,123257.msg1178290.html#msg1178290
   
   if(!$cmdKey){
     my $devName = InternalVal($name,"device",$name);
@@ -7750,10 +7751,14 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
   if ($attr{$name}{subType} eq "virtual"){# do not apply all possible channels for virtual
     for my $chanid (keys %chanExist) {
         my $chann = CUL_HM_id2Name($chanid);
-        $attr{$chann}{model} = $model;
-        if ( $fromUpdate && AttrVal($chann,'peerIDs',undef) && !keys %{$defs{$chann}{helper}{peerIDsH}}) {
+        next if !defined $defs{$chann}; #special for ACTIONDETECTOR. Or use "next if ($chanExist{$_} == 1);"
+        $attr{$chann}{model} = $model; #Beta-User: or 'VIRTUAL'?
+        if ( $fromUpdate && AttrVal($chann,'peerIDs',undef) && !keys %{$defs{$chann}{helper}{peerIDsH}} ) {
             CUL_HM_ID2PeerList($chann,$_,1) for ('peerUnread',split q{,},AttrVal($chann,'peerIDs',''));
         } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
+        CUL_HM_SetList($chann,'') if $fromUpdate || !defined $defs{$chann}{helper}{cmds}{cmdLst};
+        CUL_HM_AttrAssign($chann) if $fromUpdate; #Beta-User: add .AttrList for virtual channels
+        $defs{$chann}->{'.AttrList'} =~ s{IOList |expert[\S]+ |levelRange }{}g if defined $defs{$chann}->{'.AttrList'}; #Beta-User: some cleanup, but we may have to delete some more elements...
     }
   }
   else{
