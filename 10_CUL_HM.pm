@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 24961 2021-10-04 + various Beta-User-Patches + sort II + new initialisation + allow more set commands in startup phase + start HMinfo first $
+# $Id: 10_CUL_HM.pm 24961 2021-10-07 + various Beta-User+frank-Patches + sort II + new initialisation + allow more set commands in startup phase + start before HMinfo  $
 
 package main;
 
@@ -217,8 +217,8 @@ sub CUL_HM_Initialize($) {
 
 sub CUL_HM_updateConfig($){##########################
   my $type = shift;
-  # this routine is called 5 sec after the last define of a restart
-  # this gives FHEM sufficient time to fill in attributes
+  # this routine is called immedately after INITALIZED or REREADCFG 
+  # so all attributes and stateFile content has been read.
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
@@ -231,9 +231,11 @@ sub CUL_HM_updateConfig($){##########################
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
-    #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+    
     for (@hmdev){
-      CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef);
+      delete $attr{$_}{IODev} if AttrVal($?,'IOgrp','') ne '' && defined $attr{$_}{IODev}; #Beta-User: might fix https://forum.fhem.de/index.php/topic,123257.msg1178337.html#msg1178337
+      CUL_HM_Attr('set',$_,'IOList',AttrVal($_,'IOList','')) if AttrVal($_,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+      #Beta-User: might have to be executed again after startup?
     }
     
     foreach my $name  (@hmdev){
@@ -250,7 +252,7 @@ sub CUL_HM_updateConfig($){##########################
       }
       CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",AttrVal($name,"model","")),1) if($attr{$name}{".mId"});
       # update IOdev
-      CUL_HM_Attr("set",$name,"IOgrp",AttrVal($name,"IOgrp","")) if(AttrVal($name,"IOgrp","") ne "");# update helper by set attr again
+      CUL_HM_Attr("set",$name,"IOgrp",AttrVal($name,"IOgrp","")) if(AttrVal($name,"IOgrp","") ne "");# update helper by set attr again #Beta-User: might be to early in first notify loop?
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
                                               && defined($h->{helper}{io}{restoredIO})
@@ -317,7 +319,7 @@ sub CUL_HM_updateConfig($){##########################
       # move certain attributes to readings for future handling
       my $aName = $rName;
       $aName =~ s/D-//;
-      my $aVal = AttrVal($name,$aName,undef);      
+      my $aVal = AttrVal($name,$aName,undef);
       CUL_HM_UpdtReadSingle($hash,$rName,$aVal,0)
            if (!defined ReadingsVal($name,$rName,undef) && defined($aVal));
     }
@@ -415,19 +417,29 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
-        CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
-      } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
+      #if (AttrVal($name,'peerIDs',undef) && !keys %{$defs{$name}{helper}{peerIDsH}}) {
+      #  CUL_HM_ID2PeerList($name,$_,1) for ('peerUnread',split q{,},AttrVal($name,'peerIDs',''));
+      #} #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
-        $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
+        if (!defined $hash->{helper}{vd}{msgRed}) {
+            $hash->{helper}{vd}{msgRed}=0;
+            my $attrVal = AttrVal($name,'param','');
+            if ($attrVal =~ m/msgReduce/) {
+                my (undef,$rCnt) = split(":",$attrVal,2);
+                $rCnt=(defined $rCnt && $rCnt =~ m/^\d$/)?$rCnt:1;
+                $hash->{helper}{vd}{msgRed}=$rCnt;
+            }
+        }
         if(!defined $hash->{helper}{vd}{next}){
           ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
                     split(";",ReadingsVal($name,".next","0;".gettimeofday()));
           $hash->{helper}{vd}{idl} = 0;
           $hash->{helper}{vd}{idh} = 0;
         }
+        InternalTimer(time+10,'CUL_HM_initializeVirtuals', $hash,0); #Beta-User: make sure, CUL_HM is in toto up and running befor other devices want to use them, 
+=pod
         if ($hash->{helper}{fkt} eq "vdCtrl"){
           my $d = ReadingsNum($name,'valvePosTC','50');
                    Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
@@ -444,6 +456,7 @@ sub CUL_HM_updateConfig($){##########################
           $d = ReadingsVal($name,"humidity","");
           CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
         }
+=cut
 
         # delete - virtuals dont have regs 
         delete $attr{$name}{$_} foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
@@ -558,6 +571,29 @@ sub CUL_HM_updateConfig($){##########################
   Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
+}
+
+sub CUL_HM_initializeVirtuals {
+    my $hash = shift // return;
+    my $name = $hash->{NAME} // return;
+    my $vId = substr($hash->{DEF}."01",0,8);
+    if ($hash->{helper}{fkt} eq "vdCtrl"){
+        my $d = ReadingsNum($name,'valvePosTC','50');
+                   #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
+        CUL_HM_Set($hash,$name,"valvePos",$d);
+        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if ($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+        RemoveInternalTimer("valvePos:$vId");
+        RemoveInternalTimer("valveTmr:$vId");
+        InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+    }
+    elsif($hash->{helper}{fkt} eq "virtThSens"){
+               #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
+        my $d = ReadingsNum($name,'temperature','');
+        CUL_HM_Set($hash,$name,"virtTemp",$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+        $d = ReadingsNum($name,"humidity","");
+        CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+    }
+    return;
 }
 
 sub CUL_HM_primaryDev() {###########################
@@ -919,8 +955,6 @@ sub CUL_HM_Attr(@) {#################################
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
         $updtReq = 1;
         #Beta-User# sonst braucht man nach dem define einen Neustart?
-        #CUL_HM_AttrInit($hash,'CCU-FHEM'); #so sicher nicht, eher:
-        #CUL_HM_AttrInit($modules{CUL_HM});
         CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
     }
@@ -1076,11 +1110,13 @@ sub CUL_HM_Attr(@) {#################################
       return "vccu $ioCCU is no vccu with IOs assigned. It can't be used as IO" if (!$ioLst);# implicitely checks also for correct vccu
       my @prefIOarr;
       if ($prefIO){
-        my @ioOpts = split(",",AttrVal($ioCCU,"IOList",""));
+        my @ioOpts = split(",",$ioLst);
         return "$ioCCU not a valid CCU with IOs assigned" if (!scalar @ioOpts);
+        push @ioOpts, 'none'; #Beta-User: Might fix #2 from https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
         @prefIOarr = split(",",$prefIO);
         foreach my $pIO (@prefIOarr){
-          return "$pIO is not part if VCCU IOs:$ioLst".join(",",@ioOpts) if(1 != grep/$pIO/,@ioOpts);
+          return "$pIO is not an allowed value for preferred IO list. Leave unassigned or choose one or more of ".join(",",@ioOpts) if(1 != grep m{\A$pIO\z},@ioOpts);
+          return "'none' may not be used without precedent other IO and has to be last!" if $prefIO eq 'none' || $prefIO =~ m{\bnone[\b]*.+\z};
         }
       }
       else{
@@ -1283,6 +1319,7 @@ sub CUL_HM_AttrCheck(@) {############################
   #Beta-User: fixes https://forum.fhem.de/index.php/topic,122423.0.html
   return undef if (!$attrOpt || $attrOpt =~ m/^multiple|textField-/); # any value allowed
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
+  #return undef if $attrFound && $attrName eq 'param'; #Beta-User: might "repair" https://forum.fhem.de/index.php/topic,123136.msg1178013.html#msg1178013
   #return undef if $attrFound && $attrName eq 'tempListTmpl'; #Beta-User: would "repair"  https://forum.fhem.de/index.php/topic,122726.msg1177787.html#msg1177787 - but not helpful, as HMinfo will only use the central file if set!
   
   return "value $attrVal not allowed. Choose one of:$attrOpt";
@@ -1616,6 +1653,7 @@ sub CUL_HM_Notify(@){###############################
       #Beta-User: Perform HMinfo configCheck if possible, first for real Devices, then for VIRTUALs
       #Log3(undef,3,"debug: CUL_HM event $evnt");
       CUL_HM_updateConfig("startUp");
+=pod      
       my ($hm) = devspec2array("TYPE=HMinfo");
       if ( defined $hm ) {
         my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
@@ -1628,6 +1666,7 @@ sub CUL_HM_Notify(@){###############################
           HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($_),$_)).")\$");
         }
       }
+=cut
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
@@ -4812,6 +4851,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
                keys %defs;
       my @rl;
       foreach (@dl){
+        next if IsIgnored($_) || IsDummy($_); #frank: https://forum.fhem.de/index.php/topic,123238.msg1178193.html#msg1178193
         my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
         $pref =  "---" if (!$pref);
         my $IODev = $defs{$_}{IODev}->{NAME}?$defs{$_}{IODev}->{NAME}:"---";
@@ -4921,7 +4961,7 @@ sub CUL_HM_getTemplateModify(){
 }
 sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
   my($name,$cmdKey)=@_;
-  my $hash = $defs{$name};
+  my $hash = $defs{$name} // return; #Beta-User: workaround for uninitialized-Problem mentionned in https://forum.fhem.de/index.php/topic,123257.msg1178290.html#msg1178290
   
   if(!$cmdKey){
     my $devName = InternalVal($name,"device",$name);
@@ -7709,7 +7749,17 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
   if ($attr{$name}{subType} eq "virtual"){# do not apply all possible channels for virtual
-    $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
+    for my $chanid (keys %chanExist) {
+        my $chann = CUL_HM_id2Name($chanid);
+        next if !defined $defs{$chann}; #special for ACTIONDETECTOR. Or use "next if ($chanExist{$_} == 1);"
+        $attr{$chann}{model} = $model; #Beta-User: or 'VIRTUAL'?
+        if ( $fromUpdate && AttrVal($chann,'peerIDs',undef) && !keys %{$defs{$chann}{helper}{peerIDsH}} ) {
+            CUL_HM_ID2PeerList($chann,$_,1) for ('peerUnread',split q{,},AttrVal($chann,'peerIDs',''));
+        } #Beta-User: Might not have been called earlier. Then subtype is unknown yet, https://forum.fhem.de/index.php/topic,123136.msg1177303.html#msg1177303;
+        CUL_HM_SetList($chann,'') if $fromUpdate || !defined $defs{$chann}{helper}{cmds}{cmdLst};
+        CUL_HM_AttrAssign($chann) if $fromUpdate; #Beta-User: add .AttrList for virtual channels
+        $defs{$chann}->{'.AttrList'} =~ s{IOList |expert[\S]+ |levelRange }{}g if defined $defs{$chann}->{'.AttrList'}; #Beta-User: some cleanup, but we may have to delete some more elements...
+    }
   }
   else{
     CUL_HM_SetList($name,'') if $fromUpdate || !defined $defs{$name}{helper}{cmds}{cmdLst};
