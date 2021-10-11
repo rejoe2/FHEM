@@ -52,6 +52,7 @@ BEGIN {
     readingFnAttributes
     IsDisabled
     AttrVal
+    getAllAttr
     ReadingsVal
     devspec2array
     HttpUtils_BlockingGet
@@ -675,7 +676,7 @@ sub DVREntryCreate {
 
     $jsonData =~ s{\x20}{\%20}g;
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/dvr/entry/create?conf=$jsonData";
-	#($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    #($err, $data) = &TvHeadend_HttpGetBlocking($hash);
     return &TvHeadend_HttpGetBlocking($hash);
 }
 
