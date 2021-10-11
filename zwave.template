@@ -1,5 +1,5 @@
 ###########################################
-# $Id: zwave.template 22978 2020-10-17 05:12:58Z Beta-User $
+# $Id: zwave.template 23072 2020-11-02 05:58:05Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -43,6 +43,32 @@ par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be ident
 par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",1) }
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?room=%23devspec%3dMAINCHANNEL,CHANNEL01,CHANNEL02'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+
+
+name:----generic-devices-section--------
+filter:TYPE=ZWave
+order:00generic00000
+desc:Templates for non manufacturer specific devices
+
+
+name:zwave_dimmer
+filter:TYPE=ZWave
+order:00generic00000
+desc:May help for all type of dimmer devices, developed for Qubino (Goap) ZMNHHDx Mini Dimmer, see https://forum.fhem.de/index.php/topic,123254.0.html. 
+farewell:No Problem encountered, enjoy!
+par:CLASSESORDERED;Make sure, classes are in the right order;{ my $av = AttrVal('DEVICE','classes',''); $av =~ s{(SWITCH_BINARY )(SWITCH_MULTILEVEL )}{${2}$1}; $av }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
+attr DEVICE icon ICON
+attr DEVICE classes CLASSESORDERED
+attr DEVICE userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,'reportedState',0):ReadingsNum($name,'state',0)}
+attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
+attr DEVICE webCmd dim
+attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
+set DEVICE attrTemplate speechcontrol_type_light
+attr DEVICE model zigbee2mqtt_light_dimmer
+setreading DEVICE attrTemplateVersion zwave_dimmer_20211011
+
 
 name:----Fibaro-devices-section--------
 filter:TYPE=ZWave
@@ -334,8 +360,8 @@ par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-r
 attr DEVICE icon ICON
 set DEVICE configByte  4 1  ## should set "send battery reports once a day"
 set DEVICE configByte  5 1  ## should set "Temperature Report Threshold" to 1 (lowest value)
-option:{ RADIO_NONZWAVE_EXTERNAL_TEMP + RADIO_ZWAVE_EXTERNAL_TEMP + RADIO_NO_EXTERNAL_TEMP }
 set DEVICE configByte  6 1  ## should set valve reports to 1% delta - might not lead to any report...
+option:{ RADIO_NONZWAVE_EXTERNAL_TEMP + RADIO_ZWAVE_EXTERNAL_TEMP + RADIO_NO_EXTERNAL_TEMP }
 option:{ RADIO_DIRECT_VALVE_CONTROL }
 set DEVICE configByte 64 31 ## should set "manufacturer specific"
 option:{ RADIO_NO_EXTERNAL_TEMP }
@@ -350,8 +376,8 @@ attr DEVICE setList sml_temperature
 #closing section
 option:global
 attr DEVICE webCmd desired-temp
-attr DEVICE userReadings energySaveHeating:setpointTemp.+energySaveHeating {ReadingsNum($name,"setpointTemp",0)}, heating:setpointTemp.+heating {ReadingsNum($name,"setpointTemp",0)}, thermostatMode:setpointTemp.+ {ReadingsVal($name,"setpointTemp",0)=~m/(heating|energySaveHeating)/; $1?$1:undef}
+attr DEVICE userReadings energySaveHeating:setpointTemp.+energySaveHeating {ReadingsNum($name,"setpointTemp",0)}, heating:setpointTemp.+heating {ReadingsNum($name,"setpointTemp",0)}, thermostatMode:setpointTemp.+ {ReadingsVal($name,"setpointTemp",0)=~m/(heating|energySaveHeating)/; $1?$1:undef}, valve:reportedState.+(dim.[0-9.]+|off) {my $val = ReadingsVal($name,"state",0); return 0 if $val eq "off"; ReadingsNum($name,"state",0)}
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
 get  DEVICE configAll
 set DEVICE attrTemplate speechcontrol_type_thermostat
-setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201029
+setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201101

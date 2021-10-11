@@ -187,7 +187,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02a1
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","mqtt_device") }
+par:ICON;ICON as set, defaults to mqtt_device;{ AttrVal('DEVICE','icon','mqtt_device') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:rc_GREEN offline:rc_RED
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
