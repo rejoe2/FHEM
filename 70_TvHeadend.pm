@@ -853,7 +853,7 @@ __END__
           </li>
           <a id="TvHeadend-attr-EPGChannelList"></a>
           <li>EPGChannelList<br>
-            Selectable list of epg channels to querry.
+            Selectable list of epg channels to querry. According to https://forum.fhem.de/index.php/topic,85932.msg786091.html#msg786091 this had never been functional...
           </li>
           <a id="TvHeadend-attr-PollingQueries"></a>
           <li>PollingQueries<br>

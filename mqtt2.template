@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 24910 2021-09-03 16:52:46Z Beta-User $
+# $Id: mqtt2.template 25051 2021-10-06 17:44:09Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -3982,7 +3982,8 @@ attr OMG_BT_ID stateFormat Last IO: last_IO
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
-setreading OMG_BT_ID attrTemplateVersion 20201207
+set OMG_BT_ID attrTemplate MAINCHANNEL=DEVICE SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
@@ -4006,7 +4007,8 @@ attr OMG_BT_ID stateFormat T: temperature°C, M: moisture%, L: lux, F: fertility
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_mi_flora_sensor
-setreading OMG_BT_ID attrTemplateVersion 20200522 or prior
+set OMG_BT_ID attrTemplate MAINCHANNEL=DEVICE SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 name:OpenMQTTGateway_simple_RF433_switch
@@ -4036,7 +4038,9 @@ attr OMG_DEVCID setList\
 farewell:template has been applied successfully.
 attr OMG_DEVCID room NEWDEVROOM
 attr OMG_DEVCID model OpenMQTTGateway_simple_RF433_switch
-setreading OMG_DEVCID attrTemplateVersion 20200522 or prior
+set OMG_DEVCID attrTemplate MAINCHANNEL=DEVICE SUBCHANNELS=OMG_DEVCID
+setreading OMG_DEVCID attrTemplateVersion 20211011
+
 
 name:OpenMQTTGateway_bme
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
@@ -4092,7 +4096,8 @@ attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
-setreading OMG_BT_ID attrTemplateVersion 20200913
+set OMG_BT_ID attrTemplate MAINCHANNEL=DEVICE SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 ###############
