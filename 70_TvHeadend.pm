@@ -1,7 +1,7 @@
 # based on https://forum.fhem.de/index.php/topic,85932.0.html
 # https://github.com/Quantum1337/70_Tvheadend.pm
 # tvheadend api is available at https://github.com/dave-p/TVH-API-docs/wiki
-# $Id: 70_TvHeadend.pm 2021-09-24 Beta-User$
+# $Id: 70_TvHeadend.pm 2021-10-11 Beta-User$
 
 package TvHeadend; ##no critic qw(Package)
 
@@ -286,6 +286,7 @@ sub Rename {
 
 sub Delete {
     my $hash = shift // return;
+    RemoveInternalTimer($hash);
     my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($hash->{NAME});
     return;
 }
@@ -506,9 +507,10 @@ sub ChannelQuery {
     my $channelNames = join q{,}, @channelNames;
     $channelNames =~ s{ }{\_}g;
 
-    #$modules{TvHeadend}{AttrList} =~ s/EPGChannelList:multiple-strict.*/EPGChannelList:multiple-strict,all,$channelNames/;
-    delFromDevAttrList($hash->{NAME},'EPGChannelList');
-    addToDevAttrList($hash->{NAME},"EPGChannelList:multiple-strict,all,$channelNames",'TvHeadend');
+    my $devattrs = getAllAttr($name);
+    $devattrs =~ s{EPGChannelList:multiple-strict[\S]+}{EPGChannelList:multiple-strict,all,$channelNames};
+
+    $defs{$name}{'.AttrList'} = $devattrs;
 
     $hash->{helper}{epg}{count} = @{$entries};
     $hash->{helper}{epg}{channels} = $entries;
