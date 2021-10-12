@@ -230,7 +230,7 @@ sub CUL_HM_updateConfig($){##########################
     # only once after startup - clean up definitions. During operation define function will take care
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
-    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only #Beta-User: frank proposal, https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
 
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
@@ -249,8 +249,8 @@ sub CUL_HM_updateConfig($){##########################
       my $IOgrp = AttrVal($name,"IOgrp","");
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
-        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
         CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp); #Beta-User: frank proposal, https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
       }
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
@@ -4977,7 +4977,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
         @arr1 = grep !/(trg|)(press|event|Press|Event)[SL]\S*?/,@arr1;
       }
     }
-    delete $hash->{helper}{cmds}{cmdLst} ;
+    #delete $hash->{helper}{cmds}{cmdLst} ; #Beta-User: see frank in https://forum.fhem.de/index.php/topic,121650.msg1179090.html#msg1179090
     foreach(@arr1){
       my ($cmdS,$val) = split(":",$_,2);
       $val =~ s/\{self\}/\{self$chn\}/;
@@ -10816,22 +10816,24 @@ sub CUL_HM_UpdtCentralState($){
 }
 sub CUL_HM_operIObyIOHash($){ # noansi: in iohash, return iohash if IO is operational, else undef
   return if (!defined($_[0]));
-  my $ioname = $_[0]->{NAME};
-  return if (   !$ioname
-             || InternalVal($ioname,'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
-             || ReadingsVal($ioname,'state','disconnected') eq 'disconnected' # CUL
-             || IsDummy($ioname)
-            );
-  return $_[0];
+  return CUL_HM_operIObyIOName($_[0]->{NAME}); #Beta-User: use shortcut to get simimar behaviour...
+#  my $ioname = $_[0]->{NAME};
+#  return if (   !$ioname
+#             || InternalVal($ioname,'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
+#             || ReadingsVal($ioname,'state','disconnected') eq 'disconnected' # CUL
+#             || IsDummy($ioname)
+#             || IsDisabled($ioname)
+#            );
+#  return $_[0];
 }
 sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operational, else undef
   return if (!$_[0]);
   my $iohash = $defs{$_[0]};
   return if (   !defined($iohash)
-             || InternalVal($_[0],'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
+             || defined InternalVal($_[0],'XmitOpen',undef) && InternalVal($_[0],'XmitOpen',0) == 0 # HMLAN/HMUSB/TSCUL
              || ReadingsVal($_[0],'state','disconnected') eq 'disconnected' # CUL
-             || IsDummy($_[0]
-             || IsDisabled($_[0]))                                                                                                
+             || IsDummy($_[0])
+             || IsDisabled($_[0])
             );
   return $iohash;
 }
