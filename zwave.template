@@ -1,5 +1,5 @@
 ###########################################
-# $Id: zwave.template 23072 2020-11-02 05:58:05Z Beta-User $
+# $Id: zwave.template 25064 2021-10-11 19:16:44Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -66,7 +66,6 @@ attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
 set DEVICE attrTemplate speechcontrol_type_light
-attr DEVICE model zigbee2mqtt_light_dimmer
 setreading DEVICE attrTemplateVersion zwave_dimmer_20211011
 
 
