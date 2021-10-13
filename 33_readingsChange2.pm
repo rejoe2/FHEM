@@ -469,7 +469,7 @@ sub checkDeviceReadingsUpdates {
         next if !defined $newval;
         $changed++;
         $dev->{READINGS}{$devreading}{VAL} = $newval;
-        $events->[$i] = "$devreading: $newval";
+        $events->[$i] = defined $newval ? "$devreading: $newval" : '';
     }
     evalStateFormat($devName) if $changed;
     return;
