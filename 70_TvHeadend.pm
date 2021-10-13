@@ -508,7 +508,7 @@ sub ChannelQuery {
     my $channelNames = join q{,}, @channelNames;
     $channelNames =~ s{ }{\_}g;
 
-    my $devattrs = getAllAttr($name);
+    my $devattrs = $defs{$name}{'.AttrList'} // getAllAttr($name);
     $devattrs =~ s{EPGChannelList:multiple-strict[\S]+}{EPGChannelList:multiple-strict,all,$channelNames};
 
     $defs{$name}{'.AttrList'} = $devattrs;
