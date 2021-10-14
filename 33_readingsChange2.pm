@@ -10,6 +10,7 @@ package FHEM::readingsChange2; ##no critic qw(Package)
 use strict;
 use warnings;
 use Carp qw(carp);
+use Scalar::Util qw(looks_like_number);
 
 use GPUtils qw(:all);
 
@@ -37,6 +38,7 @@ BEGIN {
     readingFnAttributes
     AttrVal
     ReadingsVal
+    OldReadingsNum
     deviceEvents
     addToDevAttrList
     delFromDevAttrList
@@ -63,7 +65,7 @@ sub Initialize {
     $hash->{AttrFn}   = \&Attr;
 
     $hash->{AttrList} =
-    "disable:1,0 debug:0,1 $readingFnAttributes";
+    "disable:1,0 debug:0,1 disabledForIntervals $readingFnAttributes";
     $hash->{NotifyOrderPrefix} = '01-'; #be almost first to be notified
     return;
 }
@@ -121,7 +123,7 @@ sub initUserAttr {
   my $hash = shift // return;
   my $devspec = $hash->{DEVSPEC};
   $devspec = 'global' if $devspec eq '.*'; # use global, if all devices observed
-  my @devices = devspec2array($devspec);
+  my @devices = devspec2array("$devspec:FILTER=TEMPORARY!=1");
   for (@devices) {
     addToDevAttrList($_, 'readingsChange2:textField-long', 'readingsChange2');
   }
@@ -139,7 +141,7 @@ sub firstInit {
     $hash->{ERRORS} = CreateDevicesTable($hash);
     RemoveInternalTimer($hash);
     $hash->{helper}->{INITIALIZED} = 1;
-    my $nRC = join q{|}, ('global',devspec2array($hash->{DEVSPEC}));
+    my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
     notifyRegexpChanged($hash,$nRC);
     return;
 }
@@ -149,7 +151,7 @@ sub removeOldUserAttr {
     my $devspec    = shift // $hash->{DEVSPEC};
     my $newDevices = shift; #optional, may shorten procedure if given
 
-    $devspec = 'global' if $devspec eq '.*';
+    $devspec = $devspec eq '.*' ? 'global' : "$devspec::FILTER=TEMPORARY!=1";
     my @devices = devspec2array($devspec);
 
     for my $dev (@devices) {
@@ -204,8 +206,13 @@ sub CreateSingleDeviceTable {
                 next;
             }
         }
+        my %specials= ( 
+                    '$name'    => 'a',
+                    '$reading' => 'b',
+                    '$value'   => '1'
+                       );
         if (!$expr ) { #$regexp is Perl command
-            my $schk = perlSyntaxCheck( $regexp );
+            my $schk = perlSyntaxCheck( $regexp, %specials );
             if ( $schk ) {
                 push @errors, "invalid Perl syntax in attr readingsChange2 for $dev in $line: $schk";
                 delete $map->{$dev}->{$rdg};
@@ -216,7 +223,7 @@ sub CreateSingleDeviceTable {
         }
         $map->{$dev}->{$rdg}->{regexp} = $regexp;
         if ( $expr =~ m<\A\{.+}\z> ) {
-            my $schk = perlSyntaxCheck( $expr );
+            my $schk = perlSyntaxCheck( $expr, %specials );
             if ( $schk ) {
                 push @errors, "invalid Perl syntax in attr readingsChange2 for $dev in line $line: $schk";
                 delete $map->{$dev}->{$rdg};
@@ -231,7 +238,7 @@ sub CreateSingleDeviceTable {
     delete $map->{$dev} if keys %{$map->{$dev}} == 0;
 
     if ( $hash->{helper}->{INITIALIZED} ) {
-        my $nRC = join q{|}, ('global',devspec2array($hash->{DEVSPEC}));
+        my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
         notifyRegexpChanged($hash,$nRC);
     }
 
@@ -280,7 +287,7 @@ sub DeleteDeviceInTable {
 
     return if !defined $map->{$dev};
     delete($map->{$dev});
-    my $nRC = join q{|}, ('global',devspec2array($hash->{DEVSPEC}));
+    my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
     notifyRegexpChanged($hash,$nRC);
     return;
 }
@@ -293,7 +300,7 @@ sub CreateDevicesTable {
     $hash->{helper}->{DEVICES} = $map;
     my @errors;
     my $err;
-    for my $dev (devspec2array($hash->{DEVSPEC})) {
+    for my $dev (devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1")) {
         $err = CreateSingleDeviceTable($hash, $dev, $map) if $dev ne $hash->{NAME}; 
         push @errors, $err if $err;
     }
@@ -512,6 +519,40 @@ sub Attr {
   return;
 }
 
+sub compareAbs {
+    my $name    = shift // carp q[No device name provided!] && return;
+    my $reading = shift // carp q[No reading provided!] && return;
+    my $value   = shift // carp q[No value provided!] && return;
+    my $limit   = shift // q{10};
+    my $old     = shift // OldReadingsNum($name,$reading,undef) // return $value;
+    return if !looks_like_number($value);
+    return $value if $old >= $value- $limit && $old <= $value + $limit;
+    return;
+}
+
+sub compareRel {
+    my $name    = shift // carp q[No device name provided!] && return;
+    my $reading = shift // carp q[No reading provided!] && return;
+    my $value   = shift // carp q[No value provided!] && return;
+    my $limit   = shift // q{10};
+    my $old     = shift // OldReadingsNum($name,$reading,undef) // return $value;
+    return if !looks_like_number($value);
+    return $value if $old >= $value*(1 - $limit) && $old <= $value*(1 + $limit);
+    return;
+}
+
+sub compareAbsAndRel {
+    my $name     = shift // carp q[No device name provided!] && return;
+    my $reading  = shift // carp q[No reading provided!] && return;
+    my $value    = shift // carp q[No value provided!] && return;
+    my $limitabs = shift // q{10};
+    my $limitrel = shift // q{10};
+    my $old      = shift // OldReadingsNum($name,$reading,undef) // return $value;
+    my $err = compareAbs($name,$reading,$value,$limitabs,$old) // return;
+    return compareRel($name,$reading,$value,$limitrel,$old);
+}
+
+
 1;
 
 __END__
@@ -543,7 +584,7 @@ __END__
  </p>
  <p>The (minimal) configuration of the central readingsChange2 instance itself is very simple.</p>
  <a id="readingsChange2-define"></a>
- <p><b>Definition:</b></p>
+ <p><h4>Definition:</h4></p>
  <ul>
    <p><code>defmod readingsChange2 readingsChange2 [devspec,[devspec]]</code></p>
    <p><i>devspec</i> parameter in the define is optional.<br>
@@ -552,7 +593,7 @@ __END__
  </ul>
  
  <a id="readingsChange2-get"></a>
- <p><b>get:</b></p>
+ <p><h4>get:</h4></p>
  <ul>
    <li>
      <p>devlist [&lt;name (regex)&gt;]<br/>
@@ -562,18 +603,14 @@ __END__
  </ul>
 
  <a id="readingsChange2-attr"></a>
- <p><b>Attributes:</b></p>
+ <p><h4>Attributes:</h4></p>
  <ul>
    <p><b>The readingsChange2 device itself</b> supports the following attributes:</p>
-   <li>
-     <p>disable<br/>
-        Value '1' deactivates the readingsChange2</p>
-     <p>Example:<br>
-       <code>attr &lt;dev&gt; disable 1</code>
-     </p>
+   <li><a href="#disable"><code>disable</code></a>
+   </li>
+   <li><a href="#disabledForIntervals"><code>disabledForIntervals</code></a>
    </li>
   </ul>
-   <br>
   <ul>
   <p><b>For the monitored devices:</b>
    <a id="readingsChange2-attr-readingsChange2"></a>
@@ -581,8 +618,8 @@ __END__
    <p>For the devices meeting <i>devspec</i> of readingsChange2, the list of the possible attributes is automatically extended by this additional entry. The attribute is read line by line, each line starting with the exact reading name that may be changed.</p>
    <p>Example:<br>
        <code>attr &lt;dev&gt; readingsChange2 abc (\d+\.\d*) $1\<br>
-                    def (\d+\.\d*) { perlfn1($1) }\<br>
-                    ghi { otherperlfn() }
+                    temperature (\d+\.\d*) { FHEM::readingsChange2::compareAbs($name,$reading,$1,'25','10') }\<br>
+                    def { perlfn1() }
        </code></p>
     <ul>The following syntaxes are supported:
     <li>
@@ -602,10 +639,38 @@ __END__
     </li>
     <li>If there's no result (real <code>undef</code>) the reading will be deleted and the event presented to further notify functions will be reduced to an empty string!
     </li>
-    <li>In <i>perlfunction</i> the following variables may be used: <i>$name</i> (the device name the reading belongs to), <i>$reading</i> (the name of the respective reading) and <i>$value</i> (the original value as provided in event).<br>
-    
+    <li><i>perlfunction</i>
+      <ul>
+        <li>The following variables may be used: <i>$name</i> (the device name the reading belongs to), <i>$reading</i> (the name of the respective reading) and <i>$value</i> (the original value as provided in event). So e.g. the second example may be used to limit the temperature values to 10 degrees +/- 25 degrees = range from -15 to +35.
+        </li>
+        <li>If a SCALAR is returned, this will be interpreted as new value for the reading to change.
+        </li>
+        <li>If a HASH is returned, all key/value-pairs will be used as (additional) readings. If the original reading name is also a key name, it's assigned value will be used as new reading value, if it is not in the hash keys, the reading value will be deleted (and the corresponding event cleared).
+        </li>
+      </ul>
     </li>
     </ul>
+  </li>
+  </ul>
+
+  <a id="readingsChange2-functions"></a>
+  <h4>Functions provided by readingsChange2:</h4>
+
+  <ul>
+  <a id="readingsChange2-functions-compareAbs"></a>
+  <li><b>FHEM::readingsChange2::compareAbs</b><br>
+  <code>FHEM::readingsChange2::compareAbs($$$,$$)</code><br>
+  Compare nummeric value provided by last argument (defaults to OldReadingsNum() (has to be set up first!), if not handed over). Syntax is <code>FHEM::readingsChange2::compareAbs($name,$reading,$value,&lt;maximum of abs difference&gt;,&lt;old value to compare to&gt;)</code>. <i>maximum of abs difference</i> defaults to 10. If the new <i>$value</i> is not in the range of old value +/- difference, <i>undef</i> is returned.
+  </li>
+  <a id="readingsChange2-functions-compareRel"></a>
+  <li><b>FHEM::readingsChange2::compareRel</b><br>
+  <code>FHEM::readingsChange2::compareRel($$$,$$)</code><br>
+  Compare nummeric value provided by by last argument (defaults to OldReadingsNum() (has to be set up first!), if not handed over). Syntax is <code>FHEM::readingsChange2::compareRel($name,$reading,$value,&lt;maximum of relative difference&gt;,&lt;old value to compare to&gt;)</code>. <i>maximum of relative difference</i> defaults to 10 (%). If the new <i>$value</i> is not in the range of old value +/- difference in percent, <i>undef</i> is returned.
+  </li>
+  <a id="readingsChange2-functions-compareAbsAndRel"></a>
+  <li><b>FHEM::readingsChange2::compareAbsAndRel</b><br>
+  <code>FHEM::readingsChange2::compareAbsAndRel($$$,$$$)</code><br>
+  Compare nummeric value provided by last argument (defaults to OldReadingsNum() (has to be set up first!), if not handed over). Syntax is <code>FHEM::readingsChange2::compareAbsAndRel($name,$reading,$value,&lt;maximum of abs difference&gt;,&lt;&lt;maximum of relative difference&gt;,&lt;old value to compare to&gt;)</code>. Explanation of the arguments see preceding functions.
   </li>
   </ul>
 </ul>
