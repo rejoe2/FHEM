@@ -48,6 +48,8 @@ BEGIN {
     notifyRegexpChanged
     InternalTimer
     RemoveInternalTimer
+    FmtDateTime
+    gettimeofday
   ))
 
 };
@@ -141,7 +143,7 @@ sub firstInit {
     $hash->{ERRORS} = CreateDevicesTable($hash);
     RemoveInternalTimer($hash);
     $hash->{helper}->{INITIALIZED} = 1;
-    my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
+    my $nRC = join q{|}, ('global',keys %{$hash->{helper}->{DEVICES}});
     notifyRegexpChanged($hash,$nRC);
     return;
 }
@@ -238,7 +240,7 @@ sub CreateSingleDeviceTable {
     delete $map->{$dev} if keys %{$map->{$dev}} == 0;
 
     if ( $hash->{helper}->{INITIALIZED} ) {
-        my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
+        my $nRC = join q{|}, ('global',keys %{$hash->{helper}->{DEVICES}});
         notifyRegexpChanged($hash,$nRC);
     }
 
@@ -287,7 +289,7 @@ sub DeleteDeviceInTable {
 
     return if !defined $map->{$dev};
     delete($map->{$dev});
-    my $nRC = join q{|}, ('global',devspec2array("$hash->{DEVSPEC}:FILTER=TEMPORARY!=1"));
+    my $nRC = join q{|}, ('global',keys %{$hash->{helper}->{DEVICES}});
     notifyRegexpChanged($hash,$nRC);
     return;
 }
@@ -391,7 +393,15 @@ sub Notify {
             # wenn ein ueberwachtes device, tabelle korrigieren
             RenameDeviceInTable($hash, $old, $new);
             next;
-        } 
+        }
+
+        # Device added
+        if ( $s =~ m{\ADEFINED\s+([\S]+)\s+\z}x ) {
+            my $new = $1;
+            # wenn ein ueberwachtes device, tabelle korrigieren
+            addToDevAttrList($new, 'readingsChange2:textField-long', 'readingsChange2') if $new =~ m{$hash->{DEVSPEC}};
+            next;
+        }
 
         # Device deleted
         if($s =~ m{\ADELETED\s+([\S]+)\z}x) {
@@ -424,7 +434,9 @@ sub checkDeviceReadingsUpdates {
     my $dev  = shift // carp q[No monitored device hash provided!] && return;
 
     # nicht waehrend FHEM startet
-    return if !$init_done ;
+    return if !$init_done;
+
+    Log3($hash,3,"check device reading for $dev->{NAME}");
 
     # nicht, wenn deaktivert
     return '' if(::IsDisabled($hash->{NAME}));
@@ -434,13 +446,15 @@ sub checkDeviceReadingsUpdates {
 
     my $changed;
     my $events = deviceEvents($dev,1);
+    Log3($hash,3,"check events, number is " . int @{$events});
     return if !$events;
   
     for my $i (0..@{$events}-1) {
         my $event = $events->[$i];
+        Log3($hash,3,"check event for $dev->{NAME}: $event");
         my $newval;
-        $event =~ m{\A(?<dev>[^:]+)(?<devr>:\s)?(?<devrv>.*)\z}smx; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
-        my $devreading = $+{dev};
+        $event =~ m{\A(?<devrn>[^:]+)(?<devr>:\s)?(?<devrv>.*)\z}smx; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
+        my $devreading = $+{devrn};
         my $devval = $+{devrv};
 
         # Sonderlocke fuer 'state' in einigen Faellen: z.B. bei ReadingsProxy kommt in CHANGEDWITHSTATE nichts an, und in CHANGE, wie gehabt, z.B. 'off'
@@ -452,6 +466,9 @@ sub checkDeviceReadingsUpdates {
         next if !defined $devreading || !defined $devval;
         next if !defined $dev->{READINGS}{$devreading};
         $newval = checkDeviceUpdate($hash, $dev, $devreading, $devval);
+        my $lg = "$devName: new val is ";
+        $lg .= defined $newval ? $newval : "undefined";
+        Log3($hash,3,$lg);
         #next if !defined $newval;
         $changed++;
         $dev->{READINGS}{$devreading}{VAL} = $newval;
@@ -466,20 +483,21 @@ sub checkDeviceUpdate {
     my $devHash = shift // carp q[No hash for target device provided!] && return;
     my $reading = shift // carp q[No reading provided!] && return;
     my $value   = shift // q{\0} ; # TODO: pruefen: oder doch ""?;
+    my $ts      = shift // FmtDateTime(gettimeofday());
 
     my $devn = $devHash->{NAME};
     my $devDataRecord = $hash->{helper}->{DEVICES}->{$devn} // return; 
-    my $readRepl      = $devDataRecord->{$reading}         // return;
+    my $readRepl      = $devDataRecord->{$reading}          // return;
     
     my $regexp = $readRepl->{regexp}; 
     my $pcode  = $readRepl->{perl}; 
     my $expr   = $readRepl->{repl};
     my $result;
     my $changed;
-    if (defined $regexp) {
+    if ( defined $regexp ) {
         defined $pcode ?
-            $pcode =~ s{$regexp}{$pcode}g
-          : $expr  =~ s{$regexp}{$expr}g;
+            $pcode =~ s{\A$regexp\z}{$pcode}g
+          : $expr  =~ s{\A$regexp\z}{$expr}g;
     } 
     
     #simple reading
@@ -495,17 +513,24 @@ sub checkDeviceUpdate {
         $pcode =~ s{\Q$key\E}{$val}gxms;
     }
     $result = AnalyzePerlCommand( $hash, $pcode );
-    Log3( $hash, 5, "[$hash-{NAME}] result of Perl code: $result" );
-    
-    return $result if ref $result eq 'SCALAR';
-    return if ref $result ne 'HASH';
-    
-    readingsBeginUpdate($hash);
+    #Log3( $hash, 5, "[$hash-{NAME}] result of Perl code: $result" );
+
+    return if !defined $result || ref $result ne 'HASH' && $result =~ m{\AERROR.evaluating}x;
+    return $result if ref $result ne 'HASH';
+
+    #readingsBeginUpdate($hash);
     for my $k (keys %{$result}) {
         next if $k eq $reading;
-        readingsBulkUpdate($devHash,$k,$result->{$k});
+        #readingsBulkUpdate($devHash,$k,$result->{$k});
+        setReadingsVal($devHash, $k, $result->{$k},$ts); 
+        my $rv = "$k: $result->{$k}";
+        if($k eq 'state') {
+            $rv = $result->{$k};
+            $devHash->{CHANGEDWITHSTATE} = [];
+        }
+        addEvent($devHash, $rv, $ts);
     }
-    readingsEndUpdate($devHash,1);
+    #readingsEndUpdate($devHash,1);
     return $result->{$reading};
 }
 
@@ -618,7 +643,7 @@ __END__
    <p>For the devices meeting <i>devspec</i> of readingsChange2, the list of the possible attributes is automatically extended by this additional entry. The attribute is read line by line, each line starting with the exact reading name that may be changed.</p>
    <p>Example:<br>
        <code>attr &lt;dev&gt; readingsChange2 abc (\d+\.\d*) $1\<br>
-                    temperature (\d+\.\d*) { FHEM::readingsChange2::compareAbs($name,$reading,$1,'25','10') }\<br>
+                    temperature  (-?\d+\.?\d*).* $1 { FHEM::readingsChange2::compareAbs("$name","$reading","$1",'25','10') }\<br>
                     def { perlfn1() }
        </code></p>
     <ul>The following syntaxes are supported:
