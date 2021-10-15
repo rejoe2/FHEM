@@ -50,6 +50,7 @@ BEGIN {
     RemoveInternalTimer
     FmtDateTime
     gettimeofday
+    TimeNow
   ))
 
 };
@@ -187,6 +188,7 @@ sub CreateSingleDeviceTable {
         trim($line);
         next if $line eq '';
         my ($rdg, $regexp, $expr) = split m{\s+}x, $line, 3;
+        
         if (!$regexp) {
             push @errors, "no replacement argument provided in attr readingsChange2 for $dev in line $line";
             next;
@@ -213,6 +215,7 @@ sub CreateSingleDeviceTable {
                     '$reading' => 'b',
                     '$value'   => '1'
                        );
+        delete $map->{$dev}->{$rdg};
         if (!$expr ) { #$regexp is Perl command
             my $schk = perlSyntaxCheck( $regexp, %specials );
             if ( $schk ) {
@@ -446,14 +449,14 @@ sub checkDeviceReadingsUpdates {
 
     my $changed;
     my $events = deviceEvents($dev,1);
-    Log3($hash,3,"check events, number is " . int @{$events});
+    #Log3($hash,3,"check events, number is " . int @{$events});
     return if !$events;
   
     for my $i (0..@{$events}-1) {
         my $event = $events->[$i];
         Log3($hash,3,"check event for $dev->{NAME}: $event");
         my $newval;
-        $event =~ m{\A(?<devrn>[^:]+)(?<devr>:\s)?(?<devrv>.*)\z}smx; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
+        next if !defined $event || $event !~ m{\A(?<devrn>[^:]+)(?<devr>:\s)?(?<devrv>.*)\z}smx; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
         my $devreading = $+{devrn};
         my $devval = $+{devrv};
 
@@ -469,10 +472,11 @@ sub checkDeviceReadingsUpdates {
         my $lg = "$devName: new val is ";
         $lg .= defined $newval ? $newval : "undefined";
         Log3($hash,3,$lg);
-        #next if !defined $newval;
+        next if $newval eq $devval;
         $changed++;
+        #$events->[$i] = defined $newval ? "$devreading: $newval" : '';
+        $events->[$i] = defined $newval ? "$devreading: $newval" : undef;
         $dev->{READINGS}{$devreading}{VAL} = $newval;
-        $events->[$i] = defined $newval ? "$devreading: $newval" : '';
     }
     evalStateFormat($devName) if $changed;
     return;
@@ -486,22 +490,24 @@ sub checkDeviceUpdate {
     my $ts      = shift // FmtDateTime(gettimeofday());
 
     my $devn = $devHash->{NAME};
-    my $devDataRecord = $hash->{helper}->{DEVICES}->{$devn} // return; 
+    my $devDataRecord = $hash->{helper}->{DEVICES}->{$devn} // return;
     my $readRepl      = $devDataRecord->{$reading}          // return;
     
-    my $regexp = $readRepl->{regexp}; 
-    my $pcode  = $readRepl->{perl}; 
+    my $regexp = $readRepl->{regexp};
+    my $pcode  = $readRepl->{perl};
     my $expr   = $readRepl->{repl};
     my $result;
     my $changed;
     if ( defined $regexp ) {
         defined $pcode ?
-            $pcode =~ s{\A$regexp\z}{$pcode}g
-          : $expr  =~ s{\A$regexp\z}{$expr}g;
-    } 
+#            $value =~ s{\A$readRepl->{regexp}\z}{$readRepl->{perl}}g
+#          : $value =~ s{\A$readRepl->{regexp}\z}{$readRepl->{repl}}g;
+            $value =~ s{\A$regexp\z}{$pcode}eegx
+          : $value =~ s{\A$regexp\z}{$expr}eegx;
+    }
     
     #simple reading
-    return $expr if defined $expr;
+    return $value if defined $expr;
 
     my %specials = (
                     '$name'    => $devn,
@@ -510,27 +516,21 @@ sub checkDeviceUpdate {
                        );
     for my $key (keys %specials) {
         my $val = $specials{$key};
-        $pcode =~ s{\Q$key\E}{$val}gxms;
+        $value =~ s{\Q$key\E}{$val}gxms;
     }
-    $result = AnalyzePerlCommand( $hash, $pcode );
-    #Log3( $hash, 5, "[$hash-{NAME}] result of Perl code: $result" );
+    $result = AnalyzePerlCommand( $hash, $value );
+    my $txt = defined $result ? $result : "undef";
+    Log3( $hash, 3, "[$hash-{NAME}] result of Perl code $value with $regexp: $txt" );
 
     return if !defined $result || ref $result ne 'HASH' && $result =~ m{\AERROR.evaluating}x;
     return $result if ref $result ne 'HASH';
 
-    #readingsBeginUpdate($hash);
+    readingsBeginUpdate($hash);
     for my $k (keys %{$result}) {
         next if $k eq $reading;
-        #readingsBulkUpdate($devHash,$k,$result->{$k});
-        setReadingsVal($devHash, $k, $result->{$k},$ts); 
-        my $rv = "$k: $result->{$k}";
-        if($k eq 'state') {
-            $rv = $result->{$k};
-            $devHash->{CHANGEDWITHSTATE} = [];
-        }
-        addEvent($devHash, $rv, $ts);
+        readingsBulkUpdate($devHash, $k, $result->{$k},1); 
     }
-    #readingsEndUpdate($devHash,1);
+    readingsEndUpdate($devHash,1);
     return $result->{$reading};
 }
 
@@ -542,6 +542,25 @@ sub Attr {
   my $hash = $defs{$name} // return;
 
   return;
+}
+
+########################################
+sub _UpdateDevReading {
+    my $devHash = shift // carp q[No hash for target device provided!] && return;
+    my $reading = shift // carp q[No reading provided!] && return;
+    my $value   = shift // q{\0} ; # TODO: pruefen: oder doch ""?;
+    my $event   = shift // carp q[No event statement provided!] && return;
+   
+    $devHash->{READINGS}{$reading}{VAL} = $value;
+    $devHash->{READINGS}{$reading}{TIME} = TimeNow(); 
+    if  ($event==1) {
+        if (exists ($devHash->{CHANGED})) {
+            my $max = int(@{$devHash->{CHANGED}});
+            $devHash->{CHANGED}[$max] = "$reading: $value";
+        }
+    } else {
+        readingsBulkUpdate($devHash, $reading, $value, 1);
+    }
 }
 
 sub compareAbs {

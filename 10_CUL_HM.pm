@@ -1005,12 +1005,18 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
+        #my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
+        my @IOnames = grep {InternalVal($_,'Clients', #Beta-User: frank #1 in https://forum.fhem.de/index.php/topic,123238.msg1179810.html#msg1179810
+                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
+                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
+                           : '') =~ m{:CUL_HM:}} keys %defs;
         return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
             if (!grep /^$attrVal$/,@IOnames);
         $attr{$name}{$attrName} = $attrVal;
         CUL_HM_assignIO($hash);
       }
+    } else {
+        InternalTimer(gettimeofday(),'CUL_HM_assignIO',$hash,0); #Beta-User: as attribute is no longer mandatory, we should assign one after delete is done. Might collide with automatic deletion in initialisation
     }
   }
   elsif($attrName eq "IOList"){
@@ -7368,11 +7374,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "assignIO") { #################################################
     $state = "";
     my $io = $a[2];
-    return "use set of unset - $a[3] not allowed"   if ($a[3] && $a[3] != m/^(set|unset)$/);
-    return "$io no suitable for CUL_HM" if(scalar(grep{$_ eq $io}
-                                                  grep{$defs{$_}{Clients} =~ m/:CUL_HM:/}
-                                                  keys %defs));
-
+    return "use set or unset - $a[3] not allowed"   if $a[3] && $a[3] !~ m/^(set|unset)$/; #Beta-User: frank #2 in https://forum.fhem.de/index.php/topic,123238.msg1179810.html#msg1179810
+    return "$io not suitable for CUL_HM" if !scalar(grep{$_ eq $io}
+                                                  grep {InternalVal($_,'Clients',
+                                                          defined $modules{InternalVal($_,'TYPE','')}{Clients}
+                                                          ? $modules{InternalVal($_,'TYPE','')}{Clients}
+                                                          :'') =~ m/:CUL_HM:/} keys %defs);
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
 
@@ -10891,7 +10898,11 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       $dIo = $oldIODevH->{NAME};
     }
     else {
-      my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
+      #my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
+      my @IOs = grep {InternalVal($_,'Clients',
+                      defined $modules{InternalVal($_,'TYPE','')}{Clients}
+                      ? $modules{InternalVal($_,'TYPE','')}{Clients}
+                      : '') =~ m{:CUL_HM:}} keys %defs;
       ($dIo) = (grep{CUL_HM_operIObyIOName($_)} @IOs,@IOs);# tricky: use first active IO else use any IO for CUL_HM
     }
     $newIODevH  = $defs{$dIo} if($dIo);
@@ -11968,6 +11979,10 @@ __END__
           "onlyEnterBootLoader" tells the device to enter the boot loader so it can be
           flashed using the eq3 firmware update tool. Mainly useful for flush-mounted devices
           in FHEM environments solely using HM-LAN adapters.
+        </li>
+        <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
+          Add or remove an IO device to the list of available IO's.
+          Changes attribute <i>IOlist</i> accordingly.
         </li>
       </ul>
   
@@ -13444,13 +13459,17 @@ __END__
           benennt das Device und alle seine Kan&auml;le um.
         </li>
 
-        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><br>
+        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><a id="CUL_HM-set-fwUpdate"></a><br>
           update Fw des Device. Der User muss das passende FW file bereitstellen.
           waitTime ist optional. Es ist die Wartezeit, um das Device manuell in den FW-update-mode
           zu versetzen.<br>
           "onlyEnterBootLoader" schickt das Device in den Booloader so dass es vom eq3 Firmware Update 
           Tool geflashed werden kann. Haupts&auml;chlich f&uuml;r Unterputz-Aktoren in Verbindung mit 
           FHEM Installationen die ausschliesslich HM-LANs nutzen interessant.
+        </li>
+        <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
+          IO-Gerät zur Liste der IO's hinzufügen oder aus dieser Löschen.
+          Ändert das Attribut <i>IOlist</i> entsprechend.
         </li>
 
       </ul>
