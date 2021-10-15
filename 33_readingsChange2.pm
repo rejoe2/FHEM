@@ -472,7 +472,7 @@ sub checkDeviceReadingsUpdates {
         my $lg = "$devName: new val is ";
         $lg .= defined $newval ? $newval : "undefined";
         Log3($hash,3,$lg);
-        next if $newval eq $devval;
+        next if defined $newval && $newval eq $devval;
         $changed++;
         #$events->[$i] = defined $newval ? "$devreading: $newval" : '';
         $events->[$i] = defined $newval ? "$devreading: $newval" : undef;
@@ -496,18 +496,20 @@ sub checkDeviceUpdate {
     my $regexp = $readRepl->{regexp};
     my $pcode  = $readRepl->{perl};
     my $expr   = $readRepl->{repl};
-    my $result;
+    my $result = $value;
     my $changed;
     if ( defined $regexp ) {
-        defined $pcode ?
-#            $value =~ s{\A$readRepl->{regexp}\z}{$readRepl->{perl}}g
-#          : $value =~ s{\A$readRepl->{regexp}\z}{$readRepl->{repl}}g;
-            $value =~ s{\A$regexp\z}{$pcode}eegx
-          : $value =~ s{\A$regexp\z}{$expr}eegx;
+        if ( defined $pcode ) {
+            Log3( $hash, 3, "[$hash->{NAME}] Perl code was $pcode" );
+            $pcode = s<\A.(.+).\z><$1>g;
+            Log3( $hash, 3, "[$hash->{NAME}] Perl code now is $pcode" );
+            $result =~ s{\A$regexp\z}{$pcode}ag; #eegx
+        } elsif ( defined $expr ) {
+            $result =~ s{\A$regexp\z}{$expr}eegx;
+        }
     }
-    
     #simple reading
-    return $value if defined $expr;
+    return $result if defined $expr;
 
     my %specials = (
                     '$name'    => $devn,
@@ -516,22 +518,22 @@ sub checkDeviceUpdate {
                        );
     for my $key (keys %specials) {
         my $val = $specials{$key};
-        $value =~ s{\Q$key\E}{$val}gxms;
+        $result =~ s{\Q$key\E}{$val}gxms;
     }
-    $result = AnalyzePerlCommand( $hash, $value );
-    my $txt = defined $result ? $result : "undef";
-    Log3( $hash, 3, "[$hash-{NAME}] result of Perl code $value with $regexp: $txt" );
+    my $result2 = AnalyzePerlCommand( $hash, $result );
+    my $txt = defined $result2 ? $result2 : "undef";
+    Log3( $hash, 3, "[$hash->{NAME}] result of Perl code $result with $regexp: $txt" );
 
-    return if !defined $result || ref $result ne 'HASH' && $result =~ m{\AERROR.evaluating}x;
-    return $result if ref $result ne 'HASH';
+    return if !defined $result2 || ref $result2 ne 'HASH' && $result2 =~ m{\AERROR.evaluating}x;
+    return $result2 if ref $result2 ne 'HASH';
 
     readingsBeginUpdate($hash);
-    for my $k (keys %{$result}) {
+    for my $k (keys %{$result2}) {
         next if $k eq $reading;
-        readingsBulkUpdate($devHash, $k, $result->{$k},1); 
+        readingsBulkUpdate($devHash, $k, $result2->{$k},1); 
     }
     readingsEndUpdate($devHash,1);
-    return $result->{$reading};
+    return $result2->{$reading};
 }
 
 
