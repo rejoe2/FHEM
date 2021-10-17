@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25059 2021-10-11 Beta-User$
+# $Id: 10_CUL_HM.pm 25078 2021-10-17 Beta-User $
 
 package main;
 
@@ -181,7 +181,8 @@ sub CUL_HM_Initialize($) {
   CUL_HM_AttrInit($hash,"initAttrlist");
                          
   CUL_HM_initRegHash();
-
+  my $time = gettimeofday();
+  
   $hash->{prot}{rspPend} = 0;#count Pending responses
   my @statQArr     = ();
   my @statQWuArr   = ();
@@ -200,7 +201,7 @@ sub CUL_HM_Initialize($) {
   $hash->{stat}{s}{dummy}=0;
   $hash->{stat}{r}{dummy}=0;
   RemoveInternalTimer("StatCntRfresh");
-  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
+  InternalTimer($time + 3600 * 20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
 
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
@@ -210,8 +211,9 @@ sub CUL_HM_Initialize($) {
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
   $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, and also prior to HMinfo
-  InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
-  #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+  InternalTimer($time + 1,"CUL_HM_updateConfig","startUp",0);
+  #InternalTimer($time + 1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+
   return;
 }
 
@@ -223,15 +225,15 @@ sub CUL_HM_updateConfig($){##########################
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(gettimeofday() + 1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
     # only once after startup - clean up definitions. During operation define function will take care
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
-    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only #Beta-User: frank proposal, https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
-
+    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only #Beta-User: see frank #5 in https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
+    
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
         $attr{$name}{model} = "VIRTUAL" if (!$attr{$name}{model} || $attr{$name}{model} =~ m/virtual_/);
@@ -250,7 +252,7 @@ sub CUL_HM_updateConfig($){##########################
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
         CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
-        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp); #Beta-User: frank proposal, https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
+        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp); #Beta-User: see frank #6 in https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
       }
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
@@ -546,7 +548,14 @@ sub CUL_HM_updateConfig($){##########################
   }
   
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
+  if(!$modules{CUL_HM}{helper}{initDone}){
+    Log 1,"CUL_HM finished initial cleanup";
+    #if ($modules{HMinfo}){# force reread
+    if (defined &HMinfo_init){# force reread #Beta-User: see https://forum.fhem.de/index.php/topic,123473.msg1180140.html#msg1180140
+      $modules{HMinfo}{helper}{initDone} = 0;
+      InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
+    }
+  }
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
 }
@@ -1009,13 +1018,11 @@ sub CUL_HM_Attr(@) {#################################
         my @IOnames = grep {InternalVal($_,'Clients', #Beta-User: frank #1 in https://forum.fhem.de/index.php/topic,123238.msg1179810.html#msg1179810
                            defined $modules{InternalVal($_,'TYPE','')}{Clients}
                            ? $modules{InternalVal($_,'TYPE','')}{Clients}
-                           : '') =~ m{:CUL_HM:}} keys %defs;
-        return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
-            if (!grep /^$attrVal$/,@IOnames);
-        $attr{$name}{$attrName} = $attrVal;
+                           : '') =~ m{:CUL_HM:}} keys %defs;$attr{$name}{$attrName} = $attrVal;
         CUL_HM_assignIO($hash);
       }
-    } else {
+    } 
+    else {
         InternalTimer(gettimeofday(),'CUL_HM_assignIO',$hash,0); #Beta-User: as attribute is no longer mandatory, we should assign one after delete is done. Might collide with automatic deletion in initialisation
     }
   }
@@ -1566,6 +1573,7 @@ sub CUL_HM_Notify(@){###############################
   return undef if(!$events); # Some previous notify deleted the array.
   #my $cws = join(";#",@{$dev->{CHANGED}});
   my $count;
+
   foreach my $evnt(@{$events}){
     if($evnt =~ m/^(DELETEATTR)/){
     }
@@ -4983,7 +4991,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
         @arr1 = grep !/(trg|)(press|event|Press|Event)[SL]\S*?/,@arr1;
       }
     }
-    #delete $hash->{helper}{cmds}{cmdLst} ; #Beta-User: see frank in https://forum.fhem.de/index.php/topic,121650.msg1179090.html#msg1179090
+    #delete $hash->{helper}{cmds}{cmdLst} ;  #Beta-User: see frank: https://forum.fhem.de/index.php/topic,121650.msg1179090.html#msg1179090
     foreach(@arr1){
       my ($cmdS,$val) = split(":",$_,2);
       $val =~ s/\{self\}/\{self$chn\}/;
@@ -5407,7 +5415,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    if ($modules{HMinfo}){
+    #if ($modules{HMinfo}){
+    if ( defined &HMinfo_tempListDefFn ){ #Beta-User: see https://forum.fhem.de/index.php/topic,123473.msg1180140.html#msg1180140
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
@@ -9950,22 +9959,21 @@ sub CUL_HM_getChnPeerFriend($){ #which are my peerFriends
   return join(",",@chPopt);
 }
 
-sub CUL_HM_getPeerOption($){ #who are my friends
+sub CUL_HM_getPeerOption($){ #who are my friends? Whom can I peer to, who can I unpeer
   my ($name)  = @_; 
   CUL_HM_calcPeerOptions() if(!$modules{CUL_HM}{helper}{peerOpt});
 
   my %curPTmp;  
   if($defs{$name}{helper}{peerFriend}){
-      $curPTmp{$_} = $_              foreach(grep !/$name/,
-                                         split(",",
-                                         join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
-                                                  grep!/^-$/,
-                                                  split(",",$defs{$name}{helper}{peerFriend}))));
+    $curPTmp{$_} = $_              foreach(grep !/$name/,
+                                       split(",",
+                                       join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
+                                                grep!/^-$/,
+                                                split(",",$defs{$name}{helper}{peerFriend}))));
   }
-  else{
-      $curPTmp{$_} = "remove_".$_    foreach(grep !/(broadcast|self)/,values %{$defs{$name}{helper}{peerIDsH}});
+  if($defs{$name}{helper}{peerIDsH}){
+    $curPTmp{$_} = "remove_".$_    foreach(grep !/(broadcast|self)/,values %{$defs{$name}{helper}{peerIDsH}});
   }
-  
   my @peers = sort values %curPTmp;
   
   return join(",",(grep/remove/ ,@peers)   # offer remove first
@@ -10824,14 +10832,6 @@ sub CUL_HM_UpdtCentralState($){
 sub CUL_HM_operIObyIOHash($){ # noansi: in iohash, return iohash if IO is operational, else undef
   return if (!defined($_[0]));
   return CUL_HM_operIObyIOName($_[0]->{NAME}); #Beta-User: use shortcut to get simimar behaviour...
-#  my $ioname = $_[0]->{NAME};
-#  return if (   !$ioname
-#             || InternalVal($ioname,'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
-#             || ReadingsVal($ioname,'state','disconnected') eq 'disconnected' # CUL
-#             || IsDummy($ioname)
-#             || IsDisabled($ioname)
-#            );
-#  return $_[0];
 }
 sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operational, else undef
   return if (!$_[0]);
@@ -10872,10 +10872,14 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
                 || $modules{CUL_HM}{helper}{updateStep} #don't change while a fwupdate is in progress, only IO for update is in 100kbit/s speed
                 );
   my $newIODevH;
-
+  
   if ($hh->{io}{vccu}){# second option - any IO from the
     my $iom;
     ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}                  if(!$iom && @{$hh->{io}{prefIO}});
+    #Log(1,"----- assignio-Test2 ----- => n:$hash->{NAME} ioOld:".(defined($oldIODevH->{NAME})?$oldIODevH->{NAME}:"---")." ioNew:".(defined($iom)?$iom:"---"));
+    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}                               if(!$iom && @{$hh->{io}{prefIO}});
+    #Log(1,"----- assignio-Test3 ----- => n:$hash->{NAME} ioOld:".(defined($oldIODevH->{NAME})?$oldIODevH->{NAME}:"---")." ioNew:".(defined($iom)?$iom:"---"));
+    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
       ($iom) =    ((sort {@{$hh->{mRssi}{io}{$b}}[0] <=>     # This is the best choice
@@ -10885,12 +10889,12 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     } 
     ($iom) = grep{defined $defs{$_}} @{$hh->{io}{prefIO}}                           if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep{defined $defs{$_}} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}}  if(!$iom && @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}});
+    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
     $newIODevH  = $defs{$iom} if($iom);
-    return 0 if $iom && $iom eq 'none';
   }
-
+  
   if (!defined $newIODevH) {# not assigned thru CCU - try normal
-    my $dIo = AttrVal($hash->{NAME},"IODev",ReadingsVal($hash->{NAME},'IODev',''));
+    my $dIo = AttrVal($hash->{NAME},"IODev",ReadingsVal($hash->{NAME},'IODev','')); #Beta-User: https://forum.fhem.de/index.php/topic,123238.msg1179106.html#msg1179106
     if (CUL_HM_operIObyIOName($dIo)) {
       ; # assign according to reading/attribut
     }
@@ -11771,13 +11775,15 @@ __END__
           which specifies the index of the old key when the reading is divided by 2.
         </li>
         <li><a id="CUL_HM-set-clear"></a><B>clear &lt;[rssi|readings|register|msgEvents|attack|all]&gt;</B><br>
-          A set of variables can be removed.<br>
+          A set of variables or readings can be removed.<br>
           <ul>
-            readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
-            register: all captured register-readings in FHEM will be removed. This has NO impact to the values in the device.<br>
-            msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
-            rssi:  collected rssi values will be cleared. <br>
-            attack:  information regarding an attack will be removed. <br>
+            readings: all readings are removed. Any new reading will be added usual. Used to eliminate old data.<br>
+            register: all captured register-readings in FHEM are removed. NO impact to the device.<br>
+            msgEvents:  all message event counter are removed. Also commandstack is cleared. <br>
+            msgErrors:  message-error counter are removed.<br>
+            rssi:  collected rssi values are cleared. <br>
+            attack:  information regarding an attack are removed. <br>
+            trigger:  all trigger readings are removed. <br>
             all:  all of the above. <br>
           </ul>
         </li>
@@ -12108,12 +12114,11 @@ __END__
                used to stimulate the related actions as defined in the actor register.
           </li>
           <li><a id="CUL_HM-set-peerSmart"></a><B>peerSmart [&lt;peer&gt;]</B><br>
-               The command is similar to <B><a href="#CUL_HM-set-peerChan">peerChan</a></B>. 
-               peerChan uses only one parameter, the peer which the channel shall be peered to. <br>
-               Therefore peerSmart peers always in single mode (see peerChan). Funktionallity of the peered actor shall be applied 
-               manually by setting register. This is not a big difference to peerChan. <br>
-               Smart register setting could be done using hmTemplate. <br>
-               peerSmart is also available for actor-channel.
+               The command is similar to <B><a href="#CUL_HM-set-peerChan">peerChan</a></B> 
+               with reduced options for peer and unpeer.<br>
+               peerSmart peers in single mode (see peerChan) while funktionallity should be defined 
+               by setting register (not much difference to peerChan). <br>
+               Smart register setting could be done using hmTemplate.
           </li>
           <li><a id="CUL_HM-set-peerChan"></a><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B><br>
           
@@ -13459,7 +13464,7 @@ __END__
           benennt das Device und alle seine Kan&auml;le um.
         </li>
 
-        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><a id="CUL_HM-set-fwUpdate"></a><br>
+        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><br>
           update Fw des Device. Der User muss das passende FW file bereitstellen.
           waitTime ist optional. Es ist die Wartezeit, um das Device manuell in den FW-update-mode
           zu versetzen.<br>
@@ -13581,12 +13586,10 @@ __END__
                Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-pressL">pressL</a><br>
           </li>
           <li><B>peerSmart [&lt;peer&gt;] </B><a id="CUL_HM-set-peerSmart"></a><br>
-               Das Kommando ist aehnlich dem <B><a href="#CUL_HM-set-peerChan">peerChan</a></B>. 
-               peerChan braucht nur einen Parameter, den Peer zu welchem die Beziehung hergestellt werden soll.<br>
-               Daher peert peerSmart immer single mode (siehe peerChan). Die Funktionalitaet des gepeerten Aktors wird über das manuelle 
-               setzen der Register eingestellt. Am Ende ist das kein grosser Unterschied zu peerChan. <br>
-               Smartes Register Setzen kann man mit hmTemplate erreichen. <br>
-               peerSmart ist auch für Aktor Kanäle verfügbar.
+               Das Kommando ist aehnlich <B><a href="#CUL_HM-set-peerChan">peerChan</a></B> mit reduzierten Optionen.<br>
+               peerSmart peert immer single mode (siehe peerChan). Die Funktionalitaet über das  
+               setzen der Register erstellt (kein grosser Unterschied zu peerChan).<br>
+               Smartes Registersetzen unterstützt bspw hmTemplate.<br>
           </li>
           <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a id="CUL_HM-set-peerChan"></a><br>

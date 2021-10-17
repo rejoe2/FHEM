@@ -1,9 +1,10 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 24960 2021-10-04 + cref + other + start HMinfo first Beta-User $
+# $Id: 98_HMinfo.pm 25079 + clear msgErrors + new showTimer 2021-10-17 Beta-User $
 package main;
 use strict;
 use warnings;
+use B qw(svref_2object); #Beta-User: see frank hint in https://forum.fhem.de/index.php/topic,120856.msg1179854.html#msg1179854
 
 sub HMinfo_Initialize($$);
 sub HMinfo_Define($$);
@@ -15,6 +16,7 @@ sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
 sub HMinfo_noDup(@);
 sub HMinfo_register ($);
+sub HMinfo_init($);
 
 use Blocking;
 use HMConfig;
@@ -70,7 +72,6 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{NOTIFYDEV} = "global";
   $modules{HMinfo}{helper}{initDone} = 0;
   $hash->{NotifyOrderPrefix} = "49-"; #Beta-User: make sure, HMinfo is up and running after CUL_HM but prior to user code e.g. in notify
-  #HMinfo_init(); #Beta-User: doppelt gemoppelt zu Define?
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -100,7 +101,6 @@ sub HMinfo_Define($$){#########################################################
   $hash->{nb}{cnt} = 0;
   $modules{HMinfo}{helper}{initDone} = 0;
   notifyRegexpChanged($hash,"global",0);
-  #HMinfo_init(); Beta-User: do this in NotifyFn to be sure, all CUL_HM entities are already defined and readings and attr are available
   LoadModule('CUL_HM'); #Beta-User: Make sure, code from CUL_HM is available when attributes are set
   return;
 }
@@ -258,18 +258,25 @@ sub HMinfo_Notify(@){##########################################################
   if (grep /(SAVE|SHUTDOWN)/,@{$events}){# also save configuration
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
-  if (grep /INITIALIZED|REREADCFG/,@{$events}){
+  if (grep /(INITIALIZED|REREADCFG)/,@{$events}){
     $modules{HMinfo}{helper}{initDone} = 0;
-    HMinfo_init();
+    HMinfo_init($hash);
   }
   return undef;
 }
-sub HMinfo_init(){#############################################################
-  RemoveInternalTimer("HMinfo_init");# just to be secure...
+sub HMinfo_init($){############################################################
+  #my ($hash, $dev) = @_;
+
+  RemoveInternalTimer("HMinfo_init");# just to be sure...
   if ($init_done){
-    #Log3(undef,3,"debug: HMinfo_init");
-    if (!$modules{HMinfo}{helper}{initDone}){ # && !$modules{HMinfo}{helper}{initDone}){
+    if (!$modules{HMinfo}{helper}{initDone}){ 
       my ($hm) = devspec2array("TYPE=HMinfo");
+      Log3($hm,5,"debug: HMinfo_init");
+      foreach my $attrName (keys %{$attr{$hm}}){
+        #Log 1," update HM attributes  - will update CUL_HM settings ocationally";
+        HMinfo_Attr("set",$hm, $attrName,$attr{$hm}{$attrName});
+      }
+
       if (substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0){
         HMinfo_SetFn($defs{$hm},$hm,"loadConfig");
         InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
@@ -1251,7 +1258,7 @@ sub HMinfo_getCfgDefere($){####################################################
   HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".'\^('.join("|",@{$defs{$hm}{helper}{nbPend}}).')\$'.")\$");  
 }
 
-sub HMinfo_startBlocking(@){####################################################
+sub HMinfo_startBlocking(@){###################################################
   my ($name,$fkt,$param) = @_;
   my $hash = $defs{$name};
   Log3 $hash,5,"HMinfo $name start blocking:$fkt";
@@ -1743,7 +1750,7 @@ sub HMinfo_GetFn($@) {#########################################################
 #    return HMI_overview(\@entities,\@a);
 #  }                                
 
-  elsif($cmd eq "showTimer"){
+  elsif($cmd eq "showTimer"){ #Beta-User: noansi version from https://forum.fhem.de/index.php/topic,120856.msg1156655.html#msg1156655
     my ($type) = (@a,"short");# ugly way to set "full" as default
     my %show;
     if($type eq "short"){
@@ -1754,7 +1761,7 @@ sub HMinfo_GetFn($@) {#########################################################
                  ,DeviceName  => 4
                  );
     }
-    else{
+    else {
        %show =(   TYPE        => 1
                  ,NAME        => 4
                  ,TIMESPEC    => 3
@@ -1770,20 +1777,36 @@ sub HMinfo_GetFn($@) {#########################################################
     }
     my $fltr = "(".join("|",keys %show).')' ;
     my @ak;
-    foreach my $ats (keys %intAt){
-      push @ak,  substr(localtime($intAt{$_}{TRIGGERTIME}),0,19)
-               .sprintf("%8d: %-30s\t :",int($intAt{$ats}{TRIGGERTIME}-gettimeofday())
-                                        ,$intAt{$ats}{FN})
-               .(ref($intAt{$ats}{ARG}) eq 'HASH' 
-                     ? join("\t ",map{"$_ : ".$intAt{$ats}{ARG}{$_}} 
+    my ($tfnm, $cv);
+    my $timerarray =  \@intAtA;
+    my $now = gettimeofday();
+    foreach my $ats (@{$timerarray}){
+      $tfnm = $ats->{FN};
+      if (ref($tfnm) ne "") {
+        $cv = svref_2object($tfnm);
+        $tfnm = $cv->GV->NAME if ($cv);
+      }
+       if (!defined($ats->{TRIGGERTIME})) { #noansi: just for debugging
+        Log3 $hash,0,'HMinfo '.$name.' showTimer undefined TRIGGERTIME:'
+                     .(defined($ats->{atNr})?' atNr:'.$ats->{atNr}:'')
+                     .' FN:'.$tfnm
+                     .' ARG:'.$ats->{ARG};
+ #       next;
+      }
+     push @ak,  substr(localtime($ats->{TRIGGERTIME}),0,19)
+               .sprintf("%8d: %-30s\t :",int($ats->{TRIGGERTIME}-$now)
+                                        ,$tfnm)
+               .(ref($ats->{ARG}) eq 'HASH'
+                     ? join("\t ",map{"$_ : ".$ats->{ARG}{$_}}
                                   map{$_=~m/^\d/?substr($_,1,99):$_}
-                                  sort 
+                                  sort
                                   map{(my $foo = $_) =~ s/$fltr/$show{$1}$1/g; $foo;}
                                   grep /^$fltr/,
-                                  keys %{$intAt{$ats}{ARG}})
-                      :"$intAt{$ats}{ARG}")};
-    $ret = join("\n",sort @ak);
+                                  keys %{$ats->{ARG}})
+                     :"$ats->{ARG}")};
+    $ret = join("\n", @ak);
   }
+
   elsif($cmd eq "showChilds"){
     my ($type) = @a;
     $type = "all" if(!$type);
@@ -1873,13 +1896,13 @@ sub HMinfo_SetFn($@) {#########################################################
         delete $modules{CUL_HM}{stat}{s}{$_};
       }
     }
-    if ($type eq "msgErrors"){#clear message events for all devices which has problems
+    if ($type eq "msgErrors"){ #clear message errors for all devices which has problems
       my @devL = split(",",InternalVal($hash->{NAME},"iW__protoNames"  ,""));
-      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protoNames",""));
+      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protocol","")); #Beta-User: see frank, https://forum.fhem.de/index.php/topic,119760.msg1179963.html#msg1179963
       push @devL,split(",",InternalVal($hash->{NAME},"iERR__protocol"  ,""));
     
       foreach my $dName (HMinfo_noDup(@devL)){
-        CUL_HM_Set($defs{$dName},$dName,"clear","msgEvents");
+        CUL_HM_Set($defs{$dName},$dName,"clear","msgErrors"); #Beta-User: see frank, https://forum.fhem.de/index.php/topic,119760.msg1179963.html#msg1179963
       }
     }
     elsif ($type ne "msgStat"){
@@ -3403,11 +3426,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 
 
 1;
-
-__END__
-
 =pod
-=encoding utf8
 =item command
 =item summary    support and control instance for wireless homematic devices and IOs
 =item summary_DE Unterstützung und Überwachung von Homematic Funk devices und IOs 

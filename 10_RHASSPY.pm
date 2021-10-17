@@ -384,6 +384,7 @@ sub firstInit {
     fetchSiteIds($hash) if !ReadingsVal( $name, 'siteIds', 0 );
     initialize_rhasspyTweaks($hash, AttrVal($name,'rhasspyTweaks', undef ));
     fetchIntents($hash);
+    delete $hash->{ERRORS};
     if ( !defined InternalVal($name, 'IODev',undef) ) {
         Log3( $hash, 1, "[$name] no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder");
         $hash->{ERRORS} = 'no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder!';
