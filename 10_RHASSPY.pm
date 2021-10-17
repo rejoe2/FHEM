@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-09-21 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-10-17 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -246,7 +246,7 @@ my $de_mappings = {
 
 BEGIN {
 
-  GP_Import(qw(
+  GP_Import( qw(
     addToAttrList
     addToDevAttrList
     delFromDevAttrList
@@ -296,9 +296,7 @@ BEGIN {
     FileRead
     getAllSets
     trim
-  ))
-    #round
-
+  ) )
 };
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -349,7 +347,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.41';
+    $hash->{MODULE_VERSION} = '0.4.41a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -386,7 +384,13 @@ sub firstInit {
     fetchSiteIds($hash) if !ReadingsVal( $name, 'siteIds', 0 );
     initialize_rhasspyTweaks($hash, AttrVal($name,'rhasspyTweaks', undef ));
     fetchIntents($hash);
-    IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT';
+    if ( !defined InternalVal($name, 'IODev',undef) ) {
+        Log3( $hash, 1, "[$name] no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder");
+        $hash->{ERRORS} = 'no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder!';
+    }
+    IOWrite($hash, 'subscriptions', join q{ }, @topics) 
+        if defined InternalVal($name, 'IODev',undef) 
+        && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
 
     return;
