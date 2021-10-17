@@ -29,7 +29,8 @@ my %sets = (
 my %gets = (
     EPGQuery        => [],
     ChannelQuery    => [qw(noArg)],
-    ConnectionQuery => [qw(noArg)]
+    ConnectionQuery => [qw(noArg)],
+    InputQuery      => [qw(noArg)]
 );
 
 BEGIN {
@@ -142,6 +143,9 @@ sub firstInit {
         my $interval = AttrVal($name,'PollingInterval',60);
         Log3( $hash,3,"$name - ConnectionQuery will be polled with an interval of $interval s");
     }
+    
+    # Timer für alles außer EPG
+    InternalTimer(time+AttrVal($name,'PollingInterval',60),\&TvHeadend_GetUpdate,$hash);
 
     return;
 }
@@ -214,6 +218,7 @@ sub Get {
     return EPGQuery($hash,@values)          if $command eq 'EPGQuery'; 
     return ChannelQuery($hash)              if $command eq 'ChannelQuery';
     return TvHeadend_ConnectionQuery($hash) if $command eq 'ConnectionQuery';
+    return InputQuery($hash)                if $command eq 'InputQuery';
     return;
 }
 
@@ -290,6 +295,15 @@ sub Delete {
     RemoveInternalTimer($hash);
     my ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($hash->{NAME});
     return;
+}
+
+sub TvHeadend_GetUpdate {
+    my $hash = shift // return;
+    my $name = $hash->{NAME};
+
+    RemoveInternalTimer($hash,\&TvHeadend_GetUpdate);
+    InternalTimer(time+AttrVal($name,'PollingInterval',60),\&TvHeadend_GetUpdate,$hash);
+    return &InputQuery($hash);
 }
 
 sub TvHeadend_EPG {
@@ -518,6 +532,56 @@ sub ChannelQuery {
 
     return join q{\n}, @channelNames;
 }
+
+sub InputQuery {                                                                 
+    my $hash = shift // return;
+    my $name = $hash->{NAME};
+    Log3($hash, 4,"$name - Get Input-Devices");
+
+    my $ip = $hash->{helper}{http}{ip};
+    my $port = $hash->{helper}{http}{port} // '9981';
+    my $response;
+    my @inputNames;
+
+    $hash->{helper}{input}{count} = 0;
+    delete $hash->{helper}{input}{devices} if defined $hash->{helper}{input}{devices};
+
+    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/status/inputs";
+
+    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
+    ($response = $err,Log3($hash, 3,"$name - $err"),return $err) if $err;
+    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
+
+    my $entries;
+    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+        return Log3($hash, 1, "JSON decoding error: $@");
+    }
+    ($response = "No Input-Devices available",Log3($hash,3,"$name - $response"),return $response) if !@{$entries};
+
+    @{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
+
+    for my $i (0..@$entries-1) {
+        $entries->[$i]->{name} = encode('UTF-8',$entries->[$i]->{input});
+        $entries->[$i]->{id} = $i;
+        push @inputNames, $entries->[$i]->{name};
+    }
+
+    return if !@inputNames;
+    my $inputNames = join q{,}, @inputNames;
+    $inputNames =~ s{ }{\_}g;
+
+    $defs{$name}{InputDevices} = $inputNames;
+
+    $hash->{helper}{input}{count} = @{$entries};
+    $hash->{helper}{input}{devices} = $entries;
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged($hash, 'activeInputDevices', @{$entries});
+    readingsEndUpdate($hash, 1);
+
+    return join q{\n}, @inputNames;
+}
+
 
 sub EPGQuery {
     my $hash = shift // return;
