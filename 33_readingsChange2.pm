@@ -45,6 +45,7 @@ BEGIN {
     devspec2array
     perlSyntaxCheck
     AnalyzePerlCommand
+    EvalSpecials
     notifyRegexpChanged
     InternalTimer
     RemoveInternalTimer
@@ -451,9 +452,11 @@ sub checkDeviceReadingsUpdates {
     my $events = deviceEvents($dev,1);
     #Log3($hash,3,"check events, number is " . int @{$events});
     return if !$events;
-  
-    for my $i (0..@{$events}-1) {
-        my $event = $events->[$i];
+
+    #for (0..@{$events}-1) {
+    for my $evt (@{$events}) {
+        #my $event = $events->[$_];
+        my $event = $evt;
         Log3($hash,3,"check event for $dev->{NAME}: $event");
         my $newval;
         next if !defined $event || $event !~ m{\A(?<devrn>[^:]+)(?<devr>:\s)?(?<devrv>.*)\z}smx; # Schalter /sm ist wichtig! Sonst wir bei mehrzeiligen Texten Ende nicht korrekt erkannt. s. https://perldoc.perl.org/perlretut.html#Using-regular-expressions-in-Perl 
@@ -462,21 +465,28 @@ sub checkDeviceReadingsUpdates {
 
         # Sonderlocke fuer 'state' in einigen Faellen: z.B. bei ReadingsProxy kommt in CHANGEDWITHSTATE nichts an, und in CHANGE, wie gehabt, z.B. 'off'
         if(!$+{devr}) {
-            $devval = $event;
+            $devval = qq{$event};
             $devreading = 'state';
         }
 
         next if !defined $devreading || !defined $devval;
         next if !defined $dev->{READINGS}{$devreading};
         $newval = checkDeviceUpdate($hash, $dev, $devreading, $devval);
-        my $lg = "$devName: new val is ";
+        my $lg = "$devName: changed $devreading from $devval to ";
         $lg .= defined $newval ? $newval : "undefined";
         Log3($hash,3,$lg);
         next if defined $newval && $newval eq $devval;
         $changed++;
-        #$events->[$i] = defined $newval ? "$devreading: $newval" : '';
-        $events->[$i] = defined $newval ? "$devreading: $newval" : undef;
-        $dev->{READINGS}{$devreading}{VAL} = $newval;
+        if ( defined $newval ) {
+            #$events->[$i] = defined $newval ? "$devreading: $newval" : '';
+            $dev->{READINGS}{$devreading}{VAL} = $newval;
+            #$events->[$_] = "$devreading: $newval";
+            $evt = "$devreading: $newval";
+        } else {
+            #$events->[$_] = '';
+            $evt = undef;
+            delete $dev->{READINGS}{$devreading};
+        }
     }
     evalStateFormat($devName) if $changed;
     return;
@@ -496,33 +506,39 @@ sub checkDeviceUpdate {
     my $regexp = $readRepl->{regexp};
     my $pcode  = $readRepl->{perl};
     my $expr   = $readRepl->{repl};
-    my $result = $value;
+    my $result = qq{$value};
     my $changed;
-    if ( defined $regexp ) {
-        if ( defined $pcode ) {
-            Log3( $hash, 3, "[$hash->{NAME}] Perl code was $pcode" );
-            $pcode = s<\A.(.+).\z><$1>g;
-            Log3( $hash, 3, "[$hash->{NAME}] Perl code now is $pcode" );
-            $result =~ s{\A$regexp\z}{$pcode}ag; #eegx
-        } elsif ( defined $expr ) {
-            $result =~ s{\A$regexp\z}{$expr}eegx;
-        }
+    if ( defined $regexp && defined $expr ) {
+        $result =~ s{\A$regexp\z}{$expr}eegx;
+        return $result;
     }
-    #simple reading
-    return $result if defined $expr;
 
+    return if !defined $pcode;
+
+    my $result2;
     my %specials = (
                     '$name'    => $devn,
                     '$reading' => $reading,
-                    '$value'   => $value
+                    '$value'   => $value,
+                    '$val'     => $value
                        );
-    for my $key (keys %specials) {
-        my $val = $specials{$key};
-        $result =~ s{\Q$key\E}{$val}gxms;
+
+    if ( !defined $regexp ) {
+        for my $key (keys %specials) {
+            my $val = $specials{$key};
+            $result =~ s{\Q$key\E}{$val}gxms;
+        }
+        $result2 = AnalyzePerlCommand( $hash, $result );
+    } else { 
+        Log3( $hash, 3, "[$hash->{NAME}] execute Perl code: $pcode" );
+        EvalSpecials($pcode, %specials);
+        my $val = $value;
+        my $result2 = AnalyzePerlCommand( $hash, "\$val =~ s{$regexp}{$pcode}gee; return \$val" );
     }
-    my $result2 = AnalyzePerlCommand( $hash, $result );
+
     my $txt = defined $result2 ? $result2 : "undef";
-    Log3( $hash, 3, "[$hash->{NAME}] result of Perl code $result with $regexp: $txt" );
+    Log3( $hash, 3, "[$hash->{NAME}] result of Perl code $pcode with $regexp over $value: $txt" );
+    Log3( $hash, 3, "[$hash->{NAME}] result of Perl code $pcode with $regexp over $value: $txt" );
 
     return if !defined $result2 || ref $result2 ne 'HASH' && $result2 =~ m{\AERROR.evaluating}x;
     return $result2 if ref $result2 ne 'HASH';

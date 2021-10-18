@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25078 2021-10-17 Beta-User $
+# $Id: 10_CUL_HM.pm 25078 2021-10-18 Beta-User $
 
 package main;
 
@@ -239,7 +239,7 @@ sub CUL_HM_updateConfig($){##########################
         $attr{$name}{model} = "VIRTUAL" if (!$attr{$name}{model} || $attr{$name}{model} =~ m/virtual_/);
       }
       if ($attr{$name}{".mId"} && $culHmModel->{$attr{$name}{".mId"}}){ #if mId is available set model to its original value -at least temporarliy
-        $attr{$name}{model} = $culHmModel->{$attr{$name}{".mId"}}{name};
+        $attr{$name}{model} = qq($culHmModel->{$attr{$name}{".mId"}}{name});
       }
       else{#if mId is not available use attr model and assign it. 
         if ($modules{CUL_HM}{AttrList} =~ m /\.mId/){# do not handle .mId if not restarted
@@ -962,7 +962,7 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_updtDeviceModel($name,$attrVal);
     }
     else{
-      $attr{$name}{model} = $culHmModel->{$attr{$name}{".mId"}}{name} if ($attr{$name}{".mId"});# return to old model name
+      $attr{$name}{model} = qq($culHmModel->{$attr{$name}{".mId"}}{name}) if ($attr{$name}{".mId"});# return to old model name
       CUL_HM_updtDeviceModel($name,$attr{$name}{model});
     }
   }
