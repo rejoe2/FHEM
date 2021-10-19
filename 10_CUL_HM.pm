@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 2021-10-18 18:31:00Z martinp876 $
+# $Id: 10_CUL_HM.pm 25091 2021-10-19 Beta-User$
 
 package main;
 
@@ -7388,12 +7388,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $state = "";
     my $io = $a[2];
     return "use set or unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
-    return "$io not suitable for CUL_HM" if !scalar(grep{$_ eq $io}
-                                                  grep {InternalVal($_,'Clients',
-                                                          defined $modules{InternalVal($_,'TYPE','')}{Clients}
-                                                          ? $modules{InternalVal($_,'TYPE','')}{Clients}
-                                                          :'') =~ m/:CUL_HM:/}
-                                                  keys %defs);
+    return "$io not suitable for CUL_HM" if !defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/; #Beta-User: just a simple form for a single device, but requires HMLAN change...
 
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
