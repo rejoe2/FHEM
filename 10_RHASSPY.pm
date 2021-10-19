@@ -375,9 +375,9 @@ sub firstInit {
 
     # IO
     AssignIoPort($hash);
-    my $IODev = AttrVal( $name, 'IODev', ReadingsVal( $name, 'IODev', InternalVal($name, 'IODev', undef )->{NAME}));
+    my $IODev = AttrVal( $name, 'IODev', ReadingsVal( $name, 'IODev', defined InternalVal($name, 'IODev', undef ) ? InternalVal($name, 'IODev', undef )->{NAME} : undef ));
 
-    return if !$init_done || !defined $IODev;
+    return if !$init_done; # || !defined $IODev;
     RemoveInternalTimer($hash);
     deleteAllRegIntTimer($hash);
 

@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25078 2021-10-18 Beta-User $
+# $Id: 10_CUL_HM.pm 25091 2021-10-18 18:31:00Z martinp876 $
 
 package main;
 
@@ -232,14 +232,14 @@ sub CUL_HM_updateConfig($){##########################
     # only once after startup - clean up definitions. During operation define function will take care
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
-    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only #Beta-User: see frank #5 in https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
+    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only
     
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
         $attr{$name}{model} = "VIRTUAL" if (!$attr{$name}{model} || $attr{$name}{model} =~ m/virtual_/);
       }
       if ($attr{$name}{".mId"} && $culHmModel->{$attr{$name}{".mId"}}){ #if mId is available set model to its original value -at least temporarliy
-        $attr{$name}{model} = qq($culHmModel->{$attr{$name}{".mId"}}{name});
+        $attr{$name}{model} = $culHmModel->{$attr{$name}{".mId"}}{name};
       }
       else{#if mId is not available use attr model and assign it. 
         if ($modules{CUL_HM}{AttrList} =~ m /\.mId/){# do not handle .mId if not restarted
@@ -252,7 +252,7 @@ sub CUL_HM_updateConfig($){##########################
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
         CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
-        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp); #Beta-User: see frank #6 in https://forum.fhem.de/index.php/topic,123238.msg1179277.html#msg1179277
+        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
       }
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
@@ -550,8 +550,7 @@ sub CUL_HM_updateConfig($){##########################
   delete $modules{CUL_HM}{helper}{updtCfgLst};
   if(!$modules{CUL_HM}{helper}{initDone}){
     Log 1,"CUL_HM finished initial cleanup";
-    #if ($modules{HMinfo}){# force reread
-    if (defined &HMinfo_init){# force reread #Beta-User: see https://forum.fhem.de/index.php/topic,123473.msg1180140.html#msg1180140
+    if (defined &HMinfo_init){# force reread
       $modules{HMinfo}{helper}{initDone} = 0;
       InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
     }
@@ -935,11 +934,12 @@ sub CUL_HM_Attr(@) {#################################
     return "change not allowed for channels" if(!$hash->{helper}{role}{dev});
     if (  $attrVal eq "CCU-FHEM" 
       and $cmd eq "set"
-      and AttrVal($name,"model","VIRTUAL") eq "VIRTUAL"){
+      and (AttrVal($name,"model","VIRTUAL") eq "VIRTUAL" || AttrVal($name,"model","VIRTUAL") eq "") ){ #Beta-User: allow CCU also as first CUL_HM device
         delete $hash->{helper}{rxType}; # needs new calculation
         delete $hash->{helper}{mId};
         $attr{$name}{subType} = "virtual";
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
+        CUL_HM_updtDeviceModel($name,$attrVal); #Beta-User: otherwise e.g. IOlist is not available immediately after define
         $updtReq = 1;
         CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
@@ -962,7 +962,7 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_updtDeviceModel($name,$attrVal);
     }
     else{
-      $attr{$name}{model} = qq($culHmModel->{$attr{$name}{".mId"}}{name}) if ($attr{$name}{".mId"});# return to old model name
+      $attr{$name}{model} = $culHmModel->{$attr{$name}{".mId"}}{name} if ($attr{$name}{".mId"});# return to old model name
       CUL_HM_updtDeviceModel($name,$attr{$name}{model});
     }
   }
@@ -1014,11 +1014,16 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        #my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
-        my @IOnames = grep {InternalVal($_,'Clients', #Beta-User: frank #1 in https://forum.fhem.de/index.php/topic,123238.msg1179810.html#msg1179810
-                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
-                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
-                           : '') =~ m{:CUL_HM:}} keys %defs;$attr{$name}{$attrName} = $attrVal;
+        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
+#        my @IOnames = grep {InternalVal($_,'Clients',
+#                                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
+#                                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
+#                                           : '') 
+#                            =~ m{:CUL_HM:}} 
+#                            keys %defs;
+        return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
+            if (!grep /^$attrVal$/,@IOnames);
+        $attr{$name}{$attrName} = $attrVal;
         CUL_HM_assignIO($hash);
       }
     } 
@@ -5415,8 +5420,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    #if ($modules{HMinfo}){
-    if ( defined &HMinfo_tempListDefFn ){ #Beta-User: see https://forum.fhem.de/index.php/topic,123473.msg1180140.html#msg1180140
+    if (defined &HMinfo_tempListDefFn){
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
@@ -7383,12 +7387,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "assignIO") { #################################################
     $state = "";
     my $io = $a[2];
-    return "use set or unset - $a[3] not allowed"   if $a[3] && $a[3] !~ m/^(set|unset)$/; #Beta-User: frank #2 in https://forum.fhem.de/index.php/topic,123238.msg1179810.html#msg1179810
+    return "use set or unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
     return "$io not suitable for CUL_HM" if !scalar(grep{$_ eq $io}
                                                   grep {InternalVal($_,'Clients',
                                                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
                                                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
-                                                          :'') =~ m/:CUL_HM:/} keys %defs);
+                                                          :'') =~ m/:CUL_HM:/}
+                                                  keys %defs);
+
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
 
@@ -10831,16 +10837,16 @@ sub CUL_HM_UpdtCentralState($){
 }
 sub CUL_HM_operIObyIOHash($){ # noansi: in iohash, return iohash if IO is operational, else undef
   return if (!defined($_[0]));
-  return CUL_HM_operIObyIOName($_[0]->{NAME}); #Beta-User: use shortcut to get simimar behaviour...
+  return CUL_HM_operIObyIOName($_[0]->{NAME});
 }
 sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operational, else undef
   return if (!$_[0]);
   my $iohash = $defs{$_[0]};
   return if (   !defined($iohash)
              || defined InternalVal($_[0],'XmitOpen',undef) && InternalVal($_[0],'XmitOpen',0) == 0 # HMLAN/HMUSB/TSCUL
-             || ReadingsVal($_[0],'state','disconnected') eq 'disconnected' # CUL
+             || ReadingsVal($_[0],'state','disconnected') eq 'disconnected'                         # CUL
              || IsDummy($_[0])
-             || IsDisabled($_[0])
+             || IsDisabled($_[0])                                                                                                
             );
   return $iohash;
 }
@@ -10876,9 +10882,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   if ($hh->{io}{vccu}){# second option - any IO from the
     my $iom;
     ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}                  if(!$iom && @{$hh->{io}{prefIO}});
-    #Log(1,"----- assignio-Test2 ----- => n:$hash->{NAME} ioOld:".(defined($oldIODevH->{NAME})?$oldIODevH->{NAME}:"---")." ioNew:".(defined($iom)?$iom:"---"));
-    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}                               if(!$iom && @{$hh->{io}{prefIO}});
-    #Log(1,"----- assignio-Test3 ----- => n:$hash->{NAME} ioOld:".(defined($oldIODevH->{NAME})?$oldIODevH->{NAME}:"---")." ioNew:".(defined($iom)?$iom:"---"));
+    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
     return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
@@ -10889,9 +10893,10 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     } 
     ($iom) = grep{defined $defs{$_}} @{$hh->{io}{prefIO}}                           if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep{defined $defs{$_}} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}}  if(!$iom && @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}});
-    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
+    return 0 if ($iom && $iom eq 'none');
     $newIODevH  = $defs{$iom} if($iom);
   }
+  
   
   if (!defined $newIODevH) {# not assigned thru CCU - try normal
     my $dIo = AttrVal($hash->{NAME},"IODev",ReadingsVal($hash->{NAME},'IODev','')); #Beta-User: https://forum.fhem.de/index.php/topic,123238.msg1179106.html#msg1179106
@@ -10902,11 +10907,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       $dIo = $oldIODevH->{NAME};
     }
     else {
-      #my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
-      my @IOs = grep {InternalVal($_,'Clients',
-                      defined $modules{InternalVal($_,'TYPE','')}{Clients}
-                      ? $modules{InternalVal($_,'TYPE','')}{Clients}
-                      : '') =~ m{:CUL_HM:}} keys %defs;
+      my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
       ($dIo) = (grep{CUL_HM_operIObyIOName($_)} @IOs,@IOs);# tricky: use first active IO else use any IO for CUL_HM
     }
     $newIODevH  = $defs{$dIo} if($dIo);
@@ -11788,13 +11789,9 @@ __END__
           </ul>
         </li>
         <li><a id="CUL_HM-set-getConfig"></a><B>getConfig</B><br>
-          Will read major configuration items stored in the HM device. Executed
-          on a channel it will read pair Inforamtion, List0, List1 and List3 of
-          the 1st internal peer. Furthermore the peerlist will be retrieved for
-          teh given channel. If executed on a device the command will get the
-          above info or all assotated channels. Not included will be the
-          configuration for additional peers.  <br> The command is a shortcut
-          for a selection of other commands.
+          Will read configuration of the physical HM device. Executed
+          on a channel it reads peerings and register information. <br>
+          Executed on a device the command will retrieve configuration for ALL associated channels. 
         </li>
         <li><a id="CUL_HM-set-getRegRaw"></a><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6|List7]&lt;peerChannel&gt; </B><br>
         
