@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 2021-10-19 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 2021-10-20 Beta-User$
 
 package main;
 
@@ -1390,8 +1390,8 @@ sub CUL_HM_AttrInit($;$) {#############################
     $hash->{AttrX}{'powerMeter'} = {                   # subType
                            param             => 'showTimed'
                           };
-    $hash->{AttrX}{'switch'} = {                       # subType
-                           param             => 'showTimed'
+    $hash->{AttrX}{'switch'} = {                       # subType #Beta-User: for levelInverse see https://forum.fhem.de/index.php/topic,123496.msg1180909.html#msg1180909
+                           param             => 'showTimed,levelInverse'
                           };
     $hash->{AttrX}{'dimmer'} = {                       # subType
                            param             => 'showTimed'
@@ -12711,7 +12711,7 @@ __END__
            if set IO is forced to request AES signature before sending ACK to the device.<br>
            Defautls to 0<br>
           </li>
-      <li><a id="CUL_HM-attr-aesKey"></a>aesKey<br>
+      <li><a id="CUL_HM-attr-aesKey" data-pattern="aesKey.*"></a>aesKey<br>
           specifies which aes key is to be used if aesCommReq is active<br>
           </li>
       <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
@@ -12760,13 +12760,7 @@ __END__
       <li><a id="CUL_HM-attr-firmware"></a>firmware &lt;FWversion&gt;<br>
           Firmware version of the device. Should not be overwritten.
           </li>
-      <li><a id="CUL_HM-attr-hmKey"></a>hmKey &lt;key&gt;<br>
-          AES key to be used
-          </li>
-      <li><a id="CUL_HM-attr-hmKey2"></a>hmKey2 &lt;key&gt;<br>
-          AES key to be used
-          </li>
-      <li><a id="CUL_HM-attr-hmKey3"></a>hmKey3 &lt;key&gt;<br>
+      <li><a id="CUL_HM-attr-hmKey" data-pattern="hmKey.*"></a>hmKey &lt;key&gt;<br>
           AES key to be used
           </li>
       <li><a id="CUL_HM-attr-hmProtocolEvents"></a>hmProtocolEvents<br>
@@ -12861,8 +12855,6 @@ __END__
           For devices with wakeup mode the device will wait for next wakeup. Lonng delay might be 
           considered in this case. <br>
           Repeat for burst devices will impact HMLAN transmission capacity.</li>
-      <li><a id="CUL_HM-attr-param"></a>param<br>
-          param defines model specific behavior or functions. See <a href="#CUL_HM-attr-params"><b>available parameter</b></a> for details</li>
       <li><a id="CUL_HM-attr-peerIDs"></a>peerIDs<br>
           will be filled automatically by getConfig and shows the direct peerings of the channel. Should not be changed by user.</li>
       <li><a id="CUL_HM-attr-rawToReadable"></a>rawToReadable<br>
@@ -12893,7 +12885,8 @@ __END__
           in milliseconds is added to the result. So adjusting this might fix problems for example when weather messages of virtual devices are not received reliably
           </li>
     </ul>  <br>
-    <a id="CUL_HM-attr-params"></a><b>available parameter for attribut "param"</b>
+    <li>
+    <a id="CUL_HM-attr-param"></a><b>param defines model specific behavior or functions. Available parameters are (model dependand):</b>
     <ul>
       <li><B>HM-SEN-RD-O</B><br>
         <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
@@ -12913,6 +12906,10 @@ __END__
         <B>ponRestoreSmart</B> upon powerup of the device the Blind will drive to expected closest endposition followed by driving to the pre-PON level<br>
         <B>ponRestoreForce</B> upon powerup of the device the Blind will drive to level 0, then to level 100 followed by driving to the pre-PON level<br>
       </li>
+      <li><B>switch</B><br>
+        <B>levelInverse</B> siehe <i>blind</i> above.
+      </li>
+      
       <li><B>sensRain</B><br>
           <B>siren</B><br>
           <B>powerMeter</B><br>
@@ -12922,7 +12919,8 @@ __END__
         <B>showTimed</B> if timmed is running -till will be added to state. 
                          This results eventually in state on-till which allowes better icon handling.<br>
       </li>
-    </ul><br>
+    </ul>
+    </li><br>
     <a id="CUL_HM-events"></a><h4>Generated events:</h4>
     <ul>
       <li><B>general</B><br>
@@ -13384,7 +13382,8 @@ __END__
             set myChannel peerBulk 12345601 unset # entferne Peer 123456 Kanal 01<br>
           </code></ul>
         </li>
-        <li><B>regBulk &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a id="CUL_HM-set-regBulk"></a><br>
+        <a id="CUL_HM-set-regBulk"></a>
+        <li><B>regBulk &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><br>
           Dieser Befehl ersetzt das bisherige regRaw. Er erlaubt Register mit Rohdaten zu
           beschreiben. Hauptzweck ist das komplette Wiederherstellen eines zuvor gesicherten
           Registers. <br>
@@ -14040,7 +14039,7 @@ __END__
       </ul>
     </ul>
     <br>
-    <a id="CUL_HM-get"></a><b>Get</b><br>
+    <a id="CUL_HM-get"></a><h4>Get</h4><br>
     <ul>
       <li><B>configSave &lt;filename&gt;</B><a id="CUL_HM-get-configSave"></a><br>
         Sichert die Einstellungen eines Eintrags in einer Datei. Die Daten werden in
@@ -14175,7 +14174,7 @@ __END__
         Die gesamte Funktion kann &uuml;ber den "ActionDetector"-Eintrag &uuml;berpr&uuml;ft werden. Der Status aller Instanzen liegt im READING-Bereich.<br>
         Hinweis: Diese Funktion kann ebenfalls f&uuml;r Ger&auml;te ohne zyklische &Uuml;bertragung aktiviert werden. Es obliegt dem Nutzer eine vern&uuml;nftige Zeitspanne festzulegen.
       </li>
-      <li><a id="CUL_HM-attr-aesKey"></a>aesKey<br>
+      <li><a id="CUL_HM-attr-aesKey" data-pattern="aesKey.*"></a>aesKey<br>
           Spezifiziert, welcher aes key verwendet wird, falls <i>aesCommReq</i> aktiviert wird.<br>
           </li>
       <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
@@ -14275,8 +14274,6 @@ __END__
         wird automatisch gesetzt. </li>
       <li><a id="CUL_HM-attr-subType"></a>subType<br>
         wird automatisch gesetzt. </li>
-      <li><a id="CUL_HM-attr-param"></a>param<br>
-        'param' definiert modelspezifische Verhalten oder Funktionen. Siehe "models" f&uuml;r Details.</li>
       <li><a id="CUL_HM-attr-msgRepeat"></a>msgRepeat<br>
         Definiert die Nummer an Wiederholungen falls ein Ger&auml;t nicht rechtzeitig antwortet. <br>
         F&uuml;r Ger&auml;te die nur den "Config"-Modus unterst&uuml;tzen sind Wiederholungen nicht erlaubt. <br>
@@ -14322,7 +14319,8 @@ __END__
         </ul>
       </li>
       </ul> <br>
-    <a id="CUL_HM-attr-params"></a><b>verfügbare Parameter für "param"</b>
+    <li>
+    <a id="CUL_HM-attr-param"></a><b>'param'</b> definiert modelspezifische Verhalten oder Funktionen. Verfügbare Parameter für "param" (Modell-abhängig):
     <ul>
       <li><B>HM-SEN-RD-O</B><br>
         offAtPon: nur Heizkan&auml;le: erzwingt Ausschalten der Heizung nach einem powerOn<br>
@@ -14335,22 +14333,25 @@ __END__
         außer die der Ventilstellung verworfen um die Nachrichtenmenge zu reduzieren<br>
       </li>
       <li><B>blind</B><br>
-        <B>levelInverse</B> w&auml;hrend HM 100% als offen und 0% als geschlossen behandelt ist dies evtl. nicht 
+        levelInverse: w&auml;hrend HM 100% als offen und 0% als geschlossen behandelt ist dies evtl. nicht 
         intuitiv f&uuml;r den Nutzer. Defaut f&uuml;r 100% ist offen und wird als 'on'angezeigt. 
         Das Setzen des Parameters invertiert die Anzeige - 0% wird also offen und 100% ist geschlossen.<br>
         ACHTUNG: Die Anpassung betrifft nur Readings und Kommandos. <B>Register sind nicht betroffen.</B><br>
-        <B>ponRestoreSmart</B> bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
-        <B>ponRestoreForce</B> bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+        ponRestoreSmart: bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
+        ponRestoreForce: bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+      </li>
+      <li><B>switch</B><br>
+        levelInverse: siehe oben bei <i>blind</i>
       </li>
       <li><B>sensRain</B><br>
           <B>siren</B><br>
           <B>powerMeter</B><br>
-          <B>switch</B><br>
           <B>dimmer</B><br>
           <B>rgb</B><br>
         <B>showTimed</B> wenn timedOn running ist wird -till an state gehängt. Dies führt dazu, dass ggf. on-till im State steht was das stateIcon handling verbessert.<br>
       </li>
-    </ul><br>
+    </ul>
+    </li><br>
     <a id="CUL_HM-events"></a><b>Erzeugte Events:</b>
     <ul>
       <li><B>Allgemein</B><br>
