@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 2021-10-20 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 2021-10-22 Beta-User$
 
 package main;
 
@@ -1038,11 +1038,12 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients",
-                                                             defined $modules{InternalVal($nIO,"TYPE","")}{Clients}
-                                                                   ? $modules{InternalVal($nIO,"TYPE","")}{Clients}
-                                                                   :"")
-                                                   !~ m /:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
+        my $owner_ccu = InternalVal($name,'owner_CCU',undef);
+        return "device $nIO already owned by $owner_ccu" if $owner_ccu;
+        if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) { #Beta-User: clear assignements for HMLAN 
+            HMLAN_assignIDs($defs{$nIO}) if AttrVal($nIO,'hmId','') ne $hash->{DEF} && defined &HMLAN_assignIDs;
+        }
       }
       if($attr{$name}{$attrName}){# see who we lost
         foreach my $oldIOs (split(",",$attr{$name}{$attrName})){
@@ -1742,9 +1743,11 @@ sub CUL_HM_Parse($$) {#########################################################
   
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-    Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
-    
+
+    if ( !IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { # Beta-User: might fix https://forum.fhem.de/index.php/topic,123436.msg1181440.html#msg1181440;
+        my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+        Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+
     $mh{devN} = $sname ;
     $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
@@ -1763,10 +1766,11 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       else{
-        $attr{$sname}{IODev} = $mh{ioName}; 
+        #$attr{$sname}{IODev} = $mh{ioName}; #Beta-User: setting attr might be "unmodern" nowerdays
       }
     }
     $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
+  } #Beta-User: End of autcreate-if, entire block may be shifted right if that works...
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -10821,7 +10825,8 @@ sub CUL_HM_UpdtCentralState($){
 
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){ # update HMid of io devices
       Log 1,"CUL_HM correct hmId for assigned IO $ioN";
-      $attr{$ioN}{hmId} = $defs{$name}{DEF};
+      #$attr{$ioN}{hmId} = $defs{$name}{DEF};
+      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}"); #Beta-User: might force an update, esp. to HMLAN?
     }
   };
   $state .= join(",",@ioState);
