@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 2021-10-22 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-25 Beta-User$
 
 package main;
 
@@ -1728,7 +1728,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my @mI = unpack '(A2)*',$mh{p}; # split message info to bytes
   $mh{mStp} = $mI[0] ? $mI[0] : ""; #message subtype
   $mh{mTyp} = $mh{mTp}.$mh{mStp};           #message type/subtype
-  
+
   # $shash will be replaced for multichannel commands
   $mh{devH}   = CUL_HM_id2Hash($mh{src}); #sourcehash - will be modified to channel entity
   $mh{dstH}   = CUL_HM_id2Hash($mh{dst}); # destination device hash
@@ -1740,14 +1740,24 @@ sub CUL_HM_Parse($$) {#########################################################
                          ($mh{dstH} ? $mh{dstH}->{NAME} :
                     ($mh{dst} eq $mh{id} ? $mh{ioName} :
                                    $mh{dst}));
-  
-  if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
+
+  if(!$mh{devH} && $mh{mTp} eq "00") { # generate device ?
     my $sname = "HM_$mh{src}";
-
-    if ( !IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { # Beta-User: might fix https://forum.fhem.de/index.php/topic,123436.msg1181440.html#msg1181440;
-        my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-        Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
-
+    my $acdone;
+    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created
+         if (IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { 
+            my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+            Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+        } else { 
+            DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
+        }
+        $acdone = 1;
+    } elsif (!IsDisabled((devspec2array('TYPE=autocreate'))[0]) && !defined InternalVal($mh{ioName},'owner_CCU',undef)) {
+        #Beta-User: no vccu, let autocreate do its job
+        DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
+        $acdone = 1;
+    }
+    if ($acdone) {
     $mh{devN} = $sname ;
     $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;

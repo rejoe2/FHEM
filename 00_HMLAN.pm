@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_HMLAN.pm 18152 + #120600 + :CLIENTS: +cref 2021-10-18 Beta-User $
+# $Id: 00_HMLAN.pm 18152 + #120600 + :CLIENTS: +cref + some startup changes 2021-10-25 Beta-User $
 package main;
 
 
@@ -82,6 +82,7 @@ sub HMLAN_Initialize($) {
                      "wdTimer:5,10,15,20,25 ".
                      "logIDs:multiple,sys,all,broadcast ".
                      $readingFnAttributes;
+  $hash->{NotifyOrderPrefix} = "47-"; #Beta-User: make sure, HMLAN_DoInit is called once prior to CUL_HM initialisation
   return;
 }
 
@@ -141,9 +142,10 @@ sub HMLAN_Define($$) {#########################################################
   HMLAN_Attr("delete",$name,"loadLevel");
   $hash->{Clients} = ":CUL_HM:"; #Beta-User: for VCCU IO assignment?
 
-  my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
-  return $ret;
+  return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
+  return;
 }
+
 sub HMLAN_Undef($$) {##########################################################
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
@@ -175,6 +177,7 @@ sub HMLAN_Notify(@) {##########################################################
       HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
       delete $hash->{helper}{attrPend};
     }
+    DevIo_OpenDev($hash, 0, "HMLAN_DoInit"); #Beta-User: Use hmId from attr if possible
     HMLAN_writeAesKey($hash->{NAME});
   }
   elsif ($dev->{NAME} eq $hash->{NAME}){
