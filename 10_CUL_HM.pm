@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-25 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-25a Beta-User$
 
 package main;
 
@@ -1039,8 +1039,8 @@ sub CUL_HM_Attr(@) {#################################
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
         return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
-        my $owner_ccu = InternalVal($name,'owner_CCU',undef);
-        return "device $nIO already owned by $owner_ccu" if $owner_ccu;
+        my $owner_ccu = InternalVal($nIO,'owner_CCU',undef);
+        return "device $nIO already owned by $owner_ccu" if $owner_ccu && $owner_ccu ne $name;
         if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) { #Beta-User: clear assignements for HMLAN 
             HMLAN_assignIDs($defs{$nIO}) if AttrVal($nIO,'hmId','') ne $hash->{DEF} && defined &HMLAN_assignIDs;
         }

@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
+#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -33,7 +33,7 @@
 #  GNU General Public License for more details.
 #
 #
-# $Id: ShuttersControl.pm 24460 2021-05-17 12:51:14Z CoolTux $
+# $Id: ShuttersControl.pm 25115 2021-10-24 16:45:38Z CoolTux $
 #
 ###############################################################################
 
@@ -70,7 +70,7 @@ use utf8;
 use Encode;
 use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
-use Data::Dumper;    #only for Debugging
+use Data::Dumper;    #only for Debugging #Beta-User: still needed?!?
 use Date::Parse;
 
 use FHEM::Automation::ShuttersControl::Shutters;
@@ -186,7 +186,10 @@ BEGIN {
           InternalTimer
           RemoveInternalTimer
           computeAlignTime
-          ReplaceEventMap)
+          ReplaceEventMap
+          EvalSpecials
+          AnalyzeCommandChain
+          )
     );
 
     #-- Export to main context with different name
@@ -246,7 +249,7 @@ our %userAttrList = (
     'ASC_WindowRec'                                        => '-',
     'ASC_WindowRec_subType:twostate,threestate'            => '-',
     'ASC_WindowRec_PosAfterDayClosed:open,lastManual'      => '-',
-    'ASC_ShuttersPlace:window,terrace,awning'              => '-',
+    'ASC_ShuttersPlace:window,terrace,awning,EG_window'    => '-',
     'ASC_Ventilate_Pos:10,20,30,40,50,60,70,80,90,100'     => [ '', 70, 30 ],
     'ASC_ComfortOpen_Pos:0,10,20,30,40,50,60,70,80,90,100' => [ '', 20, 80 ],
     'ASC_GuestRoom:on,off'                                 => '-',
@@ -266,6 +269,7 @@ our %userAttrList = (
     'ASC_ExternalTrigger'                   => '-',
     'ASC_Adv:on,off'                        => '-',
     'ASC_SlatPosCmd_SlatDevice'             => '-',
+    'ASC_commandTemplate'                   => '-',
 );
 
 my %posSetCmds = (
@@ -273,6 +277,8 @@ my %posSetCmds = (
     Siro        => 'pct',
     CUL_HM      => 'pct',
     ROLLO       => 'pct',
+    Shelly      => 'pct',
+    HMCCUDEV    => 'pct',
     SOMFY       => 'position',
     tahoma      => 'dim',
     KLF200Node  => 'pct',
@@ -513,7 +519,7 @@ m{^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAs
             EventProcessingGeneral( $hash, undef, join( ' ', @{$events} ) );
         }
     }
-    elsif ( grep m{^($posReading):\s\d{1,3}$}xms, @{$events} ) {
+    elsif ( grep m{^($posReading):\s\d{1,3}(\.\d{1,3})?$}xms, @{$events} ) {
         ASC_Debug( 'Notify: '
               . ' ASC_Pos_Reading Event vom Rollo ' 
               . $devname
@@ -1820,32 +1826,45 @@ sub _SetCmdFn {
         }
     }
 
-    CommandSet( undef,
-            $shuttersDev
-          . ':FILTER='
-          . $shutters->getPosCmd . '!='
-          . $posValue . ' '
-          . $driveCommand );
+    my $commandTemplate = AttrVal($shuttersDev,'ASC_commandTemplate',undef);
+    if (!defined $commandTemplate) {
+        CommandSet( undef,
+                $shuttersDev
+              . ':FILTER='
+              . $shutters->getPosCmd . '!='
+              . $posValue . ' '
+              . $driveCommand );
 
-    InternalTimer(
-        gettimeofday() + 3,
-        sub() {
-            CommandSet(
-                undef,
-                (
-                      $shutters->getSlatDevice ne 'none'
-                    ? $shutters->getSlatDevice
-                    : $shuttersDev
-                  )
-                  . ' '
-                  . $shutters->getSlatPosCmd . ' '
-                  . $slatPos
-            );
-        },
-        $shuttersDev
-      )
-      if ( $slatPos > -1
+        InternalTimer(
+            gettimeofday() + 3,
+            sub() {
+                CommandSet(
+                    undef,
+                    (
+                          $shutters->getSlatDevice ne 'none'
+                        ? $shutters->getSlatDevice
+                        : $shuttersDev
+                      )
+                      . ' '
+                      . $shutters->getSlatPosCmd . ' '
+                      . $slatPos
+                );
+            },
+            $shuttersDev
+          )
+          if ( $slatPos > -1
         && $shutters->getSlatPosCmd ne 'none' );
+    } else {
+        # Nutzervariablen setzen
+        my %specials = (
+             '$name'        => $shuttersDev,
+             '$level'       => $posValue,
+             '$slatLevel'   => $slatPos
+        );
+        $commandTemplate  = EvalSpecials($commandTemplate, %specials);
+        # CMD ausführen
+        AnalyzeCommandChain( $h, $commandTemplate );
+    }
 
     $shutters->setSelfDefenseAbsent( 0, 0 )
       if (!$shutters->getSelfDefenseAbsent
