@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_HMLAN.pm 18152 + #120600 + :CLIENTS: +cref + some startup changes 2021-10-25 Beta-User $
+# $Id: 00_HMLAN.pm 18152 + #120600 + :CLIENTS: +cref + some startup changes 2021-10-26 Beta-User $
 package main;
 
 
@@ -171,7 +171,7 @@ sub HMLAN_RemoveHMPair($) {####################################################
 }
 sub HMLAN_Notify(@) {##########################################################
   my ($hash,$dev) = @_;
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     if ($hash->{helper}{attrPend}){
       my $aVal = AttrVal($hash->{NAME},"logIDs","");
       HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
