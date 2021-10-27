@@ -1,4 +1,4 @@
-# $Id: 31_LightScene.pm 18765 + cref-id + configDB usage - 2021-09-21 Beta-User $
+# $Id: 31_LightScene.pm 18765 + cref-id + configDB usage - 2021-10-27 Beta-User $
 
 package main;
 
@@ -402,6 +402,8 @@ LightScene_Load($)
   if ($ret) {
     if (configDBUsed()){
       Log3( $hash, 1, "LightScene_Load: please import your config file $statefile into configDB!");
+      ($ret, @content) = FileRead( {FileName=>$statefile, ForceType=>'file'} );
+      Log3( $hash, 1, "LightScene_Load: Cannot open $statefile: $ret") if $ret;
     } else {
       Log3( $hash, 1, "LightScene_Load: Cannot open $statefile: $ret");
     }

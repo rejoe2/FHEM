@@ -1249,7 +1249,7 @@ sub CUL_HM_Attr(@) {#################################
       }
     }
   }
-  elsif($attrName eq "ignore"){
+  elsif($attrName eq "ignore" || $attrName eq "dummy"){
     if ($cmd eq "set"){
       $attr{$name}{".ignoreSet"} = $attrVal; # remember user desire
       foreach my $chNm(CUL_HM_getAssChnNames($name)){
@@ -1265,6 +1265,13 @@ sub CUL_HM_Attr(@) {#################################
         else{
           delete $attr{$chNm}{$attrName};
         }
+      }
+      if ($attrVal) {
+        IOWrite($hash, '', 'remove:'.$hash->{DEF}) if defined $hash->{IODev}->{TYPE} && $hash->{IODev}->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s && defined $hash->{DEF};
+        delete $hash->{IODev};
+        delete $hash->{READINGS}{IODev};
+      } else {
+        CUL_HM_assignIO($hash) ;
       }
     }
     else {
@@ -1662,7 +1669,7 @@ sub CUL_HM_Notify(@){###############################
 }
 
 sub CUL_HM_setupHMLAN(@){#################################
-  foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
+  foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual:FILTER=dummy!=1:FILTER=ignore!=1")){
     $defs{$_}{helper}{io}{newChn} = "";
     CUL_HM_hmInitMsg($defs{$_}); #update device init msg for HMLAN
   }
