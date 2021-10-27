@@ -10930,7 +10930,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   # no option - 
   
   my $hash = shift;
-  
+  return 0 if IsIgnored($hash->{NAME}) || IsDummy($hash->{NAME}); #Beta-User: frank hint in https://forum.fhem.de/index.php/topic,123584.msg1182554.html#msg1182554
   my $oldIODevH = $hash->{IODev};
   my $hh = $hash->{helper};
 
