@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-25a Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-27 Beta-User$
 
 package main;
 
@@ -1639,9 +1639,13 @@ sub CUL_HM_Notify(@){###############################
       return ($count ? "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event"
                      : undef);
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/(INITIALIZED|REREADCFG)/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+    }
+    elsif ($evnt =~ m/REREADCFG/){
+      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't support rereadcfg any longer! Restart FHEM instead.");
+      return "[FAILURE] CUL_HM doesn't support rereadcfg any longer! Restart FHEM instead.";
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    elsif($evnt =~ m/(SHUTDOWN)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}#SHUTDOWN|DELAYEDSHUTDOWN
@@ -1650,7 +1654,7 @@ sub CUL_HM_Notify(@){###############################
 #    elsif($evnt =~ m/(MODIFIED)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    else                          { Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 
-  }    
+  }
 
   return undef;
 }
@@ -1754,8 +1758,9 @@ sub CUL_HM_Parse($$) {#########################################################
         $acdone = 1;
     } elsif (!IsDisabled((devspec2array('TYPE=autocreate'))[0]) && !defined InternalVal($mh{ioName},'owner_CCU',undef)) {
         #Beta-User: no vccu, let autocreate do its job
-        DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
-        $acdone = 1;
+        Log3($mh{ioName},2,"CUL_HM received learning message from unknown id $mh{src} outside of pairing mode. Please enable pairing mode first or define a virtual device w. model: CCU-FHEM.");
+        #DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
+        #$acdone = 1;
     }
     if ($acdone) {
     $mh{devN} = $sname ;
