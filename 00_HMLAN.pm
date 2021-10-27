@@ -92,7 +92,7 @@ sub HMLAN_Define($$) {#########################################################
 
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> HMLAN ip[:port]";
-    Log3 $hash, 2, $msg;
+    Log3($a[0], 2, $msg);
     return $msg;
   }
   DevIo_CloseDev($hash);
@@ -102,7 +102,7 @@ sub HMLAN_Define($$) {#########################################################
   $dev .= ":1000" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
   if($dev eq "none") {
-    Log3 $hash, 1, "$name device is none, commands will be echoed only";
+    Log3 $name, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
