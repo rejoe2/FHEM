@@ -84,6 +84,8 @@ sub CUL_HM_infoUpdtChanData(@);
 sub CUL_HM_getConfig($);
 sub CUL_HM_SndCmd($$);
 sub CUL_HM_responseSetup($$);
+sub CUL_HM_cSndUpdate($$);
+sub CUL_HM_cSndRemove($);
 sub CUL_HM_eventP($$);
 sub CUL_HM_protState($$);
 sub CUL_HM_respPendRm($);
@@ -1797,6 +1799,9 @@ sub CUL_HM_Parse($$) {#########################################################
     my $ioId = AttrVal($mh{dstH}->{IODev}{NAME},"hmId","-");
     if($ioId ne $mh{src}){
       if (   !defined $mh{dstH}->{"prot"."ErrIoId_$mh{src}"} 
+          #nonasi https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+          #&& (my $sEId = ReadingsVal($mh{dstN},'sabotageAttackId_ErrIoId_'.$mh{src}.':',undef))){
+        #(undef,$mh{dstH}->{"prot"."ErrIoId_$mh{src}"}) = split(":",$sEId);
           && ReadingsVal($mh{dstN},"sabotageAttackId_ErrIoId_$mh{src}:",undef)){
         (undef,$mh{dstH}->{"prot"."ErrIoId_$mh{src}"}) =
           split(":",ReadingsVal($mh{dstN},"sabotageAttackId_ErrIoId_$mh{src}:",undef));
@@ -1809,6 +1814,9 @@ sub CUL_HM_Parse($$) {#########################################################
     if( !defined $mh{dstH}->{helper}{cSnd} || 
           $mh{dstH}->{helper}{cSnd} !~ m/$tm/){
       if (   !defined $mh{dstH}->{"prot"."ErrIoAttack"} 
+          #nonasi https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+          #&& (my $sECnt = ReadingsVal($mh{dstN},'sabotageAttack_ErrIoAttack_cnt:',undef))){
+        #$mh{dstH}->{"prot"."ErrIoAttack"} = $sECnt;
           && ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef)){
         $mh{dstH}->{"prot"."ErrIoAttack"} =
           ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef);
@@ -3608,9 +3616,16 @@ sub CUL_HM_Parse($$) {#########################################################
                          sprintf("%02X",$vp*2)."0000";
     }
     elsif($mh{mTp} eq "02"){
-      if (defined($mh{dstH})                                      &&
-          $mh{dstH}->{helper}{prt}{rspWait}{mNo}                  &&
-          $mh{dstH}->{helper}{prt}{rspWait}{mNo} == hex($mh{mNo}) ){
+      #noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064  
+      if (defined($mh{dstH})                                          &&
+          defined($mh{dstH}->{helper}{prt}{rspWait}{mNo})             &&
+          $mh{dstH}->{helper}{prt}{rspWait}{mNo} == hex($mh{mNo})     &&
+          (   !defined($mh{dstH}->{helper}{prt}{rspWait}{fromSrc})
+           || $mh{dstH}->{helper}{prt}{rspWait}{fromSrc} eq $mh{dst} )
+          ){
+      #if (defined($mh{dstH})                                      &&
+      #    $mh{dstH}->{helper}{prt}{rspWait}{mNo}                  &&
+      #    $mh{dstH}->{helper}{prt}{rspWait}{mNo} == hex($mh{mNo}) ){
         #ack we waited for - stop Waiting
         CUL_HM_respPendRm($mh{dstH});
       }
@@ -3745,6 +3760,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                 || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) #HMLAN and HMUARTLGW does it automatically if configured to lazy config
               ) {
             CUL_HM_SndCmd($mhp->{devH}, '++A112'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}); #noansi: answer with wakeup received message for CUL
+            #Beta-User: seem lines 3426 from noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064 are already there, but modified
           }
           CUL_HM_ProcessCmdStack($mhp->{devH});
         }
@@ -3773,6 +3789,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                   foreach (keys%{$devHlpr->{prt}{rspWaitSec}});   #back to original message
           delete $devHlpr->{prt}{rspWaitSec};
           IOWrite($mhp->{devH}, "", $devHlpr->{prt}{rspWait}{cmd});     # and send
+          CUL_HM_cSndUpdate($mhp->{devH}, $devHlpr->{prt}{rspWait}{cmd});
           CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s",hex(substr($devHlpr->{prt}{rspWait}{cmd},6,2)));
           return "done";
         }
@@ -4328,8 +4345,10 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($mhp->{mTp} eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
   }
-  if (defined($rspWait->{mNo})            &&
-      $rspWait->{mNo} == hex($mhp->{mNo}) &&
+  if (defined($rspWait->{mNo})                 &&
+      $rspWait->{mNo} == hex($mhp->{mNo})      &&
+      (   !defined($rspWait->{fromSrc})         #noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+       || $rspWait->{fromSrc} eq $mhp->{dst} ) &&
       !$repeat){
     #response we waited for - stop Waiting
     CUL_HM_respPendRm($mhp->{devH});
@@ -8099,7 +8118,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
                        ? $hash->{helper}{prt}{wuReSent}
                        :1;#resend counter start value - may need preloaded for WU device
 
-    if   ($mTp =~ m/^(01|3E)$/ && $sTp)        {
+    if ($mTp =~ m/^(?:01|3E)/s && $sTp)        { #noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
       if   ($sTp eq "03"){ #PeerList-----------
         #--- remember request params in device level
         CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
@@ -8143,8 +8162,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       else{
         CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss");
       }
-      $hash->{helper}{cSnd} =~ s/.*,// if($hash->{helper}{cSnd});
-      $hash->{helper}{cSnd} .= ",".substr($cmd,8);
+      $hash->{helper}{cSnd} =~ s/.*,// if($hash->{helper}{cSnd}); #Beta-User: deacitvated in noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+      $hash->{helper}{cSnd} .= ",".substr($cmd,8);                #Beta-User: see line above
     }
     elsif($mTp eq '03')                {#AES response - keep former wait and start timer again
       # 
@@ -8182,7 +8201,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss","brstWu:=1");
     }
     elsif($mTp !~ m/C./)              {#
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss");
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"fromSrc:=$src","reSent:=$rss"); #Beta-User: noansi #121139: add our virtual src ID
     }
 
     CUL_HM_protState($hash,"CMDs_processing...");#if($mTp ne '03');
@@ -8231,6 +8250,21 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   else{
     delete($hash->{protCmdPend});
   }
+}
+
+sub CUL_HM_cSndUpdate($$) {#set our send history #noansi proposal from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+  my ($hash,$cmd) =  @_;
+  return if($hash->{helper}{prt}{sProc} == 3);#not relevant while FW update
+  my (undef,$mTp,$mr) = unpack 'A8A2A*',$cmd;
+  $hash->{helper}{cSnd} .= ','.$mTp.$mr if ($mTp =~ m/^(?:01|11|3E)/s);
+  return;
+}
+sub CUL_HM_cSndRemove($) {#remove our obsolet send history to regain attack recognition
+  my($name,$cSnd) = split(/:/,$_[0]);
+  my $hash = $defs{$name};
+  return if (!$hash);
+  $hash->{helper}{cSnd} =~ s/$cSnd//s if ($hash->{helper}{cSnd}); #noansi: regain full attack detection
+  return;
 }
 
 sub CUL_HM_sndIfOpen($) {
@@ -8351,8 +8385,16 @@ sub CUL_HM_SndCmd($$) {
   else {
     $mn = hex($mn);
   }
+  #Beta-User: next lines from noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+  my $dst = substr($cmd2,10,6);
+  IOWrite($hash, '', 'remove:'.$dst) # we can only remove before send if IO does not autoassign dst
+      if (   $io->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s
+          && $dst ne '000000'
+          && substr($cmd2,4,6) ne AttrVal($ioName, 'hmId' , '')); #noansi: avoid IO automatic, as HMLAN/HMUARTLGW do autoassignment but can't do it 
+                                                                  #        ugly and may not solve completely
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
+  CUL_HM_cSndUpdate($hash, $cmd); #noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
   CUL_HM_statCnt($ioName,"s",hex(substr($cmd2,0,2)));
   CUL_HM_eventP($hash,"Snd");
   CUL_HM_eventP($hash,"SndB") if (hex(substr($cmd2,0,2)) & 0x10);
@@ -8629,6 +8671,8 @@ sub CUL_HM_FWupdateEnd($){#end FW update
   delete $modules{CUL_HM}{helper}{updateDst};
   delete $modules{CUL_HM}{helper}{updateId};
   delete $modules{CUL_HM}{helper}{updateNbr};
+  delete $modules{CUL_HM}{helper}{updateRetry}; #Beta-User - noansi: required to allow a new update after a fail
+  delete $modules{CUL_HM}{helper}{updateNbrPassed}; #Beta-User: both lines from noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
   CUL_HM_respPendRm($hash);
 
   CUL_HM_protState($hash,"CMDs_done_FWupdate");
@@ -8719,10 +8763,14 @@ sub CUL_HM_protState($$){
     $hash->{helper}{prt}{bErr}  = 0;
     $hash->{helper}{prt}{sProc} = 0;
     $hash->{helper}{prt}{awake} = 0 if (defined $hash->{helper}{prt}{awake});
+    InternalTimer(gettimeofday()+7, "CUL_HM_cSndRemove", $hash->{NAME}.':'.$hash->{helper}{cSnd}) #Beta-User: noansi: cleanup for attack detection from noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+        if ($hash->{helper}{cSnd});
   }
   elsif($state eq "Info_Cleared"){
     $hash->{helper}{prt}{sProc} = 0;
     $hash->{helper}{prt}{awake} = 0 if (defined $hash->{helper}{prt}{awake});
+    InternalTimer(gettimeofday()+7, "CUL_HM_cSndRemove", $hash->{NAME}.':'.$hash->{helper}{cSnd}) #Beta-User: noansi: cleanup for attack detection from noansi version from https://forum.fhem.de/index.php/topic,121139.msg1161064.html#msg1161064
+        if ($hash->{helper}{cSnd});
   }
   elsif($state eq "CMDs_pending"){
     $hash->{protCmdPend} = (defined($hash->{cmdStack}) ? scalar(@{$hash->{cmdStack}})
