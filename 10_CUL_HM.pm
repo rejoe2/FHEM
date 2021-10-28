@@ -1250,6 +1250,11 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "ignore" || $attrName eq "dummy"){
     if ($cmd eq "set"){
+      if ($attrVal) {
+        IOWrite($hash, '', 'remove:'.$hash->{DEF}) if defined $hash->{IODev}->{TYPE} && $hash->{IODev}->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s && defined $hash->{DEF};
+        delete $hash->{IODev};
+        delete $hash->{READINGS}{IODev};
+      }
       $attr{$name}{".ignoreSet"} = $attrVal; # remember user desire
       foreach my $chNm(CUL_HM_getAssChnNames($name)){
         if( $attrVal == 1){
@@ -1258,20 +1263,17 @@ sub CUL_HM_Attr(@) {#################################
             CUL_HM_primaryDev();
           }
         }
-        elsif( defined $attr{$chNm}{".ignoreSet"}){
+        elsif( defined $attr{$chNm}{".ignoreSet"} && $attrName eq 'ignore'){
           $attr{$chNm}{$attrName} = $attr{$chNm}{".ignoreSet"};
         }
         else{
           delete $attr{$chNm}{$attrName};
         }
       }
-      if ($attrVal) {
-        IOWrite($hash, '', 'remove:'.$hash->{DEF}) if defined $hash->{IODev}->{TYPE} && $hash->{IODev}->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s && defined $hash->{DEF};
-        delete $hash->{IODev};
-        delete $hash->{READINGS}{IODev};
-      } else {
+      if (!$attrVal) {
         CUL_HM_assignIO($hash) ;
       }
+      delete $attr{$name}{".ignoreSet"}; #Beta-User: seems not to be used outside of this code part
     }
     else {
       delete $attr{$name}{".ignoreSet"};
@@ -1283,6 +1285,7 @@ sub CUL_HM_Attr(@) {#################################
           delete $attr{$chNm}{$attrName};
         }
       }
+      CUL_HM_assignIO($hash) if $attrName eq 'ignore' && !IsDummy($hash) || $attrName eq 'dummy' && !IsIgnored($hash);
     }
   }
   elsif($attrName eq "commStInCh"){
@@ -10942,7 +10945,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     IOWrite($hash, "", "remove:".$ID) if(   defined($oldIODevH) && defined $oldIODevH->{NAME} 
                                          && $oldIODevH->{TYPE}  && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
-    $hash->{IODev} = $newIODevH;
+    Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME}!") if defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME}; #Beta-User: see frank hint in https://forum.fhem.de/index.php/topic,123436.msg1182983.html#msg1182983
+    $newIODevH = $hash->{IODev};
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
         || (   $newIODevH->{helper}{VTS_AES})){
       IOWrite($hash, "", "init:".$ID); # assign to new IO

@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 25079 + clear msgErrors + new showTimer 2021-10-17 Beta-User $
+# $Id: 98_HMinfo.pm 25079 + clear msgErrors + new showTimer 2021-10-28 Beta-User $
 package main;
 use strict;
 use warnings;
@@ -388,6 +388,7 @@ sub HMinfo_status($){##########################################################
       foreach (grep {$ehash->{"prot".$_}} keys %protW){ $protW{$_}++; push @protNamesW,$eName;}#protocol events reported
       $rssiMin{$eName} = 0;
       foreach (keys %{$ehash->{helper}{rssi}}){
+        last if !defined $ehash->{IODev}; #Beta-User: for devices w/o IO, https://forum.fhem.de/index.php/topic,123436.msg1183002.html#msg1183002
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
         $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
           if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
