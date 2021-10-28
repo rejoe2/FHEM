@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-27 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-28 Beta-User$
 
 package main;
 
@@ -1246,6 +1246,8 @@ sub CUL_HM_Attr(@) {#################################
         next if (   $modules{$defs{$IOname}{TYPE}}{AttrList} !~  m/logIDs/);
         my $r = CommandAttr(undef, "$IOname logIDs $newVal");
       }
+    } else {
+        CommandDeleteAttr(undef, AttrVal($name,'IOList','').' logIDs'); #Beta-User: frank in https://forum.fhem.de/index.php/topic,120328.0.html
     }
   }
   elsif($attrName eq "ignore" || $attrName eq "dummy"){
