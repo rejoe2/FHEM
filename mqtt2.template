@@ -3513,7 +3513,6 @@ par:DEVNAME;Device's name in the topic tree;{ AttrVal('DEVICE','readingList','')
 par:ICON;ICON as set, defaults to on;{ AttrVal('DEVICE','icon','on') }
 attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith|IODev).*
-attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green
 attr DEVICE readingList /dingtian/DEVNAME/out/lwt_availability:.* LWT\
   /dingtian/DEVNAME/out/(relay|input)[1-8]:.* {}\
   /dingtian/DEVNAME/out/r1:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }\
@@ -3533,18 +3532,6 @@ attr DEVICE readingList /dingtian/DEVNAME/out/lwt_availability:.* LWT\
 attr DEVICE setExtensionsEvent 1
 attr DEVICE setList on:noArg /dingtian/DEVNAME/in/r1 ON\
   off:noArg /dingtian/DEVNAME/in/r1 OFF
-attr DEVICE stateFormat LWT\
-state\
-<br>\
-DigiIn\
-di1\
-di2\
-di3\
-di4\
-di5\
-di6\
-di7\
-di8
 attr DEVICE webCmd : 
 copy DEVICE DEVICE_CH2
 deleteattr DEVICE_CH2 stateFormat
@@ -3576,6 +3563,19 @@ attr DEVICE_CH7 setList on:noArg /dingtian/DEVNAME/in/r7 ON\
 attr DEVICE_CH8 setList on:noArg /dingtian/DEVNAME/in/r8 ON\
   off:noArg /dingtian/DEVNAME/in/r8 OFF
 set DEVICE attrTemplate set_associatedWith \CHANNELS=8
+attr DEVICE devStateIcon offline:rc_STOP@red online:rc_STOP@green
+attr DEVICE stateFormat LWT\
+state\
+<br>\
+DigiIn\
+di1\
+di2\
+di3\
+di4\
+di5\
+di6\
+di7\
+di8
 set DEVICE attrTemplate speechcontrol_type_switch
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20211028
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 model 8channel_relay_board_8di_split
