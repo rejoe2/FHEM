@@ -1,8 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29 Beta-User$
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29a Beta-User$
 
 package main;
 
@@ -261,7 +260,7 @@ sub CUL_HM_updateConfig($){##########################
                                               && defined($h->{helper}{io}{restoredIO})
                                               && !defined($defs{$h->{helper}{io}{restoredIO}})); # cleanup undefined restored IO
       if (!CUL_HM_operIObyIOHash($h->{IODev})) { # noansi: assign IO, if no currently operational  IO assigned
-        CUL_HM_assignIO($h) if !IsDummy($name) && !IsDisabled($name);
+        CUL_HM_assignIO($h) if !IsDummy($name) && !IsIgnored($name);
         delete($h->{IODev}{'.clientArray'}) if ($h->{IODev}); # Force a recompute
       }
     }
@@ -1648,6 +1647,7 @@ sub CUL_HM_Notify(@){###############################
           }
         }
         foreach my $HMdef (grep{AttrVal($_,"IODev","") eq $ent} @culHmDevs){# for each IODev
+          next if IsDummy($HMdef) || IsIgnored($HMdef);
           CommandAttr (undef,"$HMdef IODev $new");
           $count++;
         }
