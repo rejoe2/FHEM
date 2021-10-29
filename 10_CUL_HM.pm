@@ -1,7 +1,8 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-28 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29 Beta-User$
+# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29 Beta-User$
 
 package main;
 
@@ -260,7 +261,7 @@ sub CUL_HM_updateConfig($){##########################
                                               && defined($h->{helper}{io}{restoredIO})
                                               && !defined($defs{$h->{helper}{io}{restoredIO}})); # cleanup undefined restored IO
       if (!CUL_HM_operIObyIOHash($h->{IODev})) { # noansi: assign IO, if no currently operational  IO assigned
-        CUL_HM_assignIO($h);
+        CUL_HM_assignIO($h) if !IsDummy($name) && !IsDisabled($name);
         delete($h->{IODev}{'.clientArray'}) if ($h->{IODev}); # Force a recompute
       }
     }
@@ -674,7 +675,7 @@ sub CUL_HM_Define($$) {##############################
       }
       # fhem.pl will set an IO from reading/attr IODev or AssignIoPort at end of init, we can not avoid and can not assign correctly
       #         but with reading IOdev fhem.pl will restore the IO unsed before normal restart
-      CUL_HM_assignIO($hash) if (!$hash->{IODev}); 
+      CUL_HM_assignIO($hash) if !$hash->{IODev} && $init_done;
       delete($hash->{IODev}{'.clientArray'}) if ($hash->{IODev}); # Force a recompute
     }
   }
@@ -1122,13 +1123,14 @@ sub CUL_HM_Attr(@) {#################################
       $hash->{helper}{io}{vccu}   = $ioCCU;
       $attr{$name}{$attrName}     = $attrVal;
       delete $attr{$name}{IODev};# just in case
-      CUL_HM_assignIO($hash); 
+      #CUL_HM_assignIO($hash);
     }
     else{ # this is a delete
       my @a = ();
       $hash->{helper}{io}{vccu}   = "";
       $hash->{helper}{io}{prefIO} = \@a;
     }
+    CUL_HM_assignIO($hash); #Beta-User: most likely we want to assign a new IODev also in deletion case?
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
@@ -1253,8 +1255,9 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "ignore" || $attrName eq "dummy"){
     if ($cmd eq "set"){
       if ($attrVal) {
+        return "Setting $attrName for CCU-FHEM model requires to delete IOList first!" if defined AttrVal($hash->{NAME},'IOList',undef);
         IOWrite($hash, '', 'remove:'.$hash->{DEF}) if defined $hash->{IODev}->{TYPE} && $hash->{IODev}->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s && defined $hash->{DEF};
-        delete $hash->{IODev};
+        #delete $hash->{IODev};
         delete $hash->{READINGS}{IODev};
       }
       $attr{$name}{".ignoreSet"} = $attrVal; # remember user desire
@@ -10874,7 +10877,7 @@ sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operat
              || defined InternalVal($_[0],'XmitOpen',undef) && InternalVal($_[0],'XmitOpen',0) == 0 # HMLAN/HMUSB/TSCUL
              || ReadingsVal($_[0],'state','disconnected') eq 'disconnected'                         # CUL
              || IsDummy($_[0])
-             || IsDisabled($_[0])                                                                                                
+             || IsDisabled($_[0])
             );
   return $iohash;
 }
