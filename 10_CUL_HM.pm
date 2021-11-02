@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25091 + autocreate etc. 2021-10-29a Beta-User$
+# $Id: 10_CUL_HM.pm 25158 2021-11-02 Beta-User $
 
 package main;
 
@@ -674,7 +674,7 @@ sub CUL_HM_Define($$) {##############################
       }
       # fhem.pl will set an IO from reading/attr IODev or AssignIoPort at end of init, we can not avoid and can not assign correctly
       #         but with reading IOdev fhem.pl will restore the IO unsed before normal restart
-      CUL_HM_assignIO($hash) if !$hash->{IODev} && $init_done;
+      CUL_HM_assignIO($hash) if (!$hash->{IODev} && $init_done);
       delete($hash->{IODev}{'.clientArray'}) if ($hash->{IODev}); # Force a recompute
     }
   }
@@ -935,12 +935,12 @@ sub CUL_HM_Attr(@) {#################################
     return "change not allowed for channels" if(!$hash->{helper}{role}{dev});
     if (  $attrVal eq "CCU-FHEM" 
       and $cmd eq "set"
-      and (AttrVal($name,"model","VIRTUAL") eq "VIRTUAL" || AttrVal($name,"model","VIRTUAL") eq "") ){ #Beta-User: allow CCU also as first CUL_HM device
+      and AttrVal($name,"model","VIRTUAL") =~ m/^(VIRTUAL|)$/){
         delete $hash->{helper}{rxType}; # needs new calculation
         delete $hash->{helper}{mId};
         $attr{$name}{subType} = "virtual";
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
-        CUL_HM_updtDeviceModel($name,$attrVal); #Beta-User: otherwise e.g. IOlist is not available immediately after define
+        CUL_HM_updtDeviceModel($name,$attrVal);
         $updtReq = 1;
         CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
@@ -1015,7 +1015,7 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
+        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*,TYPE=HMLAN');
 #        my @IOnames = grep {InternalVal($_,'Clients',
 #                                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
 #                                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
@@ -1039,10 +1039,10 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/ && InternalVal($nIO,'TYPE','') ne 'HMLAN');
         my $owner_ccu = InternalVal($nIO,'owner_CCU',undef);
         return "device $nIO already owned by $owner_ccu" if $owner_ccu && $owner_ccu ne $name;
-        if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) { #Beta-User: clear assignements for HMLAN 
+        if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) {
             HMLAN_assignIDs($defs{$nIO}) if AttrVal($nIO,'hmId','') ne $hash->{DEF} && defined &HMLAN_assignIDs;
         }
       }
@@ -1122,14 +1122,13 @@ sub CUL_HM_Attr(@) {#################################
       $hash->{helper}{io}{vccu}   = $ioCCU;
       $attr{$name}{$attrName}     = $attrVal;
       delete $attr{$name}{IODev};# just in case
-      #CUL_HM_assignIO($hash);
     }
     else{ # this is a delete
       my @a = ();
       $hash->{helper}{io}{vccu}   = "";
       $hash->{helper}{io}{prefIO} = \@a;
     }
-    CUL_HM_assignIO($hash); #Beta-User: most likely we want to assign a new IODev also in deletion case?
+    CUL_HM_assignIO($hash);
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
@@ -1248,7 +1247,7 @@ sub CUL_HM_Attr(@) {#################################
         my $r = CommandAttr(undef, "$IOname logIDs $newVal");
       }
     } else {
-        CommandDeleteAttr(undef, AttrVal($name,'IOList','').' logIDs'); #Beta-User: frank in https://forum.fhem.de/index.php/topic,120328.0.html
+      CommandDeleteAttr(undef, AttrVal($name,'IOList','').' logIDs');
     }
   }
   elsif($attrName eq "ignore" || $attrName eq "dummy"){
@@ -1406,7 +1405,7 @@ sub CUL_HM_AttrInit($;$) {#############################
     $hash->{AttrX}{'powerMeter'} = {                   # subType
                            param             => 'showTimed'
                           };
-    $hash->{AttrX}{'switch'} = {                       # subType #Beta-User: for levelInverse see https://forum.fhem.de/index.php/topic,123496.msg1180909.html#msg1180909
+    $hash->{AttrX}{'switch'} = {                       # subType
                            param             => 'showTimed,levelInverse'
                           };
     $hash->{AttrX}{'dimmer'} = {                       # subType
@@ -1655,13 +1654,10 @@ sub CUL_HM_Notify(@){###############################
       return ($count ? "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event"
                      : undef);
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/(INITIALIZED|REREADCFG)/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
-    }
-    elsif ($evnt =~ m/REREADCFG/){
-      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't support rereadcfg any longer! Restart FHEM instead.");
-      return "[FAILURE] CUL_HM doesn't support rereadcfg any longer! Restart FHEM instead.";
+      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't reliably support rereadcfg any longer! Restart FHEM instead.") if ($evnt =~ m/REREADCFG/);
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    elsif($evnt =~ m/(SHUTDOWN)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}#SHUTDOWN|DELAYEDSHUTDOWN
@@ -1760,25 +1756,13 @@ sub CUL_HM_Parse($$) {#########################################################
                          ($mh{dstH} ? $mh{dstH}->{NAME} :
                     ($mh{dst} eq $mh{id} ? $mh{ioName} :
                                    $mh{dst}));
-
-  if(!$mh{devH} && $mh{mTp} eq "00") { # generate device ?
+  if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    my $acdone;
-    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created
-         if (IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { 
-            my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-            Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
-        } else { 
-            DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
-        }
-        $acdone = 1;
-    } elsif (!IsDisabled((devspec2array('TYPE=autocreate'))[0]) && !defined InternalVal($mh{ioName},'owner_CCU',undef)) {
-        #Beta-User: no vccu, let autocreate do its job
-        Log3($mh{ioName},2,"CUL_HM received learning message from unknown id $mh{src} outside of pairing mode. Please enable pairing mode first or define a virtual device w. model: CCU-FHEM.");
-        #DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
-        #$acdone = 1;
-    }
-    if ($acdone) {
+    #Beta-User: needs imo check first, if pair mode ist active to prevent creation on neighbour's devices: 
+    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created                                                               
+    my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+    Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+    
     $mh{devN} = $sname ;
     $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
@@ -1797,11 +1781,11 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       else{
-        #$attr{$sname}{IODev} = $mh{ioName}; #Beta-User: setting attr might be "unmodern" nowerdays
+        $attr{$sname}{IODev} = $mh{ioName}; 
       }
     }
     $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
-  } #Beta-User: End of autcreate-if, entire block may be shifted right if that works...
+    } #Beta-User: End of hmPair is active check
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -4344,7 +4328,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($mhp->{mTp} eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
   }
-   if (defined($rspWait->{mNo})           &&
+  if (defined($rspWait->{mNo})            &&
       $rspWait->{mNo} == hex($mhp->{mNo}) &&
       !$repeat){
     #response we waited for - stop Waiting
@@ -5031,7 +5015,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
         @arr1 = grep !/(trg|)(press|event|Press|Event)[SL]\S*?/,@arr1;
       }
     }
-    #delete $hash->{helper}{cmds}{cmdLst} ;  #Beta-User: see frank: https://forum.fhem.de/index.php/topic,121650.msg1179090.html#msg1179090
     foreach(@arr1){
       my ($cmdS,$val) = split(":",$_,2);
       $val =~ s/\{self\}/\{self$chn\}/;
@@ -7423,7 +7406,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $state = "";
     my $io = $a[2];
     return "use set or unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
-    return "$io not suitable for CUL_HM" if !defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/; #Beta-User: just a simple form for a single device, but requires HMLAN change...
+    return "$io not suitable for CUL_HM" if(!defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/ && InternalVal("$io",'TYPE','') ne 'HMLAN');
 
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
@@ -8198,7 +8181,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss","brstWu:=1");
     }
     elsif($mTp !~ m/C./)              {#
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"fromSrc:=$src","reSent:=$rss"); #Beta-User: noansi #121139: add our virtual src ID
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"fromSrc:=$src","reSent:=$rss");
     }
 
     CUL_HM_protState($hash,"CMDs_processing...");#if($mTp ne '03');
@@ -9523,7 +9506,7 @@ sub CUL_HM_setTmplDisp($){ # remove register if outdated
 }
 sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
-  my $listNo = $list + 0;
+  my $listNo += $list; #Beta-User: might prevent warning in https://forum.fhem.de/index.php/topic,123744.msg1183485.html#msg1183485
   my $name = $hash->{NAME};
   my $devId = substr(CUL_HM_name2Id($name),0,6);
   my $ioId = CUL_HM_IoId(CUL_HM_id2Hash($devId));
@@ -9635,11 +9618,12 @@ sub CUL_HM_rmOldRegs($$){ # remove register i outdated
 }
 sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
   my $name = shift;
+  return if !defined $defs{$name}; #Beta-User: might prevent https://forum.fhem.de/index.php/topic,123744.msg1183485.html#msg1183485
   foreach(grep /\.?R-/,keys %{$defs{$name}{READINGS}}){
     delete $defs{$name}{READINGS}{$_};
   }
   my $peers = ReadingsVal($name,"peerList","");
-  my $dH = CUL_HM_getDeviceHash($defs{$name});
+  my $dH = CUL_HM_getDeviceHash($defs{$name}) // return;
   foreach(grep /\.?RegL_/,keys %{$defs{$name}{READINGS}}){
     my ($l,$p);
     ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
@@ -9819,8 +9803,8 @@ sub CUL_HM_time2min($) { # minutes -> time
 
 sub CUL_HM_getRegInfo($) { # 
   my ($name) = @_;
-  my $hash = $defs{$name};
-  my $devHash = CUL_HM_getDeviceHash($hash);
+  my $hash = $defs{$name} // return; #Beta-User: might prevent https://forum.fhem.de/index.php/topic,123744.msg1183485.html#msg1183485
+  my $devHash = CUL_HM_getDeviceHash($hash) // return;
   my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
   my $md  = CUL_HM_getAliasModel($hash);#AttrVal    ($devHash->{NAME},"model"  , "" );
   my $roleD  = $hash->{helper}{role}{dev} ? 1 : 0;
@@ -10856,8 +10840,7 @@ sub CUL_HM_UpdtCentralState($){
 
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){ # update HMid of io devices
       Log 1,"CUL_HM correct hmId for assigned IO $ioN";
-      #$attr{$ioN}{hmId} = $defs{$name}{DEF};
-      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}"); #Beta-User: might force an update, esp. to HMLAN?
+      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}");
     }
   };
   $state .= join(",",@ioState);
@@ -10877,7 +10860,7 @@ sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operat
              || defined InternalVal($_[0],'XmitOpen',undef) && InternalVal($_[0],'XmitOpen',0) == 0 # HMLAN/HMUSB/TSCUL
              || ReadingsVal($_[0],'state','disconnected') eq 'disconnected'                         # CUL
              || IsDummy($_[0])
-             || IsDisabled($_[0])
+             || IsDisabled($_[0])                                                                                                
             );
   return $iohash;
 }
@@ -10898,7 +10881,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   # no option - 
   
   my $hash = shift;
-  return 0 if IsIgnored($hash->{NAME}) || IsDummy($hash->{NAME}); #Beta-User: frank hint in https://forum.fhem.de/index.php/topic,123584.msg1182554.html#msg1182554
+  return 0 if IsIgnored($hash->{NAME}) || IsDummy($hash->{NAME});
   my $oldIODevH = $hash->{IODev};
   my $hh = $hash->{helper};
 
@@ -10912,9 +10895,9 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   
   if ($hh->{io}{vccu}){# second option - any IO from the
     my $iom;
-    ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}                  if(!$iom && @{$hh->{io}{prefIO}});
-    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
-    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
+    ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
+    ($iom) = grep {$_ eq 'none'}              @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
+    return 0 if $iom && $iom eq 'none';
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
       ($iom) =    ((sort {@{$hh->{mRssi}{io}{$b}}[0] <=>     # This is the best choice
@@ -10930,7 +10913,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   
   
   if (!defined $newIODevH) {# not assigned thru CCU - try normal
-    my $dIo = AttrVal($hash->{NAME},"IODev",ReadingsVal($hash->{NAME},'IODev','')); #Beta-User: https://forum.fhem.de/index.php/topic,123238.msg1179106.html#msg1179106
+    my $dIo = AttrVal($hash->{NAME},"IODev",""); 
     if (CUL_HM_operIObyIOName($dIo)) {
       ; # assign according to reading/attribut
     }
@@ -10938,7 +10921,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       $dIo = $oldIODevH->{NAME};
     }
     else {
-      my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
+      my @IOs = devspec2array('Clients=.*:CUL_HM:.*,TYPE=HMLAN');
       ($dIo) = (grep{CUL_HM_operIObyIOName($_)} @IOs,@IOs);# tricky: use first active IO else use any IO for CUL_HM
     }
     $newIODevH  = $defs{$dIo} if($dIo);
@@ -10950,7 +10933,10 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     IOWrite($hash, "", "remove:".$ID) if(   defined($oldIODevH) && defined $oldIODevH->{NAME} 
                                          && $oldIODevH->{TYPE}  && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
-    Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME}!") if defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME}; #Beta-User: see frank hint in https://forum.fhem.de/index.php/topic,123436.msg1182983.html#msg1182983
+    if (defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME}) {
+        Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME} to $hash->{NAME}!") if !defined $hash->{IOAssignmentErrCnt};
+        $hash->{IOAssignmentErrCnt}++;
+    }
     $newIODevH = $hash->{IODev};
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
         || (   $newIODevH->{helper}{VTS_AES})){

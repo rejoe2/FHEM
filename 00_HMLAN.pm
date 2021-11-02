@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_HMLAN.pm 18152 + #120600 + :CLIENTS: +cref + some startup changes 2021-10-26 Beta-User $
+# $Id: 00_HMLAN.pm 18152 + #120600 + use DevIo +cref + some startup changes 2021-11-02 Beta-User $
 package main;
 
 
@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday time);
 use Digest::MD5 qw(md5);
+use DevIo;
 
 sub HMLAN_Initialize($);
 sub HMLAN_Define($$);
@@ -51,8 +52,6 @@ my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "HMLAN_Read";
@@ -140,7 +139,7 @@ sub HMLAN_Define($$) {#########################################################
   readingsSingleUpdate($hash,"state","disconnected",1);
   $hash->{owner} = "";
   HMLAN_Attr("delete",$name,"loadLevel");
-  $hash->{Clients} = ":CUL_HM:"; #Beta-User: for VCCU IO assignment?
+  #$hash->{Clients} = ":CUL_HM:"; #Beta-User: for VCCU IO assignment?
 
   return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
   return;
