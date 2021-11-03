@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-02 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-03 Beta-User $
 
 package main;
 
@@ -711,6 +711,7 @@ sub CUL_HM_Undef($$) {###############################
      CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
   }
   delete($modules{CUL_HM}{defptr}{$HMid});
+  delete $modules{CUL_HM}{helper}{primary} if devspec2array('TYPE=CUL_HM') == 1; #Beta-User: we need this to reactivate global events in rereadcfg case
   return undef;
 }
 sub CUL_HM_Rename($$) {##############################
@@ -1589,6 +1590,7 @@ sub CUL_HM_Notify(@){###############################
   return undef if(  $dev->{NAME} eq $ntfy->{NAME}
                   ||$dev->{NAME} ne "global"
                  );# no notification about myself
+                 #Beta-User: deletion of IODev-TYPE devices is missing
   my $events = $dev->{CHANGED};
   return undef if(!$events); # Some previous notify deleted the array.
   #my $cws = join(";#",@{$dev->{CHANGED}});
@@ -1615,6 +1617,10 @@ sub CUL_HM_Notify(@){###############################
         ||($evnt eq "RENAMED" && $defs{$new}{TYPE} eq "CUL_HM")){
         CUL_HM_Rename($new,$ent) if($evnt eq "RENAMED");
         CUL_HM_primaryDev() if ($ent eq $modules{CUL_HM}{helper}{primary});
+        if ($evnt eq 'DELETED' && $defs{$ent}{DEF} =~ m{\A[.]{6}\z} && defined $defs{$ent}->{IODev} && defined $defs{$ent}->{IODev}->{TYPE} && $defs{$ent}->{IODev}->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/) { 
+            my $ID = CUL_HM_hash2Id($defs{$ent});
+            IOWrite($defs{$ent}, '', "remove:$ID");
+        }
         $count++;
       }
       else{##------- update dependancies to IO devices used
@@ -1654,10 +1660,15 @@ sub CUL_HM_Notify(@){###############################
       return ($count ? "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event"
                      : undef);
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/(INITIALIZED|REREADCFG)/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
-      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't reliably support rereadcfg any longer! Restart FHEM instead.") if ($evnt =~ m/REREADCFG/);
+    }
+    elsif ($evnt =~ m/REREADCFG/){
+      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't reliably support rereadcfg any longer! Restart FHEM instead.");
+      delete $modules{CUL_HM}{helper}{initDone};
+      InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);
+      CUL_HM_updateConfig("startUp");
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    elsif($evnt =~ m/(SHUTDOWN)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}#SHUTDOWN|DELAYEDSHUTDOWN
