@@ -1,13 +1,13 @@
 ##############################################
-# $Id: 00_HMLAN.pm 18152 + #120600 + use DevIo +cref + some startup changes 2021-11-02 Beta-User $
+# $Id: 00_HMLAN.pm 25201 + fixes+proposals 2021-11-08 Beta-User $
 package main;
 
 
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday time);
 use Digest::MD5 qw(md5);
-use DevIo;
 
 sub HMLAN_Initialize($);
 sub HMLAN_Define($$);
@@ -52,6 +52,7 @@ my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
   my ($hash) = @_;
+  use DevIo;
 
 # Provider
   $hash->{ReadFn}  = "HMLAN_Read";
@@ -81,7 +82,7 @@ sub HMLAN_Initialize($) {
                      "wdTimer:5,10,15,20,25 ".
                      "logIDs:multiple,sys,all,broadcast ".
                      $readingFnAttributes;
-  $hash->{NotifyOrderPrefix} = "47-"; #Beta-User: make sure, HMLAN_DoInit is called once prior to CUL_HM initialisation
+  $hash->{NotifyOrderPrefix} = "47-"; #make sure, HMLAN_DoInit is called once prior to CUL_HM initialisation
   return;
 }
 
@@ -91,7 +92,7 @@ sub HMLAN_Define($$) {#########################################################
 
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> HMLAN ip[:port]";
-    Log3($a[0], 2, $msg);
+    Log3 $a[0], 2, $msg;
     return $msg;
   }
   DevIo_CloseDev($hash);
@@ -139,8 +140,9 @@ sub HMLAN_Define($$) {#########################################################
   readingsSingleUpdate($hash,"state","disconnected",1);
   $hash->{owner} = "";
   HMLAN_Attr("delete",$name,"loadLevel");
-  #$hash->{Clients} = ":CUL_HM:"; #Beta-User: for VCCU IO assignment?
+  $hash->{Clients} = ":CUL_HM:";
 
+  $hash->{nextOpenDelay} = 10; #Beta-User: limit number of calls to DevIo_OpenDev() calls if connection is interrupted
   return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
   return;
 }
@@ -176,7 +178,7 @@ sub HMLAN_Notify(@) {##########################################################
       HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
       delete $hash->{helper}{attrPend};
     }
-    DevIo_OpenDev($hash, 0, "HMLAN_DoInit"); #Beta-User: Use hmId from attr if possible
+    DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
     HMLAN_writeAesKey($hash->{NAME});
   }
   elsif ($dev->{NAME} eq $hash->{NAME}){
@@ -835,7 +837,7 @@ sub HMLAN_Parse($$) {##########################################################
 }
 sub HMLAN_Ready($) {###########################################################
   my ($hash) = @_;
-  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit",  sub(){});
+  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit",  sub(){}); #Beta-User: Pseudo-Callback to avoid to much looping to DevIo_OpenDev 
 }
 
 sub HMLAN_SimpleWrite(@) {#####################################################
@@ -910,7 +912,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
-    $hash->{helper}{q}{sending} = 1;
+    $hash->{helper}{q}{sending} = 1; #Beta-User: see mgernoth remark in https://forum.fhem.de/index.php/topic,123874.msg1185367.html#msg1185367
     $hash->{helper}{q}{scnt}++;  
   }
   else{
@@ -1230,7 +1232,7 @@ __END__
         <a id="HMLAN-get-assignIDs"><b>Get</b></a>
         <li>assignIDs<br>
           Gibt eine Liste aller diesem IO zugewiesenen IOs aus.
-          </li>
+        </li>
     </ul>
     <br><br>
 

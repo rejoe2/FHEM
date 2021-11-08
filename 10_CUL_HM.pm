@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-03 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-08 Beta-User $
 
 package main;
 
@@ -1016,7 +1016,7 @@ sub CUL_HM_Attr(@) {#################################
       return 'CUL_HM '.$name.': IOgpr set => ccu to control the IO. Delete attr IOgrp if unwanted'
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
-        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*,TYPE=HMLAN');
+        my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
 #        my @IOnames = grep {InternalVal($_,'Clients',
 #                                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
 #                                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
@@ -7417,7 +7417,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $state = "";
     my $io = $a[2];
     return "use set or unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
-    return "$io not suitable for CUL_HM" if(!defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/ && InternalVal("$io",'TYPE','') ne 'HMLAN');
+    return "$io not suitable for CUL_HM" if(!defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/);
 
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
@@ -9639,8 +9639,8 @@ sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
     my ($l,$p);
     ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
     my $ps = $p;
-    $ps =~ s/_chn-\d\d$//;
-    if (!$p || $peers =~ m/$ps/){
+    $ps =~ s/_chn-\d\d$// if defined $ps; #Beta-User: https://forum.fhem.de/index.php/topic,123874.msg1185156.html#msg1185156
+    if (!$p || defined $ps && $peers =~ m/$ps/){
       CUL_HM_updtRegDisp($defs{$name},$l,CUL_HM_name2Id($p,$dH));
     }
     else{
@@ -10932,7 +10932,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
       $dIo = $oldIODevH->{NAME};
     }
     else {
-      my @IOs = devspec2array('Clients=.*:CUL_HM:.*,TYPE=HMLAN');
+      my @IOs = devspec2array('Clients=.*:CUL_HM:.*');
       ($dIo) = (grep{CUL_HM_operIObyIOName($_)} @IOs,@IOs);# tricky: use first active IO else use any IO for CUL_HM
     }
     $newIODevH  = $defs{$dIo} if($dIo);
