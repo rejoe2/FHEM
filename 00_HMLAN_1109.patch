@@ -1,0 +1,64 @@
+--- 00_HMLAN.25201	2021-11-09 06:31:35.679758470 +0100
++++ 00_HMLAN.pm	2021-11-09 06:32:20.299669395 +0100
+@@ -1,5 +1,5 @@
+ ##############################################
+-# $Id: 00_HMLAN.pm 25201 2021-11-07 17:28:16Z martinp876 $
++# $Id: 00_HMLAN.pm 25201 + fixes+proposals 2021-11-08 Beta-User $
+ package main;
+ 
+ 
+@@ -54,7 +54,6 @@
+   my ($hash) = @_;
+   use DevIo;
+ 
+-
+ # Provider
+   $hash->{ReadFn}  = "HMLAN_Read";
+   $hash->{WriteFn} = "HMLAN_Write";
+@@ -86,6 +85,7 @@
+   $hash->{NotifyOrderPrefix} = "47-"; #make sure, HMLAN_DoInit is called once prior to CUL_HM initialisation
+   return;
+ }
++
+ sub HMLAN_Define($$) {#########################################################
+   my ($hash, $def) = @_;
+   my @a = split("[ \t][ \t]*", $def);
+@@ -142,9 +142,11 @@
+   HMLAN_Attr("delete",$name,"loadLevel");
+   $hash->{Clients} = ":CUL_HM:";
+ 
++  $hash->{nextOpenDelay} = 10; #Beta-User: limit number of calls to DevIo_OpenDev() calls if connection is interrupted
+   return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
+   return;
+ }
++
+ sub HMLAN_Undef($$) {##########################################################
+   my ($hash, $arg) = @_;
+   my $name = $hash->{NAME};
+@@ -835,8 +837,9 @@
+ }
+ sub HMLAN_Ready($) {###########################################################
+   my ($hash) = @_;
+-  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit");
++  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit",  sub(){}); #Beta-User: Pseudo-Callback to avoid to much looping to DevIo_OpenDev 
+ }
++
+ sub HMLAN_SimpleWrite(@) {#####################################################
+   my ($hash, $msg, $nonl) = @_;
+   return if(!$hash || AttrVal($hash->{NAME}, "dummy", 0) != 0);
+@@ -909,6 +912,7 @@
+                              .' '        .$dst
+                              .' '        .$p;
+ 
++    $hash->{helper}{q}{sending} = 1; #Beta-User: see mgernoth remark in https://forum.fhem.de/index.php/topic,123874.msg1185367.html#msg1185367
+     $hash->{helper}{q}{scnt}++;  
+   }
+   else{
+@@ -995,6 +999,7 @@
+   my(undef,$name) = split(':',$in);
+   my $hash = $defs{$name};
+   my $tn = gettimeofday();
++
+   if ($hash->{helper}{q}{sending}) { #Currently sending, reschedule KeepAlive
+     RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+     InternalTimer($tn+0.1,"HMLAN_KeepAlive", "keepAlive:".$name, 1);
