@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-08 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-09 Beta-User $
 
 package main;
 
@@ -1040,7 +1040,7 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/ && InternalVal($nIO,'TYPE','') ne 'HMLAN');
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
         my $owner_ccu = InternalVal($nIO,'owner_CCU',undef);
         return "device $nIO already owned by $owner_ccu" if $owner_ccu && $owner_ccu ne $name;
         if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) {
@@ -1590,7 +1590,6 @@ sub CUL_HM_Notify(@){###############################
   return undef if(  $dev->{NAME} eq $ntfy->{NAME}
                   ||$dev->{NAME} ne "global"
                  );# no notification about myself
-                 #Beta-User: deletion of IODev-TYPE devices is missing
   my $events = $dev->{CHANGED};
   return undef if(!$events); # Some previous notify deleted the array.
   #my $cws = join(";#",@{$dev->{CHANGED}});
@@ -9639,7 +9638,7 @@ sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
     my ($l,$p);
     ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
     my $ps = $p;
-    $ps =~ s/_chn-\d\d$// if defined $ps; #Beta-User: https://forum.fhem.de/index.php/topic,123874.msg1185156.html#msg1185156
+    $ps =~ s/_chn-\d\d$// if defined $ps;
     if (!$p || defined $ps && $peers =~ m/$ps/){
       CUL_HM_updtRegDisp($defs{$name},$l,CUL_HM_name2Id($p,$dH));
     }
