@@ -324,7 +324,7 @@ sub statistics_PeriodChange($)
       if ($dayChangeDelay == 0) { $dayChangeTime += 24*3600; } # Otherwise it would always lay in the past
       $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
-   my $dstcorr = HOURSECONDS * ($th[8] - (localtime(time + DAYSECONDS))[8]);
+   my $dstcorr = HOURSECONDS * ($th[8] - (localtime($now + DAYSECONDS))[8]);
    $dayChangeTime += $dstcorr;
    
    RemoveInternalTimer($hash);
