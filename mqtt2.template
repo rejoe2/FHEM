@@ -1443,7 +1443,7 @@ attr DEVICE,DEVICE_CH2 model tasmota_4ch_two_shutters_invert_0
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210607
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
 
-name:tasmota_2ch_shutter_venetian_invert_1
+name:tasmota_2ch_shutter_venetian_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as venetian shutter; needs Tasmota version 10.0.0.1 or higher, see <a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,123842.0.html">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style device pct 100% = open.
 order:A_02b3
@@ -1506,7 +1506,7 @@ Shutter specific commands available: ShutterOpenDuration1, ShutterCloseDuration1
 commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
-attr DEVICE model tasmota_2ch_shutter_venetian_invert_1
+attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
 setreading DEVICE attrTemplateVersion 20211110
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
@@ -2538,10 +2538,52 @@ attr DEVICE comment To get appropriate loadState values: Change the default limi
 attr DEVICE model shelly1_w_energy_measuring_washer_example
 setreading DEVICE attrTemplateVersion 20200831
 
+name:shelly2em
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+order:A_10c
+desc:Applies to Shelly 2em devices. <br>See https://forum.fhem.de/index.php/topic,123920.msg1185387.html#msg1185387
+par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
+par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
+par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
+par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = q(emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum($name,'emeter_0_energy',0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum($name,'emeter_1_energy',0)}); my $old =  AttrVal('DEVICE','userReadings',undef); !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
+set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power','unknown'); my $cons2 = ReadingsVal($name,'emeter_1_power','unknown'); my my $total1 = ReadingsVal($name,'emeter_0_kWh','unknown'); my $total2 = ReadingsVal($name,'emeter_1_kWh','unknown'); my $total_sum = $total1+$total2; '<a href="http://' .ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>2 Phases total: $total_sum kWh</div>"}
+attr DEVICE stateFormat { my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power','unknown'); my $cons2 = ReadingsVal($name,'emeter_1_power','unknown'); my my $total1 = ReadingsVal($name,'emeter_0_kWh','unknown'); my $total2 = ReadingsVal($name,'emeter_1_kWh','unknown'); return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh) }
+attr DEVICE readingList shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/relay/0:.* state\
+  shellies/DEVNAME/input_event/0:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/input/0:.* input0\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/emeter/0/power:.* emeter_0_power\
+  shellies/DEVNAME/emeter/0/current:.* emeter_0_current\
+  shellies/DEVNAME/emeter/0/voltage:.* emeter_0_voltage\
+  shellies/DEVNAME/emeter/0/reactive_power:.* emeter_0_reactive_power\
+  shellies/DEVNAME/emeter/1/power:.* emeter_1_power\
+  shellies/DEVNAME/emeter/1/pf:.* emeter_1_pf\
+  shellies/DEVNAME/emeter/1/current:.* emeter_1_current\
+  shellies/DEVNAME/emeter/1/voltage:.* emeter_1_voltage\
+  shellies/DEVNAME/emeter/1/reactive_power:.* emeter_1_reactive_power\
+  shellies/DEVNAME/emeter/0/energy:.* emeter_0_energy\
+  shellies/DEVNAME/emeter/0/returned_energy:.* emeter_0_returned_energy\
+  shellies/DEVNAME/emeter/0/total:.* emeter_0_total\
+  shellies/DEVNAME/emeter/0/total:.* {'emeter_0_kWh' => sprintf("%.2f",$EVENT/1000)}\
+  shellies/DEVNAME/emeter/0/total_returned:.* emeter_0_total_returned\
+  shellies/DEVNAME/emeter/1/energy:.* emeter_1_energy\
+  shellies/DEVNAME/emeter/1/returned_energy:.* emeter_1_returned_energy\
+  shellies/DEVNAME/emeter/1/total:.* emeter_1_total\
+  shellies/DEVNAME/emeter/1/total:.* {'emeter_1_kWh' => sprintf("%.2f",$EVENT/1000)}\
+  shellies/DEVNAME/emeter/1/total_returned:.* emeter_1_total_returned
+deletereading -q DEVICE (?!associatedWith|IODev).*
+set DEVICE x_mqttcom announce
+attr DEVICE model shelly2em
+setreading DEVICE attrTemplateVersion 20211110
+option:{ RADIO_SETUSERREADING }
+attr DEVICE userReadings NEWUSERREADINGS
 
 name:shelly3em
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
-order:A_10c
+order:A_10c1
 desc:Applies to Shelly 3em devices. <br>NOTE: early version, might still need some testing
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
