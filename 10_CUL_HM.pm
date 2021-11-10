@@ -1768,34 +1768,43 @@ sub CUL_HM_Parse($$) {#########################################################
                                    $mh{dst}));
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    #Beta-User: needs imo check first, if pair mode ist active to prevent creation on neighbour's devices: 
-    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created                                                               
-    my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-    Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
-    
-    $mh{devN} = $sname ;
-    $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
-    $mh{devH}->{IODev} = $iohash;
-    if (!$modules{CUL_HM}{helper}{hmManualOper}){
-      my $ioOwn = InternalVal($mh{ioName},'owner_CCU','');
-      $defs{$sname}{IODev} = $defs{$mh{ioName}}; 
-      if ($ioOwn) {
-        $attr{$sname}{IOgrp} = $ioOwn;
-        $mh{devH}->{helper}{io}{vccu} = $ioOwn;
-        if (   defined($mh{myRSSI})
-            && $mh{myRSSI} ne ''
-            && $mh{myRSSI} >= -50) { #noansi: on good rssi set prefered, too
-          $attr{$sname}{IOgrp} .= ':'.$mh{ioName};
-          my @a = ();
-          $mh{devH}->{helper}{io}{prefIO} = \@a;
+    my $acdone;
+    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created
+        if (IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { 
+            my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+            Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+        } else { 
+            DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
+            CommandAttr(undef,"$sname room CUL_HM");
         }
-      }
-      else{
-        $attr{$sname}{IODev} = $mh{ioName}; 
-      }
+        $acdone = 1;
+    } elsif (!IsDisabled((devspec2array('TYPE=autocreate'))[0]) && !defined InternalVal($mh{ioName},'owner_CCU',undef)) {
+        #Beta-User: no vccu, write Log
+        Log3($mh{ioName},2,"CUL_HM received learning message from unknown id $mh{src} outside of pairing mode. Please enable pairing mode first or define a virtual device w. model: CCU-FHEM.");
     }
-    $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
-    } #Beta-User: End of hmPair is active check
+    if ($acdone) {
+        $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
+        $mh{devH}->{IODev} = $iohash;
+        if (!$modules{CUL_HM}{helper}{hmManualOper}){
+          my $ioOwn = InternalVal($mh{ioName},'owner_CCU','');
+          $defs{$sname}{IODev} = $defs{$mh{ioName}}; 
+          if ($ioOwn) {
+            $attr{$sname}{IOgrp} = $ioOwn;
+            $mh{devH}->{helper}{io}{vccu} = $ioOwn;
+            if (   defined($mh{myRSSI})
+                && $mh{myRSSI} ne ''
+                && $mh{myRSSI} >= -50) { #noansi: on good rssi set prefered, too
+              $attr{$sname}{IOgrp} .= ':'.$mh{ioName};
+              my @a = ();
+              $mh{devH}->{helper}{io}{prefIO} = \@a;
+            }
+          }
+          else{
+            $attr{$sname}{IODev} = $mh{ioName}; 
+          }
+        }
+        $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
+    }
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
