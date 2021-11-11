@@ -1,5 +1,5 @@
 ﻿##############################################
-# $Id: 98_statistics.pm 20819 2019-12-23 23:07:57Z tupol $
+# $Id: 98_statistics.pm 20819 2021-11-11 Beta-User dst trial $
 #
 #  98_statistic.pm
 # 
@@ -324,18 +324,18 @@ sub statistics_PeriodChange($)
       if ($dayChangeDelay == 0) { $dayChangeTime += 24*3600; } # Otherwise it would always lay in the past
       $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
-   my $dstcorr = HOURSECONDS * ($th[8] - (localtime($now + DAYSECONDS))[8]);
+   my $dstcorr = HOURSECONDS * ((localtime($now - DAYSECONDS))[8] - $th[8]);
    $dayChangeTime += $dstcorr;
    
    RemoveInternalTimer($hash);
  # Run period change procedure each full hour ("periodChangePreset" second before).
    my $periodEndTime = 3600 * ( int(($now+$periodChangePreset)/3600) + 1 ) - $periodChangePreset ;
- # Run procedure also for given dayChangeTime  
+ # Run procedure also for given dayChangeTime 
    $val = "";
    if ( $now<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
       $periodEndTime = $dayChangeTime;
       $val = " (Day Change)";
-   } 
+   }
    $val = strftime ("%Y-%m-%d %H:%M:%S", localtime($periodEndTime)) . $val;
    InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 1);
 
@@ -372,8 +372,8 @@ sub statistics_PeriodChange($)
    } else {
       ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime ($now );
       ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime ($now + $periodChangePreset);
-      if ($hourNow != $hourLast || $hourNow == $hourLast && $dstcorr) { 
-         $periodSwitch = 1; 
+      if ($hourNow != $hourLast || $hourNow == $hourLast && ($dstcorr || !$dstcorr && $hourNow == 2)) {
+         $periodSwitch = 1;
          statistics_Log $hash,4,"Calculating hour change";
       } else {
          statistics_Log $hash,4,"Calculating statistics at startup";
