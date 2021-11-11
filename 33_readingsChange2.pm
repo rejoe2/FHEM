@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 33_readingsChange2.pm 25035 2021-10-14 Beta-User $
+# $Id: 33_readingsChange2.pm 25035 2021-11-11 Beta-User $
 #
 ###############################################################################
 
@@ -266,8 +266,13 @@ sub RefreshDeviceTable {
     my $attrName = shift // 'readingsChange2';
     my $attrVal  = shift;
     my $map = $hash->{helper}->{DEVICES};
+    if (!defined $attrVal) {
+        delete $map->{$dev};
+        my $nRC = join q{|}, ('global',keys %{$map});
+        notifyRegexpChanged($hash,$nRC);
+        return;
+    };
     my $err = CreateSingleDeviceTable($hash, $dev, $map);
-    delete $map->{$dev} if !defined $attrVal && keys %{$map->{$dev}} == 0;
     return $err;
 }
 
