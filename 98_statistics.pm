@@ -372,7 +372,7 @@ sub statistics_PeriodChange($)
    } else {
       ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime ($now );
       ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime ($now + $periodChangePreset);
-      if ($hourNow != $hourLast || $hourNow == $hourLast && (localtime($now - 1))[8] != (localtime($now +1))[8]) {
+      if ($hourNow != $hourLast || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr))[8]) {
          $periodSwitch = 1;
          statistics_Log $hash,4,"Calculating hour change";
       } else {
