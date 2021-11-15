@@ -1,4 +1,4 @@
-# $Id: 98_WeekdayTimer.pm 25110 2021-11-13 Test Beta-User $
+# $Id: 98_WeekdayTimer.pm 25110 2021-11-15 restructured Beta-User $
 #############################################################################
 #
 #     98_WeekdayTimer.pm
@@ -32,6 +32,7 @@ use warnings;
 
 use Time::Local qw( timelocal_nocheck );
 use Scalar::Util qw(looks_like_number);
+use Carp qw(carp);
 use FHEM::Core::Timer::Register qw(:ALL);
 use JSON qw(decode_json);
 use GPUtils qw(GP_Import);
@@ -366,7 +367,7 @@ sub _Profile {
     $hash->{profil}{$idx}{TIME}  = $time;
     $hash->{profil}{$idx}{PARA}  = $parameter;
     $hash->{profil}{$idx}{EPOCH} = getSwitchtimeEpoch ($now, $stunde, $minute, $sekunde, 0);
-    $hash->{profil}{$idx}{TAGE}  = $tage;
+    $hash->{profil}{$idx}{DAYS}  = $tage;
     $hash->{profil}{$idx}{WE_Override} = $overrulewday;
   }
 # ---- Texte Readings aufbauen -----------------------------------------
@@ -788,17 +789,17 @@ sub _SetTimer {
   return Log3( $hash, 3, "[$name] no switches to send, due to possible errors." ) if !@switches;
 
   readingsSingleUpdate ($hash, 'state', 'inactive', 1) if !defined $hash->{SETTIMERATMIDNIGHT};
-  for(my $i=0; $i<=$#switches; $i++) {
+  for my $i (0..$#switches) {
 
     my $idx = $switches[$i];
 
     my $time        = $hash->{profil}{$idx}{TIME};
     my $timToSwitch = $hash->{profil}{$idx}{EPOCH};
-    my $tage        = $hash->{profil}{$idx}{TAGE};
+    my $tage        = $hash->{profil}{$idx}{DAYS};
     my $para        = $hash->{profil}{$idx}{PARA};
     my $overrulewday = $hash->{profil}{$idx}{WE_Override};
 
-    my $isActiveTimer = isAnActiveTimer ($hash, $tage, $para, $overrulewday);
+    my $isActiveTimer = checkDaysCondition($hash, $tage, $overrulewday); #isAnActiveTimer ($hash, $tage, $para, $overrulewday);
     readingsSingleUpdate ($hash, 'state', 'active', 1)
       if !defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer;
 
@@ -807,7 +808,7 @@ sub _SetTimer {
         Log3( $hash, 4, "[$name] setTimer - timer seems to be active today: ".join( q{},@{$tage})."|$time|$para" );
         resetRegIntTimer($idx, $timToSwitch + AttrVal($name,'WDT_sendDelay',0), \&WDT_Update, $hash, 0);
       } else {
-        Log3( $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join(q{},@{$tage})."|$time|$para ". $hash->{CONDITION} );
+        Log3( $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join(q{},@{$tage})."|$time|$para " );
         deleteSingleRegIntTimer("$idx", $hash);
       }
     }
@@ -887,9 +888,7 @@ sub _checkTimerReset {
   my $idx  = shift // return;
 
   return if $hash->{profil}{$idx}{EPOCH} <= time;
-  return if 
-    !isAnActiveTimer ($hash, $hash->{profil}{$idx}{TAGE}, $hash->{profil}{$idx}{PARA}, $hash->{profil}{$idx}{WE_Override}) 
-    && !isAnActiveTimer ($hash, $hash->{helper}{WEDAYS}{0} ? [7]:[8], $hash->{profil}{$idx}{PARA}, $hash->{profil}{$idx}{WE_Override});
+  return if !checkWDTCondition($hash, $hash->{profil}{$idx}{PARA});
   resetRegIntTimer($idx, $hash->{profil}{$idx}{EPOCH}, \&WDT_Update, $hash, 0); 
   return;
 }
@@ -931,7 +930,7 @@ sub _searchAktNext {
       #Log3 $hash, 3, $shortDays{$language}[$nextTag]." ".FmtDateTime($nextTime)." ".$nextPara." ".$nextIdx;
       my $ignore = 0;
       my $wend = 0;
-      my $tage = $hash->{profil}{$nextIdx}{TAGE}[0];
+      my $tage = $hash->{profil}{$nextIdx}{DAYS}[0];
       if ($wday==$relWday) {
         $wend = $hash->{helper}{WEDAYS}{0};
         $ignore = (($tage == 7 && !$wend ) || ($tage == 8 && $wend ));
@@ -965,7 +964,7 @@ sub WDT_Update {
   my $now      = time;
 
   # Schaltparameter ermitteln
-  my $tage        = $hash->{profil}{$idx}{TAGE};
+  my $tage        = $hash->{profil}{$idx}{DAYS};
   my $time        = $hash->{profil}{$idx}{TIME};
   my $newParam    = $hash->{profil}{$idx}{PARA};
   my $timToSwitch = $hash->{profil}{$idx}{EPOCH};
@@ -984,13 +983,13 @@ sub WDT_Update {
 
   my ($activeTimer, $activeTimerState);
   if (defined $fnHash->{forceSwitch}) { #timer is delayed
-    $activeTimer      = isAnActiveTimer ($hash, $dieGanzeWoche, $newParam, $overrulewday);
-    $activeTimerState = isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
+    $activeTimer      = checkDaysCondition($hash, $dieGanzeWoche, $overrulewday); #isAnActiveTimer ($hash, $dieGanzeWoche, $newParam, $overrulewday);
+    $activeTimerState = checkWDTCondition($hash, $newParam); #isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
     Log3( $hash, 4, "[$name] Update   - past timer activated" );
     deleteSingleRegIntTimer($idx, $hash);#, 1);
     setRegIntTimer($idx, $timToSwitch, \&WDT_Update, $hash, 0) if $timToSwitch > $now && ($activeTimerState || $activeTimer );
   } else {
-    $activeTimer = isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
+    $activeTimer = checkWDTCondition($hash, $newParam); #isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
     $activeTimerState = $activeTimer;
     Log3( $hash, 4, "[$name] Update   - timer seems to be active today: ".join(q{},@{$tage})."|$time|$newParam" ) if ( $activeTimer && (@{$tage}) );
     Log3( $hash, 2, "[$name] Daylist is missing!") if !(@{$tage});
@@ -1006,7 +1005,7 @@ sub WDT_Update {
 
   # ggf. Device schalten
   if ($activeTimer) {
-    Switch_Device($hash, $newParam, $tage);
+    Switch_Device($hash, $newParam);
   }
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash, 'nextUpdate', FmtDateTime($nextTime));
@@ -1199,51 +1198,88 @@ sub checkDelayedExecution {
 
 ################################################################################
 sub Switch_Device {
-  my ($hash, $newParam, $tage)  = @_;
-  
+  my $hash      = shift // return;
+  my $newParam  = shift // carp q[No new parameter provided!] && return;
+
   my $name  = $hash->{NAME};
+  return if AttrVal($name, 'disable', 0);
 
   my $command = AttrVal($name, 'commandTemplate', undef);
+  my $setModifier = checkIfDeviceIsHeatingType($hash);
+
   if (!defined $command) {
   #modifier des Zieldevices auswaehlen
-    my $setModifier = checkIfDeviceIsHeatingType($hash);
     $setModifier .= ' ' if length $setModifier;
 
     $attr{$name}{commandTemplate} =
-        'set $NAME ' . $setModifier . '$EVENT' if !defined $attr{$name}{commandTemplate};
+        'set $NAME ' . $setModifier . '$EVENT';
     $command = AttrVal($name, 'commandTemplate', 'something went wrong');
   }
 
   $command = 'set $NAME $EVENT' if defined $hash->{WDT_EVENTMAP} && defined $hash->{WDT_EVENTMAP}{$newParam};
   $command = $hash->{COMMAND} if defined $hash->{COMMAND} && $hash->{COMMAND} ne '';
-  
+
   my $isHeating = $setModifier ? 1 : 0;
   my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, '');
      $aktParam  = sprintf("%.1f", $aktParam) if $isHeating && $aktParam =~ m{\A[0-9]{1,3}\z}ixms;
 
-  my $disabled = AttrVal($hash->{NAME}, 'disable', 0);
-  my $disabled_txt = $disabled ? '' : ' not';
-  Log3( $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is$disabled_txt disabled" );
+  Log3( $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is not disabled" );
 
   #Kommando ausführen
-  if ($command && !$disabled && $aktParam ne $newParam
-    ) {
-    if ( defined $hash->{WDT_EVENTMAP} && defined $hash->{WDT_EVENTMAP}{$newParam} ) {
-      $newParam = $hash->{WDT_EVENTMAP}{$newParam};
-    } else {
-      $newParam =~ s{\\:}{|}gxms;
-      $newParam =~ s{:}{ }gxms;
-      $newParam =~ s{\|}{:}gxms;
-    }
-
-    my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam );
-    $command = EvalSpecials($command, %specials);
-
-    Log3( $hash, 4, "[$name] command: '$command' executed with ".join(",", map { "$_=>$specials{$_}" } keys %specials) );
-    my $ret  = AnalyzeCommandChain(undef, $command);
-    Log3( $hash, 3, $ret ) if $ret;
+  return if !$command || $aktParam eq $newParam;
+  if ( defined $hash->{WDT_EVENTMAP} && defined $hash->{WDT_EVENTMAP}{$newParam} ) {
+    $newParam = $hash->{WDT_EVENTMAP}{$newParam};
+  } else {
+    $newParam =~ s{\\:}{|}gxms;
+    $newParam =~ s{:}{ }gxms;
+    $newParam =~ s{\|}{:}gxms;
   }
+
+  my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam );
+  $command = EvalSpecials($command, %specials);
+  my $ret  = AnalyzeCommandChain(undef, $command);
+  Log3( $hash, 4, "[$name] command: '$command' executed with ".join(",", map { "$_=>$specials{$_}" } keys %specials) );
+  return Log3( $hash, 2, $ret ) if $ret;
   return;
+}
+
+################################################################################
+sub checkWDTCondition {
+  my $hash = shift // return 0;
+  my $para = shift // carp q[No new parameter provided!] && return;
+  return 1 if !defined $hash->{CONDITION} || !$hash->{CONDITION};
+
+  my $name = $hash->{NAME};
+  my $condition  = $hash->{CONDITION};
+
+  Log3( $hash, 4, "[$name] checking condition: $condition");
+
+  my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $para );
+  my $xPression  = qq( { $condition } );
+     $xPression  = EvalSpecials($xPression, %specials);
+  Log3( $hash, 5, "[$name] evaluated condition: $xPression" );
+
+  my $ret = AnalyzeCommandChain(undef, $xPression);
+  Log3( $hash, 5, "[$name] condition evaluation returned: $ret" );
+  return $ret;
+}
+
+################################################################################
+sub checkDaysCondition {
+  my $hash = shift // return 0;
+  my $tage = shift // return 0;
+  my $overrulewday = shift;
+
+  my $name = $hash->{NAME};
+  Log3( $hash, 4, "[$name] check days:" . join q{,}, @{$tage} );
+  my $condition  = getDaysAsCondition($tage, $overrulewday);
+  my $tageAsHash = getDaysAsHash($hash, $tage);
+  my $xPression  = qq( $tageAsHash ; $condition );
+  Log3( $hash, 5, "[$name] check days: $xPression" );
+
+  my $ret = AnalyzePerlCommand(undef, $xPression);
+  Log3( $hash, 5, "[$name] result of check days: $ret" );
+  return $ret;
 }
 
 ################################################################################
@@ -1251,27 +1287,10 @@ sub getDaysAsHash {
   my $hash = shift;
   my $tage = shift //return {};
 
-my %days = map {$_ => 1} @{$tage};
+  my %days = map {$_ => 1} @{$tage};
   delete @days{7,8};
 
-  return 'my $days={};map{$days->{$_}=1}('. join (q{,}, sort keys %days ) .')';
-}
-
-################################################################################
-sub checkWDTCondition {
-  my $hash = shift;
-  my $tage = shift // return 0;
-  my $overrulewday = shift;
-
-  my $name = $hash->{NAME};
-  Log3( $hash, 4, "[$name] condition:$hash->{CONDITION} - Tage:" . join q{,}, @{$tage} );
-
-  my $condition  = q{( };
-  $condition .= (defined $hash->{CONDITION} && $hash->{CONDITION} ne '') ? $hash->{CONDITION} : 1 ;
-  $condition .= ' && ' . getDaysAsCondition($tage, $overrulewday);
-  $condition .= ')';
-
-  return $condition;
+  return 'my $days = {} ; map{ $days->{$_} = 1 }('. join (q{,}, sort keys %days ) .')';
 }
 
 ################################################################################
@@ -1284,11 +1303,11 @@ sub getDaysAsCondition {
   my $we       = $days{7}; delete $days{7};  # $we
   my $notWe    = $days{8}; delete $days{8};  #!$we
 
-  my $tageExp  = '(defined $days->{$wday}';
+  my $tageExp  = 'defined $days->{$wday}';
      $tageExp .= ' && !$we' if $overrulewday;
      $tageExp .= ' ||  $we' if defined $we;
      $tageExp .= ' || !$we' if defined $notWe;
-     $tageExp .= ')';
+     #$tageExp .= ')';
 
   return $tageExp;
 }
@@ -1511,17 +1530,18 @@ __END__
       If no explicit <i>command</i> is provided, <i>commandTemplate</i> attribute will indicate the command; this may be a simple <code>set $NAME $EVENT</code> or some variation wrt. to the device beeing recognized as heating type (see <i>WDT_eventMap</i> for even more options!).
   <!----------------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
-      The following parameter are replaced:<br>
+      The following parameters are replaced:<br>
         <ol>
           <li>$NAME  => the device to switch</li>
-          <li>$EVENT => the new temperature</li>
+          <li>$EVENT => the new parameter (e.g. a temperature)</li>
         </ol>
     </ul>
     <p>
     <ul><b>condition</b><br>
       if a condition is defined you must declare this with () and a valid perl-code.<br>
       The return value must be boolean.<br>
-      The parameters $NAME and $EVENT will be interpreted.
+      The parameters $NAME and $EVENT will also be interpreted.
+      If condition is provided and evaluation (at switchingtime) returns "0", the parameter will not be set, next check will be done as soon as next switchingtime is reached.
     </ul>
     <p>
     <b>Examples:</b>

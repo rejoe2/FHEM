@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 25213 2021-11-11 05:15:34Z Beta-User $
+# $Id: mqtt2.template 25219 2021-11-13 06:11:31Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -528,14 +528,14 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
 attr DEVICE_CH2 setList \
-  on:noArg $\DEVICETOPIC/2/set {"state_l2":"ON"}\
-  off:noArg $\DEVICETOPIC/2/set {"state_l2":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/2/set {"state_l2":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/l2/set {"state_l2":"ON"}\
+  off:noArg $\DEVICETOPIC/l2/set {"state_l2":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l2/set {"state_l2":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH3 setList \
-  on:noArg $\DEVICETOPIC/3/set {"state_l3":"ON"}\
-  off:noArg $\DEVICETOPIC/3/set {"state_l3":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/3/set {"state_l3":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/l3/set {"state_l3":"ON"}\
+  off:noArg $\DEVICETOPIC/l3/set {"state_l3":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l3/set {"state_l3":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
@@ -565,7 +565,7 @@ attr DEVICE setList \
 attr DEVICE stateFormat pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20210902
+setreading DEVICE attrTemplateVersion 20211113
 
 
 name:zigbee2mqtt_ContactSensor
@@ -1466,34 +1466,26 @@ attr DEVICE setList \
    half:noArg CMNDTOPIC/ShutterPosition1 50\
    pct:slider,0,1,100 CMNDTOPIC/ShutterPosition1 $EVTPART1\
    stop:noArg CMNDTOPIC/ShutterStop1\
-   closeSlat:noArg CMNDTOPIC/ShutterClose2\
-   openSlat:noArg CMNDTOPIC/ShutterOpen2\
-   halfSlat:noArg CMNDTOPIC/ShutterPosition2 50\
-   pctSlat:slider,0,1,100 CMNDTOPIC/ShutterPosition2 $EVTPART1\
-   stopSlat:noArg CMNDTOPIC/ShutterStop2\
+   closeSlat:noArg CMNDTOPIC/ShutterTilt1 Close\
+   openSlat:noArg CMNDTOPIC/ShutterTilt1 Open\
+   halfSlat:noArg CMNDTOPIC/ShutterTilt1 50\
+   pctSlat:slider,0,1,90 CMNDTOPIC/ShutterTilt1 $EVTPART1\
+   stopSlat:noArg CMNDTOPIC/ShutterTilt1 Stop\
    resetClose:noArg CMNDTOPIC/ShutterSetClose1\
-   resetCloseSlat:noArg CMNDTOPIC/ShutterSetClose2
    x_configuration CMNDTOPIC/$EVTPART1 $EVTPART2
 attr DEVICE readingList \
    TELETOPIC/LWT:.* LWT\
-   STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
-   STATTOPIC/POWER1:.* POWER1\
-   STATTOPIC/POWER1:on {{'state' => 'opening'}}\
-   STATTOPIC/POWER2:.* POWER2\
-   STATTOPIC/POWER2:on {{'state' => 'closing'}}\
-   STATTOPIC/SHUTTER1:.* state\
-   STATTOPIC/SHUTTER1:.* pct\
-   STATTOPIC/SHUTTER2:.* stateSlat\
-   STATTOPIC/SHUTTER2:.* pctSlat\
-   TELETOPIC/RESULT:.* { json2nameValue($EVENT) }\
-   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-   TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
+   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
    TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
-   TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }
+   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+   STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
+   STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE eventMap open:opens close:closes
+attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:pctSlat Shutter1_Target:pct ANALOG_Temperature:temperature
 attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
 LWT\
 </a>\
@@ -1507,7 +1499,7 @@ commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20211110
+setreading DEVICE attrTemplateVersion 20211115
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
