@@ -1524,12 +1524,10 @@ __END__
       <code>set &lt;device&gt; weekprofile &lt;weekprofile-device:topic:profile&gt;</code><br>
     </ul>
     <ul><b>command</b><br>
-      If no <i>condition</i> is set, all the rest is interpreted as a <i>command</i>. Perl-code is setting upby the well-known Block with {}.<br>
+      If no <i>condition</i> is set, all the rest is interpreted as a <i>command</i>. Perl-code is setting up by the well-known Block with {}.<br>
       Note: if a <i>command</i> is defined only this command is executed. In case of executing
-      a "set desired-temp" command, you must define the hole commandpart explicitly by yourself.<br>
+      a "set desired-temp" command, you must define the hole command part explicitly by yourself.<br>
       If no explicit <i>command</i> is provided, <i>commandTemplate</i> attribute will indicate the command; this may be a simple <code>set $NAME $EVENT</code> or some variation wrt. to the device beeing recognized as heating type (see <i>WDT_eventMap</i> for even more options!).
-  <!----------------------------------------------------------------------------- -->
-  <!-- -------------------------------------------------------------------------- -->
       The following parameters are replaced:<br>
         <ol>
           <li>$NAME  => the device to switch</li>
