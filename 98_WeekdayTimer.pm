@@ -808,7 +808,7 @@ sub _SetTimer {
         Log3( $hash, 4, "[$name] setTimer - timer seems to be active today: ".join( q{},@{$tage})."|$time|$para" );
         resetRegIntTimer($idx, $timToSwitch + AttrVal($name,'WDT_sendDelay',0), \&WDT_Update, $hash, 0);
       } else {
-        Log3( $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join(q{},@{$tage})."|$time|$para " );
+        Log3( $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join(q{},@{$tage})."|$time|$para" );
         deleteSingleRegIntTimer("$idx", $hash);
       }
     }
@@ -1004,9 +1004,7 @@ sub WDT_Update {
   my $disabled = AttrVal($hash->{NAME}, 'disable', 0);
 
   # ggf. Device schalten
-  if ($activeTimer) {
-    Switch_Device($hash, $newParam);
-  }
+  Switch_Device($hash, $newParam) if $activeTimer;
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash, 'nextUpdate', FmtDateTime($nextTime));
   readingsBulkUpdate ($hash, 'nextValue',  $nextParameter);
@@ -1213,7 +1211,7 @@ sub Switch_Device {
 
     $attr{$name}{commandTemplate} =
         'set $NAME ' . $setModifier . '$EVENT';
-    $command = AttrVal($name, 'commandTemplate', 'something went wrong');
+    $command = AttrVal($name, 'commandTemplate', 'commandTemplate not found');
   }
 
   $command = 'set $NAME $EVENT' if defined $hash->{WDT_EVENTMAP} && defined $hash->{WDT_EVENTMAP}{$newParam};
@@ -1307,8 +1305,6 @@ sub getDaysAsCondition {
      $tageExp .= ' && !$we' if $overrulewday;
      $tageExp .= ' ||  $we' if defined $we;
      $tageExp .= ' || !$we' if defined $notWe;
-     #$tageExp .= ')';
-
   return $tageExp;
 }
 
