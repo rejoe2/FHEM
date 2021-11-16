@@ -2920,7 +2920,7 @@ attr DEVICE setList\
   effect:selectnumbers,0,1,3,0,lin  shellies/DEVNAME/color/0/set {"turn": "on","mode":"color","effect":$EVTPART1}\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":$EVTPART1,"brightness":$EVTPART1}\
   ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":$EVTPART1})}\
-  rgb:colorpicker,RGB {return 'shellies/DEVNAME/color/0/command off' if $EVTPART1 eq '000000';  return 'shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":4000}' if $EVTPART1 eq 'FFFFFF'; $EVTPART1=~/(..)(..)(..)/; return if !defined $3; if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
+  rgb:colorpicker,RGB {return 'shellies/DEVNAME/color/0/command off' if $EVTPART1 eq '000000';  return 'shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":4000}' if $EVTPART1 eq 'FFFFFF'; $EVTPART1=~/(..)(..)(..)/; return if !defined $3; if($1 ne $2 || $2 ne $3){q(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","turn":"on","red":).hex($1).q(,"green":).hex($2).q(,"blue":).hex($3).'}'}else{q(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
@@ -2931,7 +2931,7 @@ attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellybulb
-setreading DEVICE attrTemplateVersion 20211110
+setreading DEVICE attrTemplateVersion 20211116
 
 # contributed by KurtK https://forum.fhem.de/index.php/topic,94495.msg1055093.html#msg1055093
 # shellyduo using original firmware
