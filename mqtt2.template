@@ -1466,11 +1466,10 @@ attr DEVICE setList \
    half:noArg CMNDTOPIC/ShutterPosition1 50\
    pct:slider,0,1,100 CMNDTOPIC/ShutterPosition1 $EVTPART1\
    stop:noArg CMNDTOPIC/ShutterStop1\
-   closeSlat:noArg CMNDTOPIC/ShutterTilt1 Close\
-   openSlat:noArg CMNDTOPIC/ShutterTilt1 Open\
-   halfSlat:noArg CMNDTOPIC/ShutterTilt1 50\
-   pctSlat:slider,0,1,90 CMNDTOPIC/ShutterTilt1 $EVTPART1\
-   stopSlat:noArg CMNDTOPIC/ShutterTilt1 Stop\
+   closeSlat:noArg CMNDTOPIC/ShutterTilt1 CLOSE\
+   openSlat:noArg CMNDTOPIC/ShutterTilt1 OPEN\
+   halfSlat:noArg CMNDTOPIC/ShutterTilt1 0\
+   tiltSlat:slider,-90,5,90 CMNDTOPIC/ShutterTilt1 $EVTPART1\
    resetClose:noArg CMNDTOPIC/ShutterSetClose1\
    x_configuration CMNDTOPIC/$EVTPART1 $EVTPART2
 attr DEVICE readingList \
@@ -1485,11 +1484,13 @@ attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE eventMap open:opens close:closes
-attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:pctSlat Shutter1_Target:pct ANALOG_Temperature:temperature
+attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:tiltSlat Shutter1_Target:pct  ANALOG_Temperature:temperature
+attr DEVICE userReadings state:pct:.* {ReadingsNum($name,"pct",0)}
 attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
 LWT\
 </a>\
-state
+state\
+tiltSlat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE setStateList open close half stop pct
 attr DEVICE comment After applying the template set "ShutterOpenDuration1", "ShutterCloseDuration1" and "shuttertiltconfig1" first.\
@@ -1499,7 +1500,7 @@ commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20211115
+setreading DEVICE attrTemplateVersion 20211116
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 

@@ -1,4 +1,4 @@
-# $Id: 98_WeekdayTimer.pm 25110 2021-11-15 restructured Beta-User $
+# $Id: 98_WeekdayTimer.pm 25110 2021-11-16 restructured Beta-User $
 #############################################################################
 #
 #     98_WeekdayTimer.pm
@@ -887,7 +887,7 @@ sub _checkTimerReset {
   my $hash = shift // return;
   my $idx  = shift // return;
 
-  return if $hash->{profil}{$idx}{EPOCH} <= time;
+  return if $hash->{profil}{$idx}{EPOCH} <= int(time) + 1; #for int/+1 see https://forum.fhem.de/index.php/topic,124101.0.html
   return if !checkWDTCondition($hash, $hash->{profil}{$idx}{PARA});
   resetRegIntTimer($idx, $hash->{profil}{$idx}{EPOCH}, \&WDT_Update, $hash, 0); 
   return;
