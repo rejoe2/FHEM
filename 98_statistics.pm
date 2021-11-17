@@ -1,5 +1,5 @@
 ﻿##############################################
-# $Id: 98_statistics.pm 20819 2021-11-11 Beta-User dst trial $
+# $Id: 98_statistics.pm 20819 2021-11-17 Beta-User dst trial III $
 #
 #  98_statistic.pm
 # 
@@ -370,9 +370,10 @@ sub statistics_PeriodChange($)
       # Positiv Value if periode changes at full hour
       $periodSwitch = abs($periodSwitch)     if $dayChangeDelay % 3600 == 0;
    } else {
-      ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime ($now );
-      ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime ($now + $periodChangePreset);
-      if ($hourNow != $hourLast || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr))[8]) {
+      ($dummy, $dummy, $hourLast, $dummy, $dummy) = localtime($now);
+      ($dummy, $dummy, $hourNow , $dummy, $dummy) = localtime($now + $periodChangePreset);
+      if (   $hourNow != $hourLast
+          || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr + $periodChangePreset))[8]) {
          $periodSwitch = 1;
          statistics_Log $hash,4,"Calculating hour change";
       } else {

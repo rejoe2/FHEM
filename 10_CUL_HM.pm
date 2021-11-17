@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-09 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-17 Beta-User $
 
 package main;
 
@@ -1077,11 +1077,13 @@ sub CUL_HM_Attr(@) {#################################
       }
       my @devUpdate = ();
       foreach my $ent (grep{AttrVal($_,"IOgrp","") =~ m/^$name:/}keys %defs){
+        next if IsIgnored($ent);
         if(scalar @{$defs{$name}{helper}{io}{ioList}}){
           my $ea = AttrVal($ent,"IOgrp","");
           my $eaOrg = $ea;
           $ea =~ s/,?$_//  foreach (@rmIO);
-          $ea =~ s/:,/:/; 
+          $ea =~ s/:,/:/;
+          $ea = $name if $ea eq "$name:" || $ea eq "$name:none"; #Beta-User: solves frank in https://forum.fhem.de/index.php/topic,124090.msg1186368.html#msg1186368?
           if($eaOrg ne $ea){
             push @devUpdate,"IOgrp $eaOrg changed to $ea for $ent";
             CommandAttr (undef,"$ent IOgrp $ea");
@@ -1637,7 +1639,7 @@ sub CUL_HM_Notify(@){###############################
                      map{my $foo = $_;$foo =~ s/$ent/$new/;$foo} 
                      split(",",$ios)
                      );
-              $attr{$HMdef}{IOgrp} = "$vccu:$ios";
+              $attr{$HMdef}{IOgrp} = $ios ? "$vccu:$ios" : "$vccu" ;
               $count++;
             }
             else {# the vccu has no IO anymore - delete clients
@@ -12022,7 +12024,7 @@ __END__
         </li>
         <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
           Add or remove an IO device to the list of available IO's.
-          Changes attribute <i>IOlist</i> accordingly.
+          Changes attribute <i>IOList</i> accordingly.
         </li>
       </ul>
   
@@ -12854,7 +12856,7 @@ __END__
           check which IO is operational and has the best RSSI performance for this device.<br>
           Optional a prefered IO - perfIO can be given. In case this IO is operational it will be selected regardless
           of rssi values. <br>
-          If none is detected in the VCCU's IOlist the mechanism is stopped.<br>
+          If none is detected in the VCCU's IOList the mechanism is stopped.<br>
           Example:<br>
           <ul><code>
             attr myDevice1 IOgrp vccu<br>
@@ -13507,7 +13509,7 @@ __END__
         </li>
         <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
           IO-Gerät zur Liste der IO's hinzufügen oder aus dieser Löschen.
-          Ändert das Attribut <i>IOlist</i> entsprechend.
+          Ändert das Attribut <i>IOList</i> entsprechend.
         </li>
 
       </ul>
