@@ -370,8 +370,8 @@ sub statistics_PeriodChange($)
       # Positiv Value if periode changes at full hour
       $periodSwitch = abs($periodSwitch)     if $dayChangeDelay % 3600 == 0;
    } else {
-      ($dummy, $dummy, $hourLast, $dummy, $dummy) = localtime($now);
-      ($dummy, $dummy, $hourNow , $dummy, $dummy) = localtime($now + $periodChangePreset);
+      ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime($now);
+      ($dummy, $dummy, $hourNow , $dummy, $dummy, $dummy) = localtime($now + $periodChangePreset);
       if (   $hourNow != $hourLast
           || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr + $periodChangePreset))[8]) {
          $periodSwitch = 1;
