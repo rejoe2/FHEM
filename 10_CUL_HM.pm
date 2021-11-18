@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-17 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-18 Beta-User $
 
 package main;
 
@@ -252,7 +252,7 @@ sub CUL_HM_updateConfig($){##########################
       my $IOgrp = AttrVal($name,"IOgrp","");
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
-        CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+        CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef);
         CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
       }
       my $h = $defs{$name};
@@ -373,6 +373,12 @@ sub CUL_HM_updateConfig($){##########################
 
         $hash->{helper}{io}{vccu} = $name if (!$hash->{helper}{io}{vccu}
                                                && AttrVal($name,"IOList","")); # noansi: help, if IOgrp is missing for VCCU
+      }
+    }
+    elsif ($md =~ m/^HM-SEN-RD-O/ && $chn eq "02"){ #Beta-User: see https://forum.fhem.de/index.php/topic,123874.msg1187854.html#msg1187854 and noansi proposal in https://forum.fhem.de/index.php/topic,122425.msg1170698.html#msg1170698
+      for my $params (split q{,},AttrVal($name,'param','')){
+        if    ($params eq "offAtPon"){$hash->{helper}{param}{offAtPon} = 1}
+        elsif ($params eq "onAtRain"){$hash->{helper}{param}{onAtRain} = 1}
       }
     }
     elsif ($st =~ m/^(motionDetector|motionAndBtn)$/ ){
