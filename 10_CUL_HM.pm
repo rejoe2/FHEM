@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25158 2021-11-18 Beta-User $
+# $Id: 10_CUL_HM.pm 25158 2021-11-19 Beta-User $
 
 package main;
 
@@ -11597,9 +11597,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     my @param = split(" ",$_);
     CUL_HM_Set($defs{$param[0]},@param);
   }
+  CUL_HM_complConfig($name) if @exec;#Beta-User: try to fix https://forum.fhem.de/index.php/topic,124136.0.html
 #  close(aSave);
   return $ret;
 }
+
 sub CUL_HM_getIcon($) { ####################################################### {my $s = gettimeofday();;return join("\n",map{$_.":\t".CUL_HM_getIcon($_)}devspec2array("TYPE=CUL_HM"))."\ntime: ".(gettimeofday() - $s)}
   my $name = shift;
   # only for CUL_HM
