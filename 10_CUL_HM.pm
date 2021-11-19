@@ -11597,7 +11597,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     my @param = split(" ",$_);
     CUL_HM_Set($defs{$param[0]},@param);
   }
-  CUL_HM_complConfig($name) if @exec;#Beta-User: try to fix https://forum.fhem.de/index.php/topic,124136.0.html
+  #CUL_HM_complConfig($name) if @exec;#Beta-User: try to fix https://forum.fhem.de/index.php/topic,124136.0.html deactivated, seems not to help...
 #  close(aSave);
   return $ret;
 }
