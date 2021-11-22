@@ -2542,7 +2542,7 @@ sub updateSlots {
     my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
     $url = qq{/api/slots?overwrite_all=$overwrite};
 
-    my @gdts = (qw(switch light media blind blinds thermostat thermometer));
+    my @gdts = (qw(switch light media blind blinds shutter thermostat thermometer));
     my @aliases = ();
     my @mainrooms = ();
 
@@ -2561,7 +2561,7 @@ sub updateSlots {
             }
             @names = get_unique(\@names);
             @names = ('') if !@names && $noEmpty;
-            my $gdtmap = { blinds => 'blind' };
+            my $gdtmap = { blinds => 'blind', shutter => 'blind' };
             my $mpdgdt = $gdtmap->{$gdt} // $gdt;
             $deviceData->{qq(${language}.${fhemId}.Device-${mpdgdt})} = \@names if @names;
             @groupnames = get_unique(\@groupnames);
