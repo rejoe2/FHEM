@@ -3254,7 +3254,7 @@ attr DEVICE setList\
   x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem","method":"Shelly.Update","params": {"stage":"stable"}}\
   x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem","method":"Shelly.Reboot"}
 attr DEVICE readingList $\DEVICETOPIC/online:.* online\
-  $\DEVICETOPIC/events/rpc { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/events/rpc:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT, 'mqtt_', $JSONMAP) }\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { json2nameValue($EVENT, 'switch_0_', $JSONMAP) }
