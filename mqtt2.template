@@ -2420,6 +2420,7 @@ setreading DEVICE attrTemplateVersion 20211006
 # shelly1 using original firmware.
 name:shelly1
 filter:TYPE=MQTT2_DEVICE
+desc:Base template for a lot of first generation shelly devices
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_10
@@ -3239,6 +3240,7 @@ setreading DEVICE attrTemplateVersion 20200831
 # Shelly Plus 1PM using original firmware.
 name:shellyPlus_1pm
 filter:TYPE=MQTT2_DEVICE
+desc:First experimental version of a base template for second generation shelly devices (names with "plus")
 par:DEV_TOPIC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyplus[^/:_]{4,}+)> ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20
