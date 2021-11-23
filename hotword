@@ -1,0 +1,1 @@
+hermes/hotword/bumblebee_linux/detected {"modelId": "/usr/lib/rhasspy/usr/local/lib/python3.7/site-packages/pvporcupine/resources/keyword_files/linux/bumblebee_linux.ppn", "modelVersion": "", "modelType": "personal", "currentSensitivity": 0.5, "siteId": "motox", "sessionId": null, "sendAudioCaptured": null, "lang": null, "customEntities": null}
