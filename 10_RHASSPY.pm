@@ -1163,7 +1163,7 @@ sub _analyze_genDevType {
             };
         }
         if ( $allset =~ m{\b(stop)([\b:\s]|\Z)}xmsi ) {
-        $currentMapping->{SetNumeric}->{setTarget}->{cmdStop} = $1;
+            $currentMapping->{SetNumeric}->{setTarget}->{cmdStop} = $1;
         }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
         return;
@@ -2327,7 +2327,8 @@ sub analyzeMQTTmessage {
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $hotword = $1;
-        handleHotwordDetection($hash, $hotword, $data);
+        my $ret = handleHotwordDetection($hash, $hotword, $data);
+        push @updatedList, $ret if $defs{$ret};
         push @updatedList, $hash->{NAME};
         return \@updatedList;
     }
@@ -3407,8 +3408,7 @@ sub handleIntentSetNumeric {
         #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
         if ( $change eq 'cmdStop' ) {
             $newVal = $oldVal;
-        }
-        elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
+        } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
             $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
         }
         # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
