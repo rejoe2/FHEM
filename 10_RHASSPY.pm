@@ -1143,7 +1143,7 @@ sub _analyze_genDevType {
         return;
     }
 
-    if ( $gdt eq 'blind' || $gdt eq 'blinds' || $gdt eq 'shutter') {
+    if ( $gdt eq 'blind' || $gdt eq 'blinds' || $gdt eq 'shutter' ) {
         if ( $allset =~ m{\bdim([\b:\s]|\Z)}xms ) {
             my $maxval = InternalVal($device, 'TYPE', 'unknown') eq 'ZWave' ? 99 : 100;
             $currentMapping = 
@@ -4609,12 +4609,22 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
 </ul>
 
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
-<p><b>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b></p>
-<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:12183<br>
+<p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
+<ul>
+<li><b>Minimalistic version</b> - Rhasspy running on the same machine using it's internal MQTT server, MQTT2_CLIENT is only used by RHASSPY, language setting from <i>global</i> is used:
+</p>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT localhost:12183<br>
+attr rhasspyMQTT2 clientOrder RHASSPY<br>
+attr rhasspyMQTT2 subscriptions setByTheProgram</code></p>
+<p><code>define Rhasspy RHASSPY defaultRoom=Livingroom</code></p>
+</li>
+<li><b>Extended version</b> - Rhasspy running on remote machine using an external MQTT server on a third machine with non-default port, MQTT2_CLIENT is also used by MQTT_GENERIC_BRIDGE and MQTT2_DEVICE, hotword events shall be generated:
+</p>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized</code></p>
-<p><code>define Rhasspy RHASSPY devspec=room=Rhasspy defaultRoom=Livingroom language=en</code></p>
-
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected &lt;additional subscriptions for other MQTT-Modules&gt;<p>define Rhasspy RHASSPY baseUrl=http://192.168.1.210:12101 defaultRoom="Büro Lisa" language=de devspec=genericDeviceType=.+,device_a1,device_xy handleHotword=1</code></p>
+</li>
+</ul>
 <p><b>Additionals remarks on MQTT2-IOs:</b></p>
 <p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see above) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely it's the only module listening to the CLIENT it could be just set to <code>attr &lt;m2client&gt; clientOrder RHASSPY</code>)</p>
 <p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:</p>
