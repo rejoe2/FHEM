@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-11-22 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-11-23 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1263,7 +1263,7 @@ sub initialize_rhasspyHotwords {
             }
         }
         $hotword = trim($hotword);
-        return if !$hotword;
+        next if !$hotword;
         if ( keys %{$named} ) {
             $hash->{helper}{hotwords}->{$hotword} = $named;
         } elsif (@{$unnamed}) {
