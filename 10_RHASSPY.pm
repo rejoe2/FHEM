@@ -1130,7 +1130,7 @@ sub _analyze_genDevType {
         return;
     }
 
-    if ( $gdt eq 'thermometer' ) {
+    if ( $gdt eq 'thermometer' || $gdt eq 'HumiditySensor' ) {
         my $r = $defs{$device}{READINGS};
         if($r) {
             for (sort keys %{$r}) {
@@ -1180,6 +1180,22 @@ sub _analyze_genDevType {
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
+    if ( $gdt eq 'motion' || $gdt eq 'contact' || $gdt eq 'ContactSensor' || $gdt eq 'lock') {
+        my $r = $defs{$device}{READINGS};
+        $gdt = 'contact' if $gdt eq 'ContactSensor';
+        if($r) {
+            for (sort reverse keys %{$r}) {
+                if ( $_ =~ m{\A(?<id>state|$gdt)\z}x ) {
+                    $currentMapping->{GetState}->{$gdt} = {currentVal => $+{id}, type => '$gdt' };
+                }
+            }
+        }
+        if ( $gdt eq 'lock') {
+            $currentMapping->{SetOnOff} = {cmdOff => 'open', type => 'SetOnOff', cmdOn => 'close'};
+        }
+        $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
+    }
     return;
 }
 
@@ -2540,7 +2556,7 @@ sub updateSlots {
     my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
     $url = qq{/api/slots?overwrite_all=$overwrite};
 
-    my @gdts = (qw(switch light media blind thermostat thermometer));
+    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion));
     my @aliases = ();
     my @mainrooms = ();
 
@@ -2552,7 +2568,7 @@ sub updateSlots {
             
             for my $device (@devs) {
                 my $attrVal = AttrVal($device, 'genericDeviceType', '');
-                my $gdtmap = { blind => 'blinds|shutter' };
+                my $gdtmap = { blind => 'blinds|shutter' , thermometer => 'HumiditySensor' , contact  => 'ContactSensor'};
                 if ($attrVal eq $gdt || defined $gdtmap->{$gdt} && $attrVal =~ m{\A$gdtmap->{$gdt}\z} ) {
                     push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names};
                     push @aliases, $hash->{helper}{devicemap}{devices}{$device}->{alias};
