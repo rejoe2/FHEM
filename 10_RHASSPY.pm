@@ -1180,7 +1180,7 @@ sub _analyze_genDevType {
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
-    if ( $gdt eq 'motion' || $gdt eq 'contact' || $gdt eq 'ContactSensor' || $gdt eq 'lock') {
+    if ( $gdt eq 'motion' || $gdt eq 'contact' || $gdt eq 'ContactSensor' || $gdt eq 'lock' || $gdt eq 'presence') {
         my $r = $defs{$device}{READINGS};
         $gdt = 'contact' if $gdt eq 'ContactSensor';
         if($r) {
@@ -2556,7 +2556,7 @@ sub updateSlots {
     my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
     $url = qq{/api/slots?overwrite_all=$overwrite};
 
-    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion));
+    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion presence));
     my @aliases = ();
     my @mainrooms = ();
 
