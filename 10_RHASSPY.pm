@@ -348,7 +348,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.01';
+    $hash->{MODULE_VERSION} = '0.5.02';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2742,9 +2742,17 @@ sub RHASSPY_ParseHttpResponse {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
-        #my $ref = decode_json($data);
-        my $siteIds = encode($cp,$ref->{dialogue}{satellite_site_ids});
-        readingsBulkUpdate($hash, 'siteIds', $siteIds);
+        my $siteIds;
+        for (keys %{$ref}) {
+            next if !defined $ref->{$_}{satellite_site_ids};
+            if ($siteIds) {
+                $siteIds .= ',' . encode($cp,$ref->{$_}{satellite_site_ids});
+            } else {
+                $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
+            }
+        }
+        my @ids = uniq(split q{,},$siteIds);
+        readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 

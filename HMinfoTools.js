@@ -1,8 +1,30 @@
-FW_version["HMinfoTools.js"] = "$Id: HMinfoTools.js 2001 2021-11-22 18:00:00Z frank $";
+FW_version["HMinfoTools.js"] = "$Id: HMinfoTools.js 2002 2021-11-23 12:00:00Z frank $";
 
 var HMinfoTools_debug = true;
 var HMinfoTools_csrf;
 var devMap = new Map();
+function HMinfoTools_initMapDevice(device) {
+	var devObj = {name: device, 
+								parentDev: '', 
+								errors: [], 
+								model: '',
+								commState: '',
+								rssi: '',
+								IODev: '',
+								aIODev: '',
+								IOgrp: '',
+								cfgState: '',
+								actCycle: '',
+								actStatus: '',
+								activity: '',
+								battery: '',
+								motorErr: '',
+								sabotageError: '',
+								sabotageAttack: '',
+								smokeDetect: ''
+	};
+	devMap.set(device,devObj);
+}
 var HMinfoTools_icons = [
 	{name: 'commState',poll: 'parent',svg: 'rc_dot',colorElements: ['path'],clickG: 'clearG msgErrors',click: 'HMinfoTools_setClearMsgEvents'},
 	{name: 'rssi',poll: 'parent',svg: 'it_wifi',colorElements: ['g'],clickG: 'clearG rssi',click: 'HMinfoTools_setClearRssi'},
@@ -31,28 +53,52 @@ $(document).ready(function() {
 	}
 });
 
-function HMinfoTools_initMapDevice(device) {
-	var devObj = {name: device, 
-								parentDev: '', 
-								errors: [], 
-								model: '',
-								commState: '',
-								rssi: '',
-								IODev: '',
-								aIODev: '',
-								IOgrp: '',
-								cfgState: '',
-								actCycle: '',
-								actStatus: '',
-								activity: '',
-								battery: '',
-								motorErr: '',
-								sabotageError: '',
-								sabotageAttack: '',
-								smokeDetect: ''
-	};
-	devMap.set(device,devObj);
+function HMinfoTools_getAllRssiData() {
+	var hminfo = $('#hminfotools').attr('device');
+	var cmd = 'get ' +hminfo+ ' rssiG full';
+	if(HMinfoTools_debug) {log('HMinfoTools: ' + cmd);}
+	var url = HMinfoTools_makeCommand(cmd);
+	$.get(url,function(data) {
+		if(data != null) {
+		/*
+		rssiG done:
+    Device          receive         from             last   avg      min_max    count
+    DimUP01         DimUP01         cul868           -59.0  -58.7  -59.0< -58.0     3
+    DimUP01         DimUP01         hmlan1           -62.0  -63.6  -66.0< -62.0    12
+    DimUP01         cul868          DimUP01          -62.0  -61.8  -63.0< -60.5    15
+    DimUP01         hmlan1          DimUP01          -62.0  -62.1  -67.0< -61.0    15
+    DimUP01         hmuart1         DimUP01          -60.0  -58.2  -60.0< -57.0    12
+		*/
+			var rssiMap = new Map();
+			var rssiArr = [];
+			var lines = data.split('\n');
+			for(var l = 2; l < lines.length; ++l) {
+				var line = lines[l];
+				var match = line.match(/^\s*([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^<]+)<\s+([^\s]+)\s*([^\s]+)\s*$/);
+				if(match != null) {
+					var device = match[1];
+					var rssiObj = {};
+					rssiObj.to = match[2];
+					rssiObj.from = match[3];
+					rssiObj.lst = match[4];
+					rssiObj.avg = match[5];
+					rssiObj.min = match[6];
+					rssiObj.max = match[7];
+					rssiObj.cnt = match[8];
+					if(rssiMap.has(device)) {
+						rssiArr = rssiMap.get(device);
+						rssiArr.push(rssiObj);
+					}
+					else {
+						rssiArr = rssiObj;
+					}
+					rssiMap.set(device,rssiArr);
+				}
+			}
+		}
+	});
 }
+
 
 function HMinfoTools_parseDevFromJson(device,data) {
 	var devObj = devMap.get(device);
@@ -200,7 +246,7 @@ function HMinfoTools_parseErrorDevices(hminfo,weblinkdiv) {
 			}
 		}
 
-		else if(object != null && object.Internals.TYPE == 'HMinfo') { //for hminfo details/weblink
+		else if(object != null && object.Internals.TYPE == 'HMinfo') { //for hminfo details or weblink
 			if(document.getElementById('hminfotools') == null) { // 1. run, we want to install basic things
 				var lastChange = ((object.Readings.lastErrChange == null)? 
 													'updated: Info_Unknown': object.Readings.lastErrChange.Value);
@@ -1111,12 +1157,15 @@ function HMinfoTools_setIconFromIODev(device,iodev) {
 			else if(!IOgrp.match(iodev) && IOgrp.match(/none/)) {color = 'red';}
 		}
 		else {                                                         // we use no prefered
-			var vccu = IOgrp.match(/^[^:]+/);
-			var vcculist = $('#hminfotools').attr('vcculist');
-			isIOmember = (vcculist.match('(?:^|\\s)' +vccu+ ':[^\\s]*?' +iodev+ '[,\\s]'))? true: false;
-			if(vcculist == '') {isIOmember = true;} // for old versions without vcculist
-			if(isIOmember) {color = 'white';}
-			else {color = 'red';}
+			if(document.getElementById('hminfotools') != null) { //only with hminfo
+				var vccu = IOgrp.match(/^[^:]+/);
+				var vcculist = $('#hminfotools').attr('vcculist');
+				isIOmember = (vcculist.match('(?:^|\\s)' +vccu+ ':[^\\s]*?' +iodev+ '[,\\s]'))? true: false;
+				if(vcculist == '') {isIOmember = true;} // for old versions without vcculist
+				if(isIOmember) {color = 'white';}
+				else {color = 'red';}
+			}
+			else {color = 'white';}
 		}
 	}
 	else if(IOgrp == 'missing_IOgrp' && aIODev == 'missing_aIODev') { // no attributes
