@@ -1,4 +1,4 @@
-FW_version["HMinfoTools.js"] = "$Id: HMinfoTools.js 2002 2021-11-23 12:00:00Z frank $";
+FW_version["HMinfoTools.js"] = "$Id: HMinfoTools.js 2003 2021-11-24 12:00:00Z frank $";
 
 var HMinfoTools_debug = true;
 var HMinfoTools_csrf;
@@ -70,7 +70,6 @@ function HMinfoTools_getAllRssiData() {
     DimUP01         hmuart1         DimUP01          -60.0  -58.2  -60.0< -57.0    12
 		*/
 			var rssiMap = new Map();
-			var rssiArr = [];
 			var lines = data.split('\n');
 			for(var l = 2; l < lines.length; ++l) {
 				var line = lines[l];
@@ -85,20 +84,133 @@ function HMinfoTools_getAllRssiData() {
 					rssiObj.min = match[6];
 					rssiObj.max = match[7];
 					rssiObj.cnt = match[8];
+					var rssiDevObj = {};
 					if(rssiMap.has(device)) {
-						rssiArr = rssiMap.get(device);
-						rssiArr.push(rssiObj);
+						rssiDevObj = rssiMap.get(device);
+						rssiDevObj.rssiArr.push(rssiObj);
 					}
 					else {
-						rssiArr = rssiObj;
+						rssiDevObj.rssiArr = [rssiObj];
 					}
-					rssiMap.set(device,rssiArr);
+					rssiMap.set(device,rssiDevObj);
 				}
 			}
+			
+			var div = $("<div id='FW_okDialog'>");
+			$(div).html('rssi table' + '<br><br>');
+			$("body").append(div);
+			// rssi table
+			var table = document.createElement('table');
+			$(div).append(table);
+			table.id = 'HMinfoTools_rssiTable';
+			table.style.margin = '10px 0px 0px 0px';
+			var thead = document.createElement('thead');
+			table.appendChild(thead);
+			var row = document.createElement('tr');
+			thead.appendChild(row);
+			row.id = 'HMinfoTools_rssiTable_header';
+			var headerList = ['','receive','from','last','avg','min','max','count','diff_minMax','diff_minAvg'];
+			for(var h = 0; h < headerList.length; ++h) {
+				var thCol = document.createElement('th');
+				row.appendChild(thCol);
+				thCol.setAttribute('scope','col');
+				thCol.innerHTML = headerList[h];
+			}
+			var tbody = document.createElement('tbody');
+			table.appendChild(tbody);
+			var deviceCnt = 0;
+			rssiMap.forEach(function(value,key,map) {
+				++deviceCnt;
+				var curIO = devMap.has(key)? devMap.get(key).IODev: '';
+				var devObj = map.get(key);
+				for(var r = 0; r < devObj.rssiArr.length; ++r) {
+					var row = document.createElement('tr');
+					tbody.appendChild(row);
+					row.id = 'HMinfoTools_rssiTable_row_' +key+ '_r' + r;
+					row.style.backgroundColor = (deviceCnt%2 == 0)? '#333333': '#111111';
+					//row header
+					var thRow = document.createElement('th');
+					row.appendChild(thRow);
+					thRow.setAttribute('scope','row');
+					if(r == 0) {thRow.innerHTML = key;}
+					var c1 = document.createElement('td');
+					row.appendChild(c1);
+					c1.align = 'left';
+					c1.innerHTML = devObj.rssiArr[r].to;
+					var c2 = document.createElement('td');
+					row.appendChild(c2);
+					c2.align = 'left';
+					c2.innerHTML = devObj.rssiArr[r].from;
+					var c3 = document.createElement('td');
+					row.appendChild(c3);
+					c3.align = 'right';
+					c3.innerHTML = devObj.rssiArr[r].lst;
+					var c4 = document.createElement('td');
+					row.appendChild(c4);
+					c4.align = 'right';
+					if(curIO == devObj.rssiArr[r].to || curIO == devObj.rssiArr[r].from) {c4.style.backgroundColor = '#888888';}
+					c4.style.color = doColorAbs(devObj.rssiArr[r].avg);
+					c4.innerHTML = devObj.rssiArr[r].avg;
+					var c5 = document.createElement('td');
+					row.appendChild(c5);
+					c5.align = 'right';
+					c5.style.color = doColorAbs(devObj.rssiArr[r].min);
+					c5.innerHTML = devObj.rssiArr[r].min;
+					var c6 = document.createElement('td');
+					row.appendChild(c6);
+					c6.align = 'right';
+					c6.innerHTML = devObj.rssiArr[r].max;
+					var c7 = document.createElement('td');
+					row.appendChild(c7);
+					c7.align = 'right';
+					c7.innerHTML = devObj.rssiArr[r].cnt;
+					var c8 = document.createElement('td');
+					row.appendChild(c8);
+					c8.align = 'right';
+					c8.style.color = doColorDiff((devObj.rssiArr[r].min-devObj.rssiArr[r].max).toFixed(1));
+					c8.innerHTML = (devObj.rssiArr[r].min-devObj.rssiArr[r].max).toFixed(1);
+					var c9 = document.createElement('td');
+					row.appendChild(c9);
+					c9.align = 'right';
+					c9.style.color = doColorDiff((devObj.rssiArr[r].min-devObj.rssiArr[r].avg).toFixed(1));
+					c9.innerHTML = (devObj.rssiArr[r].min-devObj.rssiArr[r].avg).toFixed(1);
+				}
+			});
+
+			function doColorAbs(rssi) {
+				var color = 'blue';
+				if(-80 < rssi) {color = 'lime';}
+				else if(-90 <  rssi && rssi <= -80) {color = 'yellow';}
+				else if(-99 <= rssi && rssi <= -90) {color = 'orange';}
+				else if(rssi < -99) {color = 'red';}
+				return color;
+			}
+			function doColorDiff(rssi) {
+				var color = 'blue';
+				if(-5 < rssi) {color = 'lime';}
+				else if(-10 <  rssi && rssi <= -5) {color = 'yellow';}
+				else if(-20 <= rssi && rssi <= -10) {color = 'orange';}
+				else if(rssi < -20) {color = 'red';}
+				return color;
+			}
+			function doClose() {
+				$(div).dialog('close'); 
+				$(div).remove();
+			}
+			function doEntry() {
+			}
+				$(div).dialog({dialogClass:'no-close', modal:true, width:$('#HMinfoTools_rssiTable').width()*1.15, closeOnEscape:true, 
+				maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+				//buttons: [{text:'Yes', click:function(){ doEntry(); doClose();}},
+				buttons: [
+									{text:'Cancel',  click:function(){ doClose();}}]
+			});
 		}
 	});
 }
 
+/*
+*/
 
 function HMinfoTools_parseDevFromJson(device,data) {
 	var devObj = devMap.get(device);
@@ -252,8 +364,12 @@ function HMinfoTools_parseErrorDevices(hminfo,weblinkdiv) {
 													'updated: Info_Unknown': object.Readings.lastErrChange.Value);
 				HMinfoTools_createHMinfoTools(hminfo,weblinkdiv,lastChange);
 				$('#hminfotools').attr('device_mode',((object.Attributes.HMinfoTools_deviceMode == null)
-																								? 'err'
+																								? ''
 																								: object.Attributes.HMinfoTools_deviceMode));;
+				var check = document.getElementById('hminfo_allDev_check');
+				check.checked = ($('#hminfotools').attr('device_mode') == 'all')? true: false;
+				var checkCell = document.getElementById('hminfo_allDev');
+				checkCell.hidden = ($('#hminfotools').attr('device_mode') == '')? true: false;
 				var ssAttr = ((object.Attributes.HMinfoTools_screenshotPort == null)? 
 													'': object.Attributes.HMinfoTools_screenshotPort);
 				var ssArgs = ssAttr.split(',');
@@ -480,9 +596,9 @@ function HMinfoTools_createHMinfoTools(hminfo,weblinkdiv,lastChange) {
 	var edit = document.createElement('span');
 	right.appendChild(edit);
 	edit.id = 'hminfo_edit';
-	edit.title = 'under construction';
-	//edit.setAttribute('onclick',"HMinfoTools_rssiCheck('"+hminfo+"')");
-
+	edit.title = 'rssi overview';
+	edit.style.cursor = 'pointer';
+	edit.setAttribute('onclick','HMinfoTools_getAllRssiData()');
 	var cmd = "{FW_makeImage('rc_SETUP')}";
 	if(HMinfoTools_debug) {log('HMinfoTools: ' + cmd);}
 	var url = HMinfoTools_makeCommand(cmd);
@@ -498,12 +614,37 @@ function HMinfoTools_createHMinfoTools(hminfo,weblinkdiv,lastChange) {
 			}
 		}
 	});
+	var allDev = document.createElement('span');
+	right.appendChild(allDev);
+	allDev.id = 'hminfo_allDev';
+	allDev.hidden = true;
+	var check = document.createElement('input');
+	allDev.appendChild(check);
+	check.id = 'hminfo_allDev_check';
+	check.type = 'checkbox';
+	check.checked = false;
+	check.style.margin = '5px 0px 0px 0px';
+	check.title = 'check => "attr ' +hminfo+' HMinfoTools_deviceMode all"';
+	check.style.cursor = 'pointer';
+	check.setAttribute('onclick','HMinfoTools_setAttrDeviceMode()');
 	
 	var tbody = document.createElement('tbody');
 	table.appendChild(tbody);
 	tbody.id = 'hminfo_table_errDev';
 
 	$('#hminfotools').attr('installation','ready');
+}
+
+function HMinfoTools_setAttrDeviceMode() {
+	var hminfo = $('#hminfotools').attr('device');
+	var val = ($('#hminfotools').attr('device_mode') == 'all')? 'err': 'all';
+	var cmd = 'attr ' +hminfo+ ' HMinfoTools_deviceMode ' + val;
+	if(HMinfoTools_debug) {log('HMinfoTools: ' + cmd);}
+	var url = HMinfoTools_makeCommand(cmd);
+	$.get(url,function(data) {
+		if(data) {FW_okDialog(data);}
+		else {location.reload();}
+	});
 }
 
 function HMinfoTools_parseIOsFromHMinfo(ioInfoRaw) {
