@@ -739,7 +739,7 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses)[\s]*=}x) {
+        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses|ignoreKeywords)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
@@ -1069,10 +1069,10 @@ sub _analyze_genDevType {
 
     my @rooms;
     if (!defined AttrVal($device,"${prefix}Room", undef)) {
-        $attrv = AttrVal($device,'alexaRoom', undef);
-        push @rooms, split m{,}x, lc $attrv if $attrv;
+        $attrv = _clean_ignored_keywords( $hash,'rooms', AttrVal($device,'alexaRoom', undef));
+        push @rooms, split m{,}x, $attrv if $attrv;
 
-        $attrv = AttrVal($device,'room',undef);
+        $attrv = _clean_ignored_keywords( $hash,'rooms', AttrVal($device,'room',undef));
         push @rooms, split m{,}x, lc $attrv if $attrv;
         $rooms[0] = $hash->{defaultRoom} if !@rooms;
     }
@@ -1086,8 +1086,8 @@ sub _analyze_genDevType {
     }
     $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
 
-    $attrv = AttrVal($device,'group', undef);
-    $hash->{helper}{devicemap}{devices}{$device}{groups} = lc $attrv if $attrv;
+    $attrv = _clean_ignored_keywords( $hash,'group', AttrVal($device,'group', undef));
+    $hash->{helper}{devicemap}{devices}{$device}{groups} = $attrv if $attrv;
 
     my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{});
     my $allset = getAllSets($device);
@@ -1191,12 +1191,23 @@ sub _analyze_genDevType {
             }
         }
         if ( $gdt eq 'lock') {
-            $currentMapping->{SetOnOff} = {cmdOff => 'open', type => 'SetOnOff', cmdOn => 'close'};
+            $currentMapping->{SetOnOff} = {cmdOff => 'unlock', type => 'SetOnOff', cmdOn => 'lock'};
         }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
         return;
     }
     return;
+}
+
+sub _clean_ignored_keywords {
+    my $hash    = shift // return;
+    my $keyword = shift // return;
+    my $toclean = shift // return;
+    return lc $toclean if !defined $hash->{helper}->{tweaks}
+                        ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}
+                        ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword};
+    $toclean =~ s{\A$hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword}\z}{}gi;
+    return lc $toclean;
 }
 
 sub _analyze_genDevType_setter {
@@ -4901,13 +4912,19 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntentResponses"></a>
       <li><b>confirmIntentResponses</b>
-        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.
+        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.<br>
         Example: <p><code>confirmIntentResponses=SetOnOffGroup="really switch group $target $Value" SetOnOff="confirm setting $target $Value" </code></p>
         <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.</p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
       <li><b>intentFilter</b>
         <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
+      </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-ignoreKeywords"></a>
+      <li><b>ignoreKeywords</b>
+        <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br>
+        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code><br>
+        Note: requires restart to take full effect, will only affect content from general room, group or alexaRoom attributes.</p>
       </li>
     </ul>
   </li>
