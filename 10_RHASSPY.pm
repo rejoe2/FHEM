@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-11-23 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-11-25 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -59,7 +59,8 @@ my %sets = (
     trainRhasspy => [qw(noArg)],
     fetchSiteIds => [qw(noArg)],
     update       => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
-    volume       => []
+    volume       => [],
+    text2intent  => []
 );
 
 my $languagevars = {
@@ -565,7 +566,8 @@ sub Set {
         speak       => \&sendSpeakCommand,
         textCommand => \&sendTextCommand,
         play        => \&setPlayWav,
-        volume      => \&setVolume
+        volume      => \&setVolume,
+        text2intent => \&text2intentRecognition
     };
 
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
@@ -2510,6 +2512,37 @@ sub sendSpeakCommand {
     }
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/dialogueManager/startSession $json});
+}
+
+# start intent recognition by Rhasspy service, see https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
+sub text2intentRecognition {
+    my $hash = shift;
+    my $cmd  = shift;
+
+    my $id        = "$hash->{LANGUAGE}.$hash->{fhemId}" . time;
+    my $sendData =  { 
+        intentFilter => 'null',
+        id           => $id,
+        sessionId    => $id
+    };
+    if (ref $cmd eq 'HASH') {
+        return 'text2intent with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
+        $sendData->{siteId}    = $cmd->{siteId};
+        $sendData->{input}     = $cmd->{text};
+        $sendData->{id}        = $cmd->{id} // $id;
+        $sendData->{sessionId} = $cmd->{sessionId} // $id
+    } else {    #Beta-User: might need review, as parseParams is used by default...!
+        my($unnamedParams, $namedParams) = parseParams($cmd);
+        if (defined $namedParams->{siteId} || defined $namedParams->{text}) {
+            $sendData->{siteId} = $namedParams->{siteId} // shift @{$unnamedParams};
+            $sendData->{input} = lc $namedParams->{text} // lc join q{ }, @{$unnamedParams};
+        } else {
+            $sendData->{siteId} = shift @{$unnamedParams};
+            $sendData->{input} = lc join q{ }, @{$unnamedParams};
+        }
+    }
+    my $json = _toCleanJSON($sendData);
+    return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
 }
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
