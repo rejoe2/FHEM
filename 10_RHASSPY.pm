@@ -5112,7 +5112,6 @@ yellow=rgb FFFF00</code></p>
   <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
   {Device} and {Value} (on/off) are mandatory, {Room} is optional.
-  
   <li>SetOnOffGroup</li>
   {Group} and {Value} (on/off) are mandatory, {Room} is optional, <i>global</i> in {Room} will be interpreted as "everywhere".
   <li>SetTimedOnOff</li>Basic keywords see SetOnOff, plus timer info in at least one of the fields {Hour} (for relative additions starting now), {Hourabs} (absolute time of day), {Min} (minutes) and {Sec} (seconds). If {Hourabs} is provided, {Min} and {Sec} will also be interpreted as absolute values.
@@ -5120,7 +5119,7 @@ yellow=rgb FFFF00</code></p>
   <li>SetTimedOnOffGroup</li> (for keywords see SetOnOffGroup)
   <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
-  {Device} and {Value} (nummeric value) are mandatory, {Room} is optional. Additional optional field is {Change} with one of 
+  {Device} and {Value} (nummeric value) are mandatory, {Room} is optional. Additional optional fields are {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored) and {Change} with one of 
   <ul>
     <li>lightUp, lightDown (brightness)</li>
     <li>volUp, volDown (volume)</li>
@@ -5128,6 +5127,7 @@ yellow=rgb FFFF00</code></p>
     <li>setUp, setDown (setTarget)</li>
     <li>cmdStop (blinds)</li>
   </ul>
+  allowing to guess for the proper device and/or answer.
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
   <li>GetNumeric</li> (as SetNumeric)
