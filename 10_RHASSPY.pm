@@ -3442,13 +3442,10 @@ sub handleIntentSetNumeric {
     my $diff    = $value // $mapping->{step} // 10;
 
     my $up = $change // 0;
-    my $totest = $change // 'none';
-    
     if ( defined $change ) {
         $up = $internal_mappings->{Change}->{$change}->{up} 
              // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
-             // ( $change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) 
-           ? 1 : 0;
+             // ( $change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 : 0;
     }
 
     my $forcePercent = ( defined $mapping->{map} && lc $mapping->{map} eq 'percent' ) ? 1 : 0;
