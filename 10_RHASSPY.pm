@@ -349,7 +349,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.04';
+    $hash->{MODULE_VERSION} = '0.5.04a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -3441,12 +3441,15 @@ sub handleIntentSetNumeric {
 
     my $diff    = $value // $mapping->{step} // 10;
 
-    #my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
-    my $up = $change;
-    $up    = $internal_mappings->{Change}->{$change}->{up} 
-          // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
-          // defined $change && ($change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) ? 1 
-           : 0;
+    my $up = $change // 0;
+    my $totest = $change // 'none';
+    
+    if ( defined $change ) {
+        $up = $internal_mappings->{Change}->{$change}->{up} 
+             // $internal_mappings->{Change}->{$de_mappings->{ToEn}->{$change}}->{up}
+             // ( $change =~ m{\A$internal_mappings->{regex}->{upward}\z}xi || $change =~ m{\A$de_mappings->{regex}->{upward}\z}xi ) 
+           ? 1 : 0;
+    }
 
     my $forcePercent = ( defined $mapping->{map} && lc $mapping->{map} eq 'percent' ) ? 1 : 0;
 
@@ -3510,8 +3513,7 @@ sub handleIntentSetNumeric {
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric' );
 
     # execute Cmd
-    $change ne 'cmdStop'
-            || !defined $mapping->{cmdStop}
+    !defined $change || $change ne 'cmdStop' || !defined $mapping->{cmdStop} 
             ? !defined $useMap ? analyzeAndRunCmd($hash, $device, $cmd, $newVal)
                                : analyzeAndRunCmd($hash, $device, $useMap)
             : analyzeAndRunCmd($hash, $device, $mapping->{cmdStop});
