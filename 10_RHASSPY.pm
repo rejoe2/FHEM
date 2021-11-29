@@ -3484,7 +3484,7 @@ sub handleIntentSetNumeric {
         #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
         if ( $change eq 'cmdStop' || $useMap ) {
             $newVal = $oldVal // 50;
-        } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {        } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
+        } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
             $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
         }
         # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
