@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25272 2021-11-28 12:34:00Z martinp876 $
+# $Id: 10_CUL_HM.pm 25272 2021-12-01 Beta-User $
 
 package main;
 
@@ -4728,6 +4728,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "regTable") {  ################################################
+    return "no HMinfo instance defined!" if !defined &HMinfo_GetFn;
     return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
   }       
   elsif($cmd eq "regList") {  #################################################
@@ -4811,6 +4812,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if (defined $tplH{$tt}){
         $info .= "\n$tplTyp{$tt}:";
         foreach (@{$tplH{$tt}}){
+          last if !defined &HMinfo_templateList;
           my ($r)=split("\n",HMinfo_templateList($_));
           $info .= "\n   ".$r;
         }
@@ -4944,6 +4946,10 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     if ($cfgState =~ m/(unknown|ok)/){
     }
     else{
+      if (!defined &HMinfo_getTxt2Check) {
+        $ret .= '\n   no HMinfo device defined!';
+        return $ret ;
+      }
       foreach(sort keys %{$hash->{helper}{cfgChk}}){
         my( $Fkt,$shtxt,$txt) = HMinfo_getTxt2Check($_);
         $ret .= "\n   $shtxt: $txt";
