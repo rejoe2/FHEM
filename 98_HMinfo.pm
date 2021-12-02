@@ -1,10 +1,10 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 25079 + clear msgErrors + new showTimer 2021-10-28 Beta-User $
+# $Id: 98_HMinfo.pm 25159 2021-10-30 17:37:57Z martinp876 $
 package main;
 use strict;
 use warnings;
-use B qw(svref_2object); #Beta-User: see frank hint in https://forum.fhem.de/index.php/topic,120856.msg1179854.html#msg1179854
+use B qw(svref_2object);
 
 sub HMinfo_Initialize($$);
 sub HMinfo_Define($$);
@@ -388,7 +388,7 @@ sub HMinfo_status($){##########################################################
       foreach (grep {$ehash->{"prot".$_}} keys %protW){ $protW{$_}++; push @protNamesW,$eName;}#protocol events reported
       $rssiMin{$eName} = 0;
       foreach (keys %{$ehash->{helper}{rssi}}){
-        last if !defined $ehash->{IODev}; #Beta-User: for devices w/o IO, https://forum.fhem.de/index.php/topic,123436.msg1183002.html#msg1183002
+        last if !defined $ehash->{IODev};
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
         $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
           if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
@@ -1264,7 +1264,7 @@ sub HMinfo_startBlocking(@){###################################################
   my $hash = $defs{$name};
   Log3 $hash,5,"HMinfo $name start blocking:$fkt";
   my $id = ++$hash->{nb}{cnt};
-  my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME},$param", 
+  my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME};$param", 
                         "HMinfo_bpPost", 30, 
                         "HMinfo_bpAbort", "$name:0");
   $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -1751,7 +1751,7 @@ sub HMinfo_GetFn($@) {#########################################################
 #    return HMI_overview(\@entities,\@a);
 #  }                                
 
-  elsif($cmd eq "showTimer"){ #Beta-User: noansi version from https://forum.fhem.de/index.php/topic,120856.msg1156655.html#msg1156655
+  elsif($cmd eq "showTimer"){
     my ($type) = (@a,"short");# ugly way to set "full" as default
     my %show;
     if($type eq "short"){
@@ -1762,7 +1762,7 @@ sub HMinfo_GetFn($@) {#########################################################
                  ,DeviceName  => 4
                  );
     }
-    else {
+    else{
        %show =(   TYPE        => 1
                  ,NAME        => 4
                  ,TIMESPEC    => 3
@@ -1794,7 +1794,7 @@ sub HMinfo_GetFn($@) {#########################################################
                      .' ARG:'.$ats->{ARG};
  #       next;
       }
-     push @ak,  substr(localtime($ats->{TRIGGERTIME}),0,19)
+      push @ak,  substr(localtime($ats->{TRIGGERTIME}),0,19)
                .sprintf("%8d: %-30s\t :",int($ats->{TRIGGERTIME}-$now)
                                         ,$tfnm)
                .(ref($ats->{ARG}) eq 'HASH'
@@ -1804,10 +1804,9 @@ sub HMinfo_GetFn($@) {#########################################################
                                   map{(my $foo = $_) =~ s/$fltr/$show{$1}$1/g; $foo;}
                                   grep /^$fltr/,
                                   keys %{$ats->{ARG}})
-                     :"$ats->{ARG}")};
+                      :"$ats->{ARG}")};
     $ret = join("\n", @ak);
   }
-
   elsif($cmd eq "showChilds"){
     my ($type) = @a;
     $type = "all" if(!$type);
@@ -1897,13 +1896,13 @@ sub HMinfo_SetFn($@) {#########################################################
         delete $modules{CUL_HM}{stat}{s}{$_};
       }
     }
-    if ($type eq "msgErrors"){ #clear message errors for all devices which has problems
+    if ($type eq "msgErrors"){#clear message errors for all devices which has problems
       my @devL = split(",",InternalVal($hash->{NAME},"iW__protoNames"  ,""));
-      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protocol","")); #Beta-User: see frank, https://forum.fhem.de/index.php/topic,119760.msg1179963.html#msg1179963
+      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protocol"  ,""));
       push @devL,split(",",InternalVal($hash->{NAME},"iERR__protocol"  ,""));
     
       foreach my $dName (HMinfo_noDup(@devL)){
-        CUL_HM_Set($defs{$dName},$dName,"clear","msgErrors"); #Beta-User: see frank, https://forum.fhem.de/index.php/topic,119760.msg1179963.html#msg1179963
+        CUL_HM_Set($defs{$dName},$dName,"clear","msgErrors");
       }
     }
     elsif ($type ne "msgStat"){
@@ -2000,7 +1999,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $id = ++$hash->{nb}{cnt};
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
     HMinfo_startBlocking($name,"HMinfo_purgeConfig", "$fn");
-    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
+    my $bl = BlockingCall("HMinfo_purgeConfig", join(";",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -2009,7 +2008,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "saveConfig")      {##action: saveConfig-----------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none",$fn,$opt,$filter)), 
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none;$fn",$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});

@@ -60,7 +60,8 @@ my %sets = (
     fetchSiteIds => [qw(noArg)],
     update       => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
     volume       => [],
-    text2intent  => []
+    msgDialog    => [qw( enable disable )]
+    #text2intent  => []
 );
 
 my $languagevars = {
@@ -221,13 +222,8 @@ BEGIN {
     readingsEndUpdate
     readingsDelete
     Log3
-    defs
-    attr
-    cmds
-    L
-    DAYSECONDS
-    HOURSECONDS
-    MINUTESECONDS
+    defs attr cmds modules L
+    DAYSECONDS HOURSECONDS MINUTESECONDS
     init_done
     InternalTimer
     RemoveInternalTimer
@@ -259,6 +255,8 @@ BEGIN {
     makeReadingName
     FileRead
     getAllSets
+    notifyRegexpChanged
+    deviceEvents
     trim
   ) )
 };
@@ -282,9 +280,10 @@ sub Initialize {
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&Parse;
+    $hash->{NotifyFn}    = \&Notify;
     $hash->{parseParams} = 1;
 
     return;
@@ -312,7 +311,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.05a';
+    $hash->{MODULE_VERSION} = '0.5.06';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -530,7 +529,7 @@ sub Set {
         textCommand => \&sendTextCommand,
         play        => \&setPlayWav,
         volume      => \&setVolume,
-        text2intent => \&text2intentRecognition
+        msgDialog   => \&msgDialog
     };
 
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
@@ -578,6 +577,7 @@ sub Set {
         my $training = $h->{training}  // shift @values;
         return updateSingleSlot($hash, $slotname, $slotdata, $overwr, $training);
     }
+
     return;
 }
 
@@ -617,7 +617,7 @@ sub Attr {
             delete $hash->{helper}{tweaks}{$_};
         }
         if ($command eq 'set') {
-            return initialize_rhasspyTweaks($hash, $value);
+            return initialize_rhasspyTweaks($hash, $value) if $init_done;
         } 
     }
 
@@ -627,7 +627,7 @@ sub Attr {
         }
         delete $hash->{helper}{hotwords};
         if ($command eq 'set') {
-            return initialize_rhasspyHotwords($hash, $value);
+            return initialize_rhasspyHotwords($hash, $value) if $init_done;
         } 
     }
 
@@ -639,6 +639,11 @@ sub Attr {
             $value = undef;
         }
         return initialize_Language($hash, $hash->{LANGUAGE}, $value);
+    }
+
+    if ( $attribute eq 'rhasspyMsgDialog' ) {
+        delete $hash->{helper}{msgDialog};
+        return initialize_msgDialog($hash, $value, $command);
     }
 
     return;
@@ -809,7 +814,6 @@ sub RHASSPY_configure_DialogManager {
     return configure_DialogManager( $fnHash->{HASH}, $fnHash->{MODIFIER}, $fnHash->{toDisable}, $fnHash->{enable} );
 }
 
-
 sub init_custom_intents {
     my $hash    = shift // return;
     my $attrVal = shift // return;
@@ -848,7 +852,6 @@ sub init_custom_intents {
     }
     return;
 }
-
 
 sub initialize_devicemap {
     my $hash = shift // return;
@@ -1295,6 +1298,50 @@ sub initialize_rhasspyHotwords {
     return;
 }
 
+sub initialize_msgDialog {
+    my $hash    = shift // return;
+    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspyMsgDialog',undef) // return;
+    my $mode    = shift // 'set';
+
+    return InternalTimer(time+1, \&initialize_msgDialog, $hash ) if !$init_done;
+
+    return disable_msgDialog($hash) if $mode ne 'set';
+    return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr};
+    for my $line (split m{\n}x, $attrVal) {
+        next if !length $line;
+        my ($keywd, $values) = split m{=}x, $line, 2;
+        if ( $keywd =~ m{\Aopen|close|allowed|msgCommand|siteId\z}xms ) {
+            $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
+            next;
+        }
+    }
+    return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
+    $hash->{helper}->{msgDialog}->{config}->{open}       //= q{open};
+    $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
+    $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{everyone};
+    $hash->{helper}->{msgDialog}->{config}->{msgCommand} //= q{msg push \@$recipients $message};
+    $hash->{helper}->{msgDialog}->{config}->{siteId}     //= qq{$hash->{LANGUAGE}$hash->{fhemId}};
+    
+    my $msgConfig = $modules{msgConfig}{defptr}{NAME};
+
+    #addToDevAttrList($msgConfig, "$hash->{prefix}_evalSpecials:textField-long ",'RHASSPY');
+    addToDevAttrList($msgConfig, "$hash->{prefix}_msgCommand:textField ",'RHASSPY');
+    notifyRegexpChanged($hash,'TYPE=(ROOMMATE|GUEST)',0);
+    return;
+
+}
+
+sub disable_msgDialog {
+    my $hash   = shift // return;
+    my $enable = shift // 0;
+    readingsSingleUpdate($hash,"enableMsgDialog",$enable,1);
+    return initialize_msgDialog($hash) if $enable;
+    notifyRegexpChanged($hash,'',1);
+    delete $hash->{helper}{msgDialog};
+    return;
+}
+
+
 sub perlExecute {
     my $hash   = shift // return;
     my $device = shift;
@@ -1480,6 +1527,16 @@ sub getAllRhasspyRooms {
     return;
 }
 
+sub getAllRhasspyMainRooms {
+    my $hash = shift // return;
+    return if !$hash->{useGenericAttrs};
+    my @devs = devspec2array("$hash->{devspec}");
+    my @mainrooms = ();
+    for my $device (@devs) {
+        push @mainrooms, (split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{rooms})[0];
+    }
+    return get_unique(\@mainrooms, 1 );
+}
 
 # Alle Sender sammeln
 sub getAllRhasspyChannels {
@@ -2235,6 +2292,56 @@ sub Parse {
     return @ret;
 }
 
+sub Notify {
+    my $hash     = shift // return;
+    my $dev_hash = shift // return;
+    my $name = $hash->{NAME} // return;
+    my $device = $dev_hash->{NAME} // return;
+
+    Log3($name, 5, "NotifyFn called with event in $device");
+
+    return if !ReadingsVal($name,'enableMsgDialog',1) || !defined $hash->{helper}->{msgDialog};
+    my @events = @{deviceEvents($dev_hash, 1)};
+
+    return if !@events;
+    return if $hash->{helper}->{msgDialog}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
+
+    for my $event (@events){
+        next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush): (.+)}xms;
+
+        my $msgtext = $1;
+        Log3($name, 4 , qq($name received $msgtext from $device));
+
+        return msgDialog_close($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{close}\z}x;
+        return msgDialog_open($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{open}\z}x;
+        return msgDialog_progress($hash, $device, $msgtext);
+    }
+
+    return;
+}
+
+sub msgDialog_close {
+    my $hash   = shift // return;
+    my $device = shift // return;
+    Log3($hash, 5, "msgDialog_close called with $device");
+    return;
+}
+
+sub msgDialog_open {
+    my $hash   = shift // return;
+    my $device = shift // return;
+    Log3($hash, 5, "msgDialog_open called with $device");
+    return;
+}
+
+sub msgDialog_progress {
+    my $hash    = shift // return;
+    my $device  = shift // return;
+    my $msgtext = shift // return;
+    Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
+    return;
+}
+
 # Update the readings lastIntentPayload and lastIntentTopic
 # after and intent is received
 sub updateLastIntentReadings {
@@ -2505,10 +2612,16 @@ sub sendSpeakCommand {
 }
 
 # start intent recognition by Rhasspy service, see https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
-sub text2intentRecognition {
+sub msgDialog {
     my $hash = shift;
     my $cmd  = shift;
 
+    readingsSingleUpdate($hash,"enableMsgDialog", $cmd eq 'enable' ? 1 : 0 ,1);
+
+    return initialize_msgDialog($hash) if $cmd eq 'enable';
+    return disable_msgDialog($hash);
+    
+    
     my $id        = "$hash->{LANGUAGE}.$hash->{fhemId}" . time;
     my $sendData =  { 
         intentFilter => 'null',
@@ -3637,52 +3750,38 @@ sub handleIntentMediaControls {
     my $data = shift // return;
     my $command, my $device, my $room;
     my $mapping;
-    my $response = getResponse($hash, 'DefaultError');
+    my $response;
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
     # At least one command has to be received
-    if (exists $data->{Command}) {
-        $room = getRoomName($hash, $data);
-        $command = $data->{Command};
+    return respond( $hash, $data, getResponse($hash, 'DefaultError') ) if !exists $data->{Command};
 
-        # Search for matching device
-        if (exists $data->{Device}) {
-            $device = getDeviceByName($hash, $room, $data->{Device});
-        } else {
-            $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef);
-            $response = getResponse($hash, 'NoActiveMediaDevice') if !defined $device;
-        }
+    $room = getRoomName($hash, $data);
+    $command = $data->{Command};
 
-        $mapping = getMapping($hash, $device, 'MediaControls', undef, defined $hash->{helper}{devicemap}, 0);
-
-        if (defined $device && defined $mapping) {
-            #check if confirmation is required
-            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
-            my $cmd = $mapping->{$command};
-
-            #Beta-User: backwards compability check; might be removed later...
-            if (!defined $cmd) {
-                my $Media = { 
-                    play => 'cmdPlay', pause => 'cmdPause', 
-                    stop => 'cmdStop', vor => 'cmdFwd', next => 'cmdFwd',
-                    'zurück' => 'cmdBack', previous => 'cmdBack'
-                };
-                $cmd = $mapping->{ $Media->{$command} } if defined $mapping->{ $Media->{$command} };
-                Log3($hash->{NAME}, 4, "MediaControls with outdated mapping $command called. Please change to avoid future problems...");
-            }
-
-            else {
-                # Execute Cmd
-                analyzeAndRunCmd($hash, $device, $cmd);
-                
-                # Define voice response
-                $response = defined $mapping->{response} ?
-                     _getValue($hash, $device, $mapping->{response}, $command, $room)
-                     : getResponse($hash, 'DefaultConfirmation');
-            }
-        }
+    # Search for matching device
+    if (exists $data->{Device}) {
+        $device = getDeviceByName($hash, $room, $data->{Device});
+    } else {
+        $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef);
+        $response = getResponse($hash, 'NoActiveMediaDevice') if !defined $device;
     }
+
+    $mapping = getMapping($hash, $device, 'MediaControls', undef, defined $hash->{helper}{devicemap}, 0);
+
+    if ( defined $device && defined $mapping && defined $mapping->{$command} ) {
+        #check if confirmation is required
+        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
+        my $cmd = $mapping->{$command};
+        # Execute Cmd
+        analyzeAndRunCmd($hash, $device, $cmd);
+        # Define voice response
+        $response = defined $mapping->{response} ?
+            _getValue($hash, $device, $mapping->{response}, $command, $room)
+            : getResponse($hash, 'DefaultConfirmation');
+    }
+    $response = getResponse($hash, 'DefaultError') if !defined $response;
     # Send voice response
     respond( $hash, $data, $response );
     return $device;
@@ -3698,48 +3797,31 @@ sub handleIntentSetScene{
     return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !defined $data->{Scene};
 
     # Device AND Scene are optimum exist
-    if ( !exists $data->{Device} ) {
-        return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) );
-    } else {
-        $room = getRoomName($hash, $data);
-        $scene = $data->{Scene};
-        $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetScene', undef, defined $hash->{helper}{devicemap});
-        # restore HUE scenes
-        $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
-=pod
-        if ($scene =~ m{id=.+}xms) {
-            my $allset = getAllSets($device);
-            if ($allset =~ m{\bscene:(?<scnames>[\S]+)}xm) {
-                for my $scname (split m{,}xms, $+{scnames}) {
-                    if ($scname =~ m{$scene}xms) {
-                        $scene = $scname;
-                        $scene =~ s{[#]}{ }gxm;
-                        last $scname;
-                    }
-                }
-            }
-        }
-=cut
 
-        # Mapping found?
-        return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !$device || !defined $mapping;
+    return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !exists $data->{Device};
 
-        #check if confirmation is required
-        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetScene' );
+    $room = getRoomName($hash, $data);
+    $scene = $data->{Scene};
+    $device = getDeviceByName($hash, $room, $data->{Device});
+    $mapping = getMapping($hash, $device, 'SetScene', undef, defined $hash->{helper}{devicemap});
+    # restore HUE scenes
+    $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
 
-        my $cmd = qq(scene $scene);
+    # Mapping found?
+    return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !$device || !defined $mapping;
 
-        # execute Cmd
-        analyzeAndRunCmd($hash, $device, $cmd);
-        Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetScene' );
 
-        # Define response
-        $response = $mapping->{response} // getResponse( $hash, 'DefaultConfirmation' );
-    }
+    my $cmd = qq(scene $scene);
 
-    # Send response
-    $response = $response  // getResponse($hash, 'DefaultError');
+    # execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+    # Define response
+    $response = $mapping->{response} // getResponse( $hash, 'DefaultConfirmation' );
+
     respond( $hash, $data, $response );
     return $device;
 }
