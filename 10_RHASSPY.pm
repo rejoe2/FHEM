@@ -1322,7 +1322,7 @@ sub initialize_msgDialog {
     return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
     $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
-    $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{everyone};
+    $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{none};
     $hash->{helper}->{msgDialog}->{config}->{siteId}     //= qq{$hash->{LANGUAGE}$hash->{fhemId}};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
@@ -5078,6 +5078,20 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
     <i>default</i> is optional. If set, this action will be executed for all <i>siteIds</i> without match to other keywords.<br>
     Additionally, if either <i>rhasspyHotwords</i> ia set or key <i>handleHotword</i> in DEF is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
   </li>
+    <li>
+    <a id="RHASSPY-attr-rhasspyMsgDialog"></a><b>rhasspyMsgDialog</b>
+    <p>If some key in this attribute are set, RHASSPY will (note: somewhen in the future...) react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and additionally for each RHASSPY instance a siteId has to be added to the intent recognition service.</p>
+    Keys that may be set in this attribute:
+     <ul>
+        <li><i>allowed</i> The <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices allowed to interact with RHASSPY (comma-separated device names)</li>
+        <li><i>open</i> the keyword used to initiate a dialogue</li>
+        <li><i>close</i> the keyword used to exit a dialogue</li>
+        <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
+        <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
+        <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
+        <li><i>querrymark</i> Text pattern that shall be used to distinguish the querries done in intent MsgDialog from others (will be added to all requests towards Rhasspy intent recognition system automatically)</li>
+      </ul>
+  </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
     <p>If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
@@ -5218,6 +5232,10 @@ yellow=rgb FFFF00</code></p>
       </li>
 
     </ul>
+  </li>
+  <li>
+    <a id="RHASSPY-attr-rhasspyMsgDialog" data-pattern=".*MsgDialog"></a><b>rhasspyMsgDialog</b>
+    <p>Command used by RHASSPY to send messages to text dialogue partners. See also <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> attribute.</p>
   </li>
 </ul>
 
