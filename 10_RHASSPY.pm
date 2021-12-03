@@ -311,7 +311,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.06';
+    $hash->{MODULE_VERSION} = '0.5.06a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -334,6 +334,7 @@ sub Define {
         addToAttrList(q{genericDeviceType});
         #addToAttrList(q{homebridgeMapping});
     }
+    notifyRegexpChanged($hash,'',1);
 
     return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
 }
@@ -342,6 +343,7 @@ sub firstInit {
     my $hash = shift // return;
 
     my $name = $hash->{NAME};
+    notifyRegexpChanged($hash,'',1);
 
     # IO
     AssignIoPort($hash);
@@ -364,6 +366,7 @@ sub firstInit {
         if defined InternalVal($name, 'IODev',undef) 
         && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
+    initialize_msgDialog($hash);
 
     return;
 }
@@ -643,6 +646,7 @@ sub Attr {
 
     if ( $attribute eq 'rhasspyMsgDialog' ) {
         delete $hash->{helper}{msgDialog};
+        return if !$init_done;
         return initialize_msgDialog($hash, $value, $command);
     }
 
@@ -1303,29 +1307,34 @@ sub initialize_msgDialog {
     my $attrVal = shift // AttrVal($hash->{NAME},'rhasspyMsgDialog',undef) // return;
     my $mode    = shift // 'set';
 
-    return InternalTimer(time+1, \&initialize_msgDialog, $hash ) if !$init_done;
-
     return disable_msgDialog($hash) if $mode ne 'set';
+
     return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr};
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aopen|close|allowed|msgCommand|siteId\z}xms ) {
+        if ( $keywd =~ m{\Aopen|close|allowed|msgCommand|siteId|hello|goodbye|querrymark\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
     }
+
     return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
-    $hash->{helper}->{msgDialog}->{config}->{open}       //= q{open};
+    $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
     $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{everyone};
-    $hash->{helper}->{msgDialog}->{config}->{msgCommand} //= q{msg push \@$recipients $message};
     $hash->{helper}->{msgDialog}->{config}->{siteId}     //= qq{$hash->{LANGUAGE}$hash->{fhemId}};
-    
-    my $msgConfig = $modules{msgConfig}{defptr}{NAME};
+    $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
+    $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
+    $hash->{helper}->{msgDialog}->{config}->{querrymark} //= q{this is a feminine request};
 
-    #addToDevAttrList($msgConfig, "$hash->{prefix}_evalSpecials:textField-long ",'RHASSPY');
-    addToDevAttrList($msgConfig, "$hash->{prefix}_msgCommand:textField ",'RHASSPY');
+    my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
+    #addToDevAttrList($msgConfig, "$hash->{prefix}EvalSpecials:textField-long ",'RHASSPY');
+    addToDevAttrList($msgConfig, "$hash->{prefix}MsgCommand:textField ",'RHASSPY');
+    if (!defined $hash->{helper}->{msgDialog}->{config}->{msgCommand} ) {
+        $hash->{helper}->{msgDialog}->{config}->{msgCommand}
+                = AttrVal($msgConfig, "$hash->{prefix}MsgCommand", q{msg push \@$recipients $message});
+    }
     notifyRegexpChanged($hash,'TYPE=(ROOMMATE|GUEST)',0);
     return;
 
@@ -2298,13 +2307,13 @@ sub Notify {
     my $name = $hash->{NAME} // return;
     my $device = $dev_hash->{NAME} // return;
 
-    Log3($name, 5, "NotifyFn called with event in $device");
+    Log3($name, 5, "[$name] NotifyFn called with event in $device");
 
     return if !ReadingsVal($name,'enableMsgDialog',1) || !defined $hash->{helper}->{msgDialog};
     my @events = @{deviceEvents($dev_hash, 1)};
 
     return if !@events;
-    return if $hash->{helper}->{msgDialog}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
+    return if $hash->{helper}->{msgDialog}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
 
     for my $event (@events){
         next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush): (.+)}xms;
@@ -2312,8 +2321,8 @@ sub Notify {
         my $msgtext = $1;
         Log3($name, 4 , qq($name received $msgtext from $device));
 
-        return msgDialog_close($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{close}\z}x;
-        return msgDialog_open($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{open}\z}x;
+        return msgDialog_close($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{config}->{close}\z}x;
+        return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{config}->{open}}xi;
         return msgDialog_progress($hash, $device, $msgtext);
     }
 
@@ -2321,24 +2330,86 @@ sub Notify {
 }
 
 sub msgDialog_close {
-    my $hash   = shift // return;
-    my $device = shift // return;
+    my $hash     = shift // return;
+    my $device   = shift // return;
+    my $response = shift // $hash->{helper}->{msgDialog}->{config}->{goodbye};
     Log3($hash, 5, "msgDialog_close called with $device");
+
+    my $data_old = $hash->{helper}{'.delayed'}->{$device} // return;
+
+    deleteSingleRegIntTimer($device, $hash);
+    respond( $hash, $data_old, $response );
+    delete $hash->{helper}{'.delayed'}->{$device};
     return;
 }
 
 sub msgDialog_open {
-    my $hash   = shift // return;
-    my $device = shift // return;
-    Log3($hash, 5, "msgDialog_open called with $device");
+    my $hash    = shift // return;
+    my $device  = shift // return;
+    my $msgtext = shift // return;
+    $msgtext =~ s{\A$hash->{helper}->{msgDialog}->{open}}{}xi;
+    $msgtext = trim($msgtext);
+    Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
+    my $data = '';
+    
+    my $siteId = $hash->{helper}->{msgDialog}->{config}->{siteId};
+    my $id        = "$siteId" . time;
+    my $sendData =  { 
+        intentFilter => 'null',
+        id           => $id,
+        sessionId    => $device,
+        siteId       => $hash->{helper}->{msgDialog}->{config}->{siteId},
+        input        => $msgtext
+    };
+
+    setDialogTimeout($hash, $sendData, undef, $msgtext ? '' : $hash->{helper}->{msgDialog}->{config}->{hello},'');
+    return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
     return;
 }
 
+#handle messages from FHEM/messenger side
 sub msgDialog_progress {
     my $hash    = shift // return;
     my $device  = shift // return;
     my $msgtext = shift // return;
+
+    #atm. this just hands over incoming text to Rhasspy without any additional logic. 
+    #This is the place to add additional logics and decission making...
+    my $data    = $hash->{helper}{'.delayed'}{$device} // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
+
+    my $json = _toCleanJSON($data);
+    return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
+    return;
+}
+
+#handle messages from MQTT side
+sub handleIntentMsgDialog {
+    my $hash = shift // return;
+    my $data = shift // return;
+    my $name = $hash->{NAME};
+    #Beta-User: fake function, needs review...
+
+    my $response = ReadingsVal($name,'textResponse',getResponse( $hash, 'reSpeak_failed' ));
+
+    Log3($hash->{NAME}, 5, 'handleIntentMsgDialog called');
+
+    respond( $hash, $data, $response );
+
+    return $name;
+}
+
+
+sub msgDialog_respond {
+    my $hash       = shift // return;
+    my $recipients = shift // return;
+    my $message    = shift // return;
+    Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
+    
+    my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
+    $msgCommand =~ s{(\$\w+)}{$1}eegx;;
+
+    AnalyzeCommand($hash, $msgCommand);
     return;
 }
 
@@ -2381,6 +2452,7 @@ my $dispatchFns = {
     CancelAction        => \&handleIntentCancelAction,
     ChoiceRoom          => \&handleIntentChoiceRoom,
     ChoiceDevice        => \&handleIntentChoiceDevice,
+    MsgDialog           => \&handleIntentMsgDialog,
     ReSpeak             => \&handleIntentReSpeak
 };
 
@@ -2538,8 +2610,13 @@ sub respond {
       : readingsBulkUpdate($hash, 'textResponse', $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
-    IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     Log3($hash->{NAME}, 5, "Response is: $response");
+    #check for msgDialog session
+    if ( defined $hash->{helper}->{msgDialog} 
+      && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}} ){
+        return msgDialog_respond($hash, $sendData->{customData}, $response);
+    }
+    IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
 
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
@@ -2620,32 +2697,6 @@ sub msgDialog {
 
     return initialize_msgDialog($hash) if $cmd eq 'enable';
     return disable_msgDialog($hash);
-    
-    
-    my $id        = "$hash->{LANGUAGE}.$hash->{fhemId}" . time;
-    my $sendData =  { 
-        intentFilter => 'null',
-        id           => $id,
-        sessionId    => $id
-    };
-    if (ref $cmd eq 'HASH') {
-        return 'text2intent with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
-        $sendData->{siteId}    = $cmd->{siteId};
-        $sendData->{input}     = $cmd->{text};
-        $sendData->{id}        = $cmd->{id} // $id;
-        $sendData->{sessionId} = $cmd->{sessionId} // $id
-    } else {    #Beta-User: might need review, as parseParams is used by default...!
-        my($unnamedParams, $namedParams) = parseParams($cmd);
-        if (defined $namedParams->{siteId} || defined $namedParams->{text}) {
-            $sendData->{siteId} = $namedParams->{siteId} // shift @{$unnamedParams};
-            $sendData->{input} = lc $namedParams->{text} // lc join q{ }, @{$unnamedParams};
-        } else {
-            $sendData->{siteId} = shift @{$unnamedParams};
-            $sendData->{input} = lc join q{ }, @{$unnamedParams};
-        }
-    }
-    my $json = _toCleanJSON($sendData);
-    return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
 }
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
@@ -5055,6 +5106,7 @@ Each of the keywords found in these attributes will be sent by <a href="#RHASSPY
     <p>Comma-separated "labels" for the "rooms" the device is located in. Recommended to be unique.</p>
     <p>Example:<br>
     <code>attr m2_wz_08_sw rhasspyRoom living room</code></p>
+    <p>Note: If you provide more than one room, the first will be regarded as <i>mainroom</i>, which has a special role, especially in dialogues.</p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyGroup" data-pattern=".*Group"></a><b>rhasspyGroup</b>
