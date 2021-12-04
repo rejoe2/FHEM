@@ -713,7 +713,7 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses|ignoreKeywords)[\s]*=}x) {
+        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses|ignoreKeywords|gdt2groups)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
@@ -1062,6 +1062,9 @@ sub _analyze_genDevType {
     $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
 
     $attrv = _clean_ignored_keywords( $hash,'group', AttrVal($device,'group', undef));
+    if ( defined $hash->{helper}->{tweaks} && defined $hash->{helper}->{tweaks}->{gdt2groups} && defined $hash->{helper}->{tweaks}->{gdt2groups}->{$gdt} ) {
+       $attrv = $attrv ? "$attrv,$hash->{helper}->{tweaks}->{gdt2groups}->{$gdt}" : $hash->{helper}->{tweaks}->{gdt2groups}->{$gdt};
+    }
     $hash->{helper}{devicemap}{devices}{$device}{groups} = $attrv if $attrv;
 
     my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{});
@@ -5063,8 +5066,12 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <a id="RHASSPY-attr-rhasspyTweaks-ignoreKeywords"></a>
       <li><b>ignoreKeywords</b>
         <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br>
-        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code><br>
-        Note: requires restart to take full effect, will only affect content from general room, group or alexaRoom attributes.</p>
+        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code>
+      </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-gdt2groups"></a>
+      <li><b>gdt2groups</b>
+        <p>You may want to assign some default groupnames to all devices with the same genericDeviceType without repeating it in all single devices.<br>
+        Example: <p><code>gdt2groups= blind=rollläden,rollladen thermostat=heizkörper light=lichter,leuchten</code>
       </li>
     </ul>
   </li>
