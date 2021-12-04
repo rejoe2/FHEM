@@ -1335,7 +1335,8 @@ sub initialize_msgDialog {
         $hash->{helper}->{msgDialog}->{config}->{msgCommand}
                 = AttrVal($msgConfig, "$hash->{prefix}MsgCommand", q{msg push \@$recipients $message});
     }
-    notifyRegexpChanged($hash,'TYPE=(ROOMMATE|GUEST)',0);
+    my $monitored = join q{|}, devspec2array('TYPE=(ROOMMATE|GUEST)');
+    notifyRegexpChanged($hash,$monitored,0);
     return;
 
 }
@@ -2316,12 +2317,12 @@ sub Notify {
     return if $hash->{helper}->{msgDialog}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
 
     for my $event (@events){
-        next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush): (.+)}xms;
+        next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush):.(.+)}xms;
 
         my $msgtext = $1;
         Log3($name, 4 , qq($name received $msgtext from $device));
 
-        return msgDialog_close($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{config}->{close}\z}x;
+        return msgDialog_close($hash, $device) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{config}->{close}\z}xi;
         return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A$hash->{helper}->{msgDialog}->{config}->{open}}xi;
         return msgDialog_progress($hash, $device, $msgtext);
     }
