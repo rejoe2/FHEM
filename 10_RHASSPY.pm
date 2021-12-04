@@ -5235,7 +5235,7 @@ yellow=rgb FFFF00</code></p>
     </ul>
   </li>
   <li>
-    <a id="RHASSPY-attr-rhasspyMsgDialog" data-pattern=".*MsgDialog"></a><b>rhasspyMsgDialog</b>
+    <a id="RHASSPY-attr-rhasspyMsgCommand" data-pattern=".*MsgCommand"></a><b>rhasspyMsgCommand</b>
     <p>Command used by RHASSPY to send messages to text dialogue partners. See also <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> attribute.</p>
   </li>
 </ul>
