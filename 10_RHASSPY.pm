@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm  25275 2021-11-30 + Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-05 16:39:38Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1405,7 +1405,7 @@ sub setDialogTimeout {
     $data->{'.ENABLED'} = $toEnable; #dialog 
     my $identiy = qq($data->{sessionId});
 
-    $response = getResponse($hash, 'DefaultConfirmationReceived') if $response eq 'default';
+    $response = getResponse($hash, 'DefaultConfirmationReceived') if ref $response ne 'HASH' && $response eq 'default';
     $hash->{helper}{'.delayed'}{$identiy} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_DialogTimeout, $hash, 0);
@@ -2344,6 +2344,7 @@ sub msgDialog_close {
     deleteSingleRegIntTimer($device, $hash);
     respond( $hash, $data_old, $response );
     delete $hash->{helper}{'.delayed'}->{$device};
+    delete $hash->{helper}{msgDialog}->{$device};
     return;
 }
 
@@ -2354,7 +2355,7 @@ sub msgDialog_open {
     $msgtext =~ s{\A$hash->{helper}->{msgDialog}->{open}}{}xi;
     $msgtext = trim($msgtext);
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
-    my $data = '';
+    $hash->{helper}{msgDialog}->{$device} = 'started';
     
     my $siteId = $hash->{helper}->{msgDialog}->{config}->{siteId};
     my $id        = "$siteId" . time;
@@ -2362,8 +2363,9 @@ sub msgDialog_open {
         intentFilter => 'null',
         id           => $id,
         sessionId    => $device,
-        siteId       => $hash->{helper}->{msgDialog}->{config}->{siteId},
-        input        => $msgtext
+        siteId       => $siteId,
+        input        => $msgtext,
+        customData   => $device
     };
 
     setDialogTimeout($hash, $sendData, undef, $msgtext ? '' : $hash->{helper}->{msgDialog}->{config}->{hello},'');
