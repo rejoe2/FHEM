@@ -311,7 +311,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.06a';
+    $hash->{MODULE_VERSION} = '0.5.07';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -5185,9 +5185,11 @@ yellow=rgb FFFF00</code></p>
             Float nummeric value, just as async_delay in structure; the delay will be obeyed prior to the next sending command.</li> 
           <li><b>prio</b><br>
             Numeric value, defaults to "0". <i>prio</i> and <i>async_delay</i> will be used to determine the sending order as follows: first devices will be those with lowest prio arg, second sort argument is <i>async_delay</i> with lowest value first.</li>
+          <li><b>partOf</b><br>
+            Will adress an entire group directly. This group has to exist in FHEM first (could be e.g. a <i>structure</i> or a <i>ZigBee</i>-group) and needs to be switched with the same command than the single device.</li> 
         </ul>
         <p>Example:</p>
-        <p><code>attr lamp1 rhasspySpecials group:async_delay=100 prio=1 group=lights</code></p>
+        <p><code>attr lamp1 rhasspySpecials group:async_delay=0.3 prio=1 group=lights</code></p>
       </li>
       <li><b>numericValueMap</b>
         <p>Allows mapping of numeric values from the <i>Value</i> key to individual commands. Might e.g. usefull to address special positioning commands for blinds.</p>
