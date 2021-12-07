@@ -472,7 +472,6 @@ attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC/availability:.* availability\
   $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE getList air_quality:noArg air_quality $\DEVICETOPIC/get {"air_quality": ""}
 attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
 attr DEVICE stateFormat air quality: air_quality, VOC: voc, Hum: humidity
 deletereading -q DEVICE (?!associatedWith|IODev).*
