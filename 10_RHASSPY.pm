@@ -737,7 +737,14 @@ sub initialize_rhasspyTweaks {
             $hash->{helper}{tweaks}{$tweak} = $namedParams;
             next;
         }
-
+        if ($line =~ m{\A[\s]*(extrarooms)[\s]*=}x) {
+            ($tweak, $values) = split m{=}x, $line, 2;
+            $tweak = trim($tweak);
+            $values= trim($values);
+            return "Error in $line! No content provided!" if !length $values && $init_done;
+            $hash->{helper}{tweaks}{$tweak} = $values;
+            next;
+        }
     }
     return configure_DialogManager($hash) if $init_done;
     return;
@@ -1548,6 +1555,7 @@ sub getAllRhasspyMainRooms {
     for my $device (@devs) {
         push @mainrooms, (split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{rooms})[0];
     }
+    push @mainrooms, split m{,}x, $hash->{helper}{tweaks}->{extrarooms} if defined $hash->{helper}->{tweaks} && defined $hash->{helper}{tweaks}->{extrarooms};
     return get_unique(\@mainrooms, 1 );
 }
 
@@ -2719,6 +2727,7 @@ sub updateSlots {
     # Collect everything and store it in arrays
     my @devices   = getAllRhasspyNames($hash);
     my @rooms     = getAllRhasspyRooms($hash);
+    push @rooms, split m{,}x, $hash->{helper}{tweaks}->{extrarooms} if defined $hash->{helper}->{tweaks} && defined $hash->{helper}{tweaks}->{extrarooms};
     my @channels  = getAllRhasspyChannels($hash);
     my @colors    = getAllRhasspyColors($hash);
     my @types     = getAllRhasspyTypes($hash);
@@ -5075,6 +5084,11 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <p>You may want to assign some default groupnames to all devices with the same genericDeviceType without repeating it in all single devices.<br>
         Example: <p><code>gdt2groups= blind=rollläden,rollladen thermostat=heizkörper light=lichter,leuchten</code>
       </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-extrarooms"></a>
+      <li><b>extrarooms</b>
+        <p>You may want to add more rooms to what Rhasspy can recognize as room. Using this key, the comma-separated items will be sent as rooms for preparing the room and mainrooms slots.<br>
+        Example: <p><code>extrarooms= hut,music collection,cooking recipies</code>
+      </li>
     </ul>
   </li>
     <li>
@@ -5173,7 +5187,7 @@ yellow=rgb FFFF00</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspySpecials" data-pattern=".*Specials"></a><b>rhasspySpecials</b>
-    <p>Currently some colour light options besides group and venetian blind related stuff is implemented, this could be the place to hold additional options, e.g. for confirmation requests. You may use several of the following lines.</p>
+    <p>Options to change a bunch of aspects how a single device behaves when addressed by voice commands. You may use several of the following lines.</p>
     <p><i>key:value</i> line by line arguments similar to <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a>.</p>
     <ul>
       <li><b>group</b>
@@ -5266,13 +5280,13 @@ yellow=rgb FFFF00</code></p>
   <li>SetTimedOnOffGroup</li> (for keywords see SetOnOffGroup)
   <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
-  {Device} and either {Value} (nummeric value) or {Change} are mandatory, {Room} is optional. Additional optional field is {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored). {Change} can be with one of 
+  Dependend on the specific surrounding informations, a combination of {Device}, {Value} (nummeric value), {Change} and/or {Type} are sufficient, {Room} is optional. Additional optional field is {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored). {Change} can be with one of ({Type})
   <ul>
     <li>lightUp, lightDown (brightness)</li>
     <li>volUp, volDown (volume)</li>
     <li>tempUp, tempDown (temperature)</li>
     <li>setUp, setDown (setTarget)</li>
-    <li>cmdStop (blinds)</li>
+    <li>cmdStop (applies only for blinds)</li>
   </ul>
   allowing to decide on calculation scheme and to guess for the proper device and/or answer.
   <li>SetNumericGroup</li>
