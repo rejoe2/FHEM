@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test d Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test e Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2341,9 +2341,9 @@ sub Notify {
         Log3($name, 4 , qq($name received $msgtext from $device));
 
         my $tocheck = $hash->{helper}->{msgDialog}->{config}->{close};
-        return msgDialog_close($hash, $device) if $msgtext =~ m{\A[\b]*$tocheck[\b]*\z}xi;
+        return msgDialog_close($hash, $device) if $msgtext =~ m{\A[\b]*$tocheck[\b]*\z}i;
         $tocheck = $hash->{helper}->{msgDialog}->{config}->{open};
-        return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A[\b]*$tocheck}xi;
+        return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A[\b]*$tocheck}i;
         return msgDialog_progress($hash, $device, $msgtext);
     }
 
@@ -2400,7 +2400,7 @@ sub msgDialog_open {
     my $msgtext = shift // return;
 
     my $tocheck = $hash->{helper}->{msgDialog}->{config}->{open};
-    $msgtext =~ s{\A[\b]*$tocheck}{}xi;
+    $msgtext =~ s{\A[\b]*$tocheck}{}i;
     $msgtext = trim($msgtext);
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
     $hash->{helper}{msgDialog}->{$device} = 'started';
