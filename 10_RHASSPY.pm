@@ -1330,14 +1330,18 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aopen|close|allowed|msgCommand|siteId|hello|goodbye|querrymark\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|siteId|hello|goodbye|querrymark\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
+            next;
+        }
+        if ( $keywd =~ m{\Aopen|close\z}xms ) {
+            $hash->{helper}->{msgDialog}->{config}->{$keywd} = _toregex($values);
             next;
         }
     }
 
     return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
-    $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi rhasspy};
+    $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi.rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
     $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{none};
     $hash->{helper}->{msgDialog}->{config}->{siteId}     //= qq{$hash->{LANGUAGE}$hash->{fhemId}};
@@ -2341,9 +2345,9 @@ sub Notify {
         Log3($name, 4 , qq($name received $msgtext from $device));
 
         my $tocheck = $hash->{helper}->{msgDialog}->{config}->{close};
-        return msgDialog_close($hash, $device) if $msgtext =~ m{\A[\b]*$tocheck[\b]*\z}iu;
+        return msgDialog_close($hash, $device) if $msgtext =~ m{\A[\b]*$tocheck[\b]*\z}i;
         $tocheck = $hash->{helper}->{msgDialog}->{config}->{open};
-        return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A[\b]*$tocheck}iu;
+        return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A[\b]*$tocheck}i;
         return msgDialog_progress($hash, $device, $msgtext);
     }
 
@@ -2400,7 +2404,7 @@ sub msgDialog_open {
     my $msgtext = shift // return;
 
     my $tocheck = $hash->{helper}->{msgDialog}->{config}->{open};
-    $msgtext =~ s{\A[\b]*$tocheck}{}iu;
+    $msgtext =~ s{\A[\b]*$tocheck}{}i;
     $msgtext = trim($msgtext);
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
     $hash->{helper}{msgDialog}->{$device} = 'started';
@@ -4752,6 +4756,13 @@ sub _toCleanJSON {
 }
 
 sub _round { int( $_[0] + ( $_[0] < 0 ? -.5 : .5 ) ); }
+
+sub _toregex {
+    my $toclean = shift // return;
+    trim($toclean); 
+    $toclean =~ s{ }{\.}g;
+    return $toclean;
+}
 
 1;
 
