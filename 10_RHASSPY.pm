@@ -314,7 +314,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.07';
+    $hash->{MODULE_VERSION} = '0.5.07a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2425,9 +2425,10 @@ sub msgDialog_progress {
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
-    my $data    = $hash->{helper}{'.delayed'}->{$device} // msgDialog_close($hash, $device);
+    my $data    = $hash->{helper}{'.delayed'}->{$device}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
+    return if !defined $data;
     my $json = _toCleanJSON($data);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
     return;
