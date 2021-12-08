@@ -747,7 +747,7 @@ sub initialize_rhasspyTweaks {
         if ($line =~ m{\A[\s]*(extrarooms)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
-            $values= trim($values);
+            $values= join q{,}, split m{[\s]*,[\s]*}, $values;
             return "Error in $line! No content provided!" if !length $values && $init_done;
             $hash->{helper}{tweaks}{$tweak} = $values;
             next;
@@ -2360,8 +2360,9 @@ sub activateVoiceInput {
         $base = (split m{,}, $base)[0];
     }
     my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
+    my $hotword = $h->{hotword} // shift @{$anon} // $h->{modelId} // "$hash->{LANGUAGE}$hash->{fhemId}";
     my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
-    my $hotword = $h->{hotword} // shift @{$anon} // $modelId;
+
     my $sendData =  {
         modelId             => $modelId,
         modelVersion        => '',
@@ -4976,6 +4977,10 @@ After changing something relevant within FHEM for either the data structure in</
     <code>set &lt;rhasspyDevice&gt; customSlot mySlot a,b,c overwrite training </code><br>
     <code>set &lt;rhasspyDevice&gt; customSlot slotname=mySlot slotdata=a,b,c overwrite=false</code></p>
   </li>
+  <li>
+    <a id="RHASSPY-set-activateVoiceInput"></a><b>activateVoiceInput</b>
+    <p>Activate a satellite for voice input. <i>siteId</i>, <i>hotword</i> and <i>modelId</i> may be provided (either in order of appearance or as named arguments), otherwise some defaults will be used.
+  </li>
 </ul>
 
 <a id="RHASSPY-attr"></a>
@@ -5136,7 +5141,8 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <a id="RHASSPY-attr-rhasspyTweaks-extrarooms"></a>
       <li><b>extrarooms</b>
         <p>You may want to add more rooms to what Rhasspy can recognize as room. Using this key, the comma-separated items will be sent as rooms for preparing the room and mainrooms slots.<br>
-        Example: <p><code>extrarooms= hut,music collection,cooking recipies</code>
+        Example: <p><code>extrarooms= barn,music collection,cooking recipies</code><br>
+        Note: Only do this in case you really know what you are doing! Additional rooms only may be usefull in case you have some external application knowing what to do with info assinged to these rooms!
       </li>
     </ul>
   </li>
