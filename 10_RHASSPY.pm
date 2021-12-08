@@ -52,15 +52,16 @@ my %gets = (
 );
 
 my %sets = (
-    speak        => [],
-    play         => [],
-    customSlot   => [],
-    textCommand  => [],
-    trainRhasspy => [qw(noArg)],
-    fetchSiteIds => [qw(noArg)],
-    update       => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
-    volume       => [],
-    msgDialog    => [qw( enable disable )]
+    speak               => [],
+    play                => [],
+    customSlot          => [],
+    textCommand         => [],
+    trainRhasspy        => [qw(noArg)],
+    fetchSiteIds        => [qw(noArg)],
+    update              => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
+    volume              => [],
+    msgDialog           => [qw( enable disable )],
+    activateVoiceInput  => []
     #text2intent  => []
 );
 
@@ -268,6 +269,8 @@ my @topics = qw(
     hermes/dialogueManager/sessionEnded
     hermes/nlu/intentNotRecognized
     hermes/hotword/+/detected
+    hermes/hotword/toggleOn
+    hermes/hotword/toggleOff
 );
 
 sub Initialize {
@@ -525,6 +528,10 @@ sub Set {
         $values[0] = $h->{siteId} if defined $h->{siteId};
         $values[1] = $h->{path}   if defined $h->{path};
         $values[1] = $h->{volume} if defined $h->{volume};
+    }
+
+    if ($command eq 'activateVoiceInput') {
+        return activateVoiceInput($hash, $anon, $h);
     }
 
     $dispatch = {
@@ -1346,7 +1353,7 @@ sub initialize_msgDialog {
                 = AttrVal($msgConfig, "$hash->{prefix}MsgCommand", q{msg push \@$recipients $message});
     }
     my $monitored = join q{|}, devspec2array('TYPE=(ROOMMATE|GUEST)');
-    notifyRegexpChanged($hash,$monitored,0);
+    notifyRegexpChanged($hash,$monitored,0) if $monitored;
     return;
 
 }
@@ -2294,7 +2301,7 @@ sub Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', ReadingsVal($hash->{NAME}, 'IODev', InternalVal($hash->{NAME}, 'IODev', 'none')));
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected|hermes/hotword/toggleO[nf]+};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
@@ -2339,6 +2346,34 @@ sub Notify {
     }
 
     return;
+}
+
+sub activateVoiceInput {
+    my $hash    = shift //return;
+    my $anon    = shift;
+    my $h       = shift;
+
+    my $base = ReadingsVal($hash->{NAME},'siteIds', "$hash->{LANGUAGE}$hash->{fhemId}");
+    if ($base =~ m{\b(default|base)(?:[\b]|\Z)}xms) {
+        $base = $1;
+    } else { 
+        $base = (split m{,}, $base)[0];
+    }
+    my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
+    my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
+    my $hotword = $h->{hotword} // shift @{$anon} // $modelId;
+    my $sendData =  {
+        modelId             => $modelId,
+        modelVersion        => '',
+        modelType           => 'personal',
+        currentSensitivity  => '0.5',
+        siteId              => $siteId,
+        sessionId           => 'NULL',
+        sendAudioCaptured   => 'NULL',
+        customEntities      => 'NULL'
+    };
+    my $json = _toCleanJSON($sendData);
+    return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
 
 sub msgDialog_close {
@@ -2524,6 +2559,15 @@ sub analyzeMQTTmessage {
         push @updatedList, $hash->{NAME};
         return \@updatedList;
     }
+    # Hotword detection
+    if ($topic =~ m{\Ahermes/hotword/toggle(O[nf]+)}x) {
+        my $active = $1 eq 'On' ? 1 : 0;
+        my $siteId = $data->{siteId} // return;
+        $active = $data->{reason} if $active && defined $data->{reason};
+        readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
+        push @updatedList, $hash->{NAME};
+        return \@updatedList;
+    }
 
     if ($topic =~ m{\Ahermes/intent/.*[:_]SetMute}x && defined $siteId) {
         $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
@@ -2540,7 +2584,7 @@ sub analyzeMQTTmessage {
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $hotword = $1;
         my $ret = handleHotwordDetection($hash, $hotword, $data);
-        push @updatedList, $ret if $defs{$ret};
+        push @updatedList, $ret if $ret && $defs{$ret};
         push @updatedList, $hash->{NAME};
         return \@updatedList;
     }
@@ -2777,6 +2821,7 @@ sub updateSlots {
         for my $gdt (@gdts) {
             my @names = ();
             my @groupnames = ();
+            my @roomnames = ();
             my @devs = devspec2array("$hash->{devspec}");
             
             for my $device (@devs) {
@@ -2787,6 +2832,7 @@ sub updateSlots {
                     push @aliases, $hash->{helper}{devicemap}{devices}{$device}->{alias};
                     push @groupnames, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{groups} if defined $hash->{helper}{devicemap}{devices}{$device}->{groups};
                     push @mainrooms, (split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{rooms})[0];
+                    push @roomnames, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{rooms};
                 }
             }
             @names = get_unique(\@names);
@@ -2795,6 +2841,9 @@ sub updateSlots {
             @groupnames = get_unique(\@groupnames);
             @groupnames = ('') if !@groupnames && $noEmpty;
             $deviceData->{qq(${language}.${fhemId}.Group-$gdt)} = \@groupnames if @groupnames;
+            @roomnames = get_unique(\@roomnames);
+            @roomnames = ('') if !@roomnames && $noEmpty;
+            $deviceData->{qq(${language}.${fhemId}.Room-$gdt)} = \@roomnames if @roomnames;
         }
         @mainrooms = get_unique(\@mainrooms);
         @mainrooms = ('') if !@mainrooms && $noEmpty;
