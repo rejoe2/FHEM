@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-05 16:39:38Z Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -314,7 +314,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.07a';
+    $hash->{MODULE_VERSION} = '0.5.07b';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2412,7 +2412,8 @@ sub msgDialog_open {
         customData   => $device
     };
 
-    setDialogTimeout($hash, $sendData, undef, $msgtext ? '' : $hash->{helper}->{msgDialog}->{config}->{hello},'');
+    $msgtext = $hash->{helper}->{msgDialog}->{config}->{hello} if !$msgtext;
+    setDialogTimeout($hash, $sendData, $hash->{keepOpenDelay}, $msgtext ,'');
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
     return;
 }
@@ -2470,7 +2471,6 @@ sub updateLastIntentReadings {
     my $hash  = shift;
     my $topic = shift;
     my $data  = shift // return;
-    
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'lastIntentTopic', $topic);
     readingsBulkUpdate($hash, 'lastIntentPayload', toJSON($data));
@@ -2675,6 +2675,7 @@ sub respond {
     #check for msgDialog session
     if ( defined $hash->{helper}->{msgDialog} 
       && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}} ){
+        Log3($hash, 5, "respond deviated to msgDialog_respond for customData $sendData->{customData}.");
         return msgDialog_respond($hash, $sendData->{customData}, $response);
     }
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
