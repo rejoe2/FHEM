@@ -306,7 +306,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|encoding|useGenericAttrs|handleHotword|experimental)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -326,7 +326,7 @@ sub Define {
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
-    for my $key (qw( experimental handleHotword )) {
+    for my $key (qw( experimental handleHotword keepOpenDelay )) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -2425,7 +2425,7 @@ sub msgDialog_progress {
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
-    my $data    = $hash->{helper}{'.delayed'}{$device} // msgDialog_close($hash, $device);
+    my $data    = $hash->{helper}{'.delayed'}->{$device} // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     my $json = _toCleanJSON($data);
@@ -2637,6 +2637,7 @@ sub respond {
     my $data     = shift // return;
     my $response = shift // return;
     my $topic    = shift // q{endSession};
+    my $delay    = shift // $hash->{keepOpenDelay};
 
     my $type      = $data->{requestType} // return;
 
@@ -2652,7 +2653,7 @@ sub respond {
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
         }
-    } elsif ($topic eq 'continueSession') {
+    } elsif ( $topic eq 'continueSession' || $delay ) {
         $sendData->{text} = $response;
         $sendData->{intentFilter} = 'null';
     } else {
@@ -2676,6 +2677,7 @@ sub respond {
         return msgDialog_respond($hash, $sendData->{customData}, $response);
     }
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
+    setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
@@ -4428,7 +4430,7 @@ sub handleIntentCancelAction {
     my $identiy = qq($data->{sessionId});
     my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
     if ( !defined $data_old ) {
-        respond( $hash, $data, getResponse( $hash, 'SilentCancelConfirmation' ) );
+        respond( $hash, $data, getResponse( $hash, 'SilentCancelConfirmation' ), undef, 0 );
         return configure_DialogManager( $hash, $data->{siteId}, undef, undef, 1 ); #global intent filter seems to be not working!
     }
 
