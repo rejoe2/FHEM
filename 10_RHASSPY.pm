@@ -2369,9 +2369,9 @@ sub activateVoiceInput {
         modelType           => 'personal',
         currentSensitivity  => '0.5',
         siteId              => $siteId,
-        sessionId           => 'NULL',
-        sendAudioCaptured   => 'NULL',
-        customEntities      => 'NULL'
+        sessionId           => 'null',
+        sendAudioCaptured   => 'null',
+        customEntities      => 'null'
     };
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
