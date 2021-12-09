@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-09 Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-09 a Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -271,6 +271,7 @@ my @topics = qw(
     hermes/hotword/+/detected
     hermes/hotword/toggleOn
     hermes/hotword/toggleOff
+    hermes/tts/say
 );
 
 sub Initialize {
@@ -306,7 +307,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -323,6 +324,7 @@ sub Define {
     $hash->{fhemId} = $h->{fhemId} // q{fhem};
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || defined $h->{prefix} && $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
+    $hash->{siteId} = $h->{siteId} // qq{${language}$hash->{fhemId}};
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
@@ -1330,7 +1332,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|siteId|hello|goodbye|querrymark\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querrymark\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1344,7 +1346,6 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi.rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
     $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{none};
-    $hash->{helper}->{msgDialog}->{config}->{siteId}     //= qq{$hash->{LANGUAGE}$hash->{fhemId}};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
     $hash->{helper}->{msgDialog}->{config}->{querrymark} //= q{this is a feminine request};
@@ -2307,7 +2308,7 @@ sub Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', ReadingsVal($hash->{NAME}, 'IODev', InternalVal($hash->{NAME}, 'IODev', 'none')));
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected|hermes/hotword/toggleO[nf]+};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected|hermes/hotword/toggleO[nf]+|hermes/tts/say};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
@@ -2385,6 +2386,28 @@ sub activateVoiceInput {
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
 
+sub RHASSPY_msgDialogTimeout {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+    my $identiy = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identiy, $hash, 1); 
+    return msgDialog_close($hash, $identiy);
+}
+
+sub setMsgDialogTimeout {
+    my $hash     = shift // return;
+    my $data     = shift // return;
+    my $timeout  = shift // _getDialogueTimeout($hash);
+
+    my $siteId = $data->{siteId};
+    my $identiy = qq($data->{customData});
+    $hash->{helper}{msgDialog}->{$identiy} = $data;
+
+    resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
+    return;
+}
+
 sub msgDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
@@ -2394,8 +2417,8 @@ sub msgDialog_close {
     my $data_old = $hash->{helper}{'.delayed'}->{$device} // return;
 
     deleteSingleRegIntTimer($device, $hash);
-    respond( $hash, $data_old, $response );
-    delete $hash->{helper}{'.delayed'}->{$device};
+    msgDialog_respond( $hash, $device, $response );
+    #delete $hash->{helper}{'.delayed'}->{$device};
     delete $hash->{helper}{msgDialog}->{$device};
     return;
 }
@@ -2409,23 +2432,18 @@ sub msgDialog_open {
     $msgtext =~ s{\A[\b]*$tocheck}{}i;
     $msgtext = trim($msgtext);
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
-    $hash->{helper}{msgDialog}->{$device} = 'started';
-    
-    my $siteId = $hash->{helper}->{msgDialog}->{config}->{siteId};
-    my $id        = "$siteId" . time;
-    my $sendData =  { 
-        intentFilter => 'null',
-        id           => $id,
-        sessionId    => $device,
+
+    my $siteId   = $hash->{siteId};
+    my $id       = "${siteId}_${device}_" . time;
+    my $sendData =  {
+        sessionId    => $id,
         siteId       => $siteId,
-        input        => $msgtext,
         customData   => $device
     };
 
-    my $hello = $msgtext ? '' : $hash->{helper}->{msgDialog}->{config}->{hello};
-    setDialogTimeout($hash, $sendData, $hash->{keepOpenDelay}, $hello, '');
+    setMsgDialogTimeout($hash, $sendData, $hash->{keepOpenDelay});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
-    return;
+    return msgDialog_respond($hash, $device, $hash->{helper}->{msgDialog}->{config}->{hello});
 }
 
 #handle messages from FHEM/messenger side
@@ -2436,35 +2454,21 @@ sub msgDialog_progress {
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
-    my $data    = $hash->{helper}{'.delayed'}->{$device}; # // msgDialog_close($hash, $device);
+    my $data    = $hash->{helper}->{msgDialog}->{$device}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     return if !defined $data;
+    $data->{text} = $msgtext;
+
     my $json = _toCleanJSON($data);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
     return;
 }
 
-#handle messages from MQTT side
-sub handleIntentMsgDialog {
-    my $hash = shift // return;
-    my $data = shift // return;
-    my $name = $hash->{NAME};
-    #Beta-User: fake function, needs review...
-
-    my $response = ReadingsVal($name,'textResponse',getResponse( $hash, 'reSpeak_failed' ));
-
-    Log3($hash->{NAME}, 5, 'handleIntentMsgDialog called');
-    respond( $hash, $data, $response );
-    return $name;
-}
-
-
 sub msgDialog_respond {
     my $hash       = shift // return;
     my $recipients = shift // return;
     my $message    = shift // return;
-    $message = $message->{input} if ref $message eq 'HASH' && defined $message->{input};
 
     Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
 
@@ -2473,7 +2477,66 @@ sub msgDialog_respond {
     Log3($hash, 5, "msgDialog_respond command is $msgCommand");
 
     AnalyzeCommand($hash, $msgCommand);
-    return;
+    return $recipients;
+}
+
+#handle tts/say messages from MQTT side
+=pod
+    #source: https://rhasspy.readthedocs.io/en/latest/reference/#tts_say
+    hermes/tts/say (JSON)
+
+    Generate spoken audio for a sentence using the configured text to speech system
+    Automatically sends playBytes
+        playBytes.requestId = say.id
+    text: string - sentence to speak (required)
+    lang: string? = null - override language for TTS system
+    id: string? = null - unique ID for request (copied to sayFinished)
+    volume: float? = null - volume level to speak with (0 = off, 1 = full volume)
+    siteId: string = "default" - Hermes site ID
+    sessionId: string? = null - current session ID
+    Response(s)
+        hermes/tts/sayFinished (JSON)
+
+    hermes/tts/sayFinished (JSON)
+
+    Indicates that the text to speech system has finished speaking
+    id: string? = null - unique ID for request (copied from say)
+    siteId: string = "default" - Hermes site ID
+    Response to hermes/tts/say
+
+
+=cut
+sub handleTtsMsgDialog {
+    my $hash = shift // return;
+    my $data = shift // return;
+
+    my $recipients = $data->{sessionId} // return;
+    my $message    = $data->{text}      // return;
+    $recipients = (split m{_}, $recipients,3)[1] // return;
+
+    Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipients and text $message");
+    msgDialog_respond($hash,$recipients,$message) if defined $hash->{helper}->{msgDialog} 
+        && defined $hash->{helper}->{msgDialog}->{$recipients};
+
+    my $sendData =  { 
+        id           => $data->{id},
+        siteId       => $hash->{siteId}
+    };
+    my $json = _toCleanJSON($sendData);
+    IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
+    return $recipients;
+}
+
+#handle return messages from MQTT side
+sub handleIntentMsgDialog {
+    my $hash = shift // return;
+    my $data = shift // return;
+    my $name = $hash->{NAME};
+
+    #Beta-User: fake function, needs review...
+    Log3($hash, 5, "[$name] handleIntentMsgDialog called");
+
+    return $name;
 }
 
 # Update the readings lastIntentPayload and lastIntentTopic
@@ -2602,6 +2665,14 @@ sub analyzeMQTTmessage {
         return \@updatedList;
     }
 
+    if ( $topic =~ m{\Ahermes/tts/say}x ) {
+        return if !$hash->{siteId} || $data->{siteId} ne $hash->{siteId};
+        my $ret = handleTtsMsgDialog($hash, $data);
+        push @updatedList, $ret if $ret && $defs{$ret};
+        push @updatedList, $hash->{NAME};
+        return \@updatedList;
+    }
+
     if ($mute) {
         $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         respond( $hash, $data, q{ } );
@@ -2683,21 +2754,25 @@ sub respond {
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     Log3($hash->{NAME}, 5, "Response is: $response");
+=pod
     #check for msgDialog session
     if ( defined $hash->{helper}->{msgDialog} 
       && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for customData $sendData->{customData}.");
         return msgDialog_respond($hash, $sendData->{customData}, $response);
     }
+=cut
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
+    #no audio output in msgDialog session
+    return if defined $hash->{helper}->{msgDialog} 
+        && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
             text   => $response} )
                 if $secondAudio;
-
     return;
 }
 

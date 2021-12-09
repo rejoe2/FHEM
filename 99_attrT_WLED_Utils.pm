@@ -39,23 +39,25 @@ sub Initialize {
 
 sub WLED_getNames {
   my $dev   = shift // return;
-  my $event = shift // return;
+  my $event = shift;
 
-  my $cleaned = { api => $event };
-  if ( $event =~ m,(?<=<sx>)([\d]+)(?=<\/sx>),x ) {
-      $cleaned->{speed} = $1 if $1 ne ReadingsVal($dev,'speed','unknown');
-  }
-  if ( $event =~ m,(?<=<ix>)([\d]+)(?=<\/ix>),x ) {
-      $cleaned->{intensity} = $1 if $1 ne ReadingsVal($dev,'intensity','unknown');
-  }
-  if ( $event =~ m,(?<=<fp>)([\d]+)(?=<\/fp>),x ) {
-      $cleaned->{palette} = $1 if $1 ne ReadingsVal($dev,'palette','unknown');
-  }
-  if ( $event =~ m,(?<=<fx>)([\d]+)(?=<\/fx>),x ) {
-      $cleaned->{effect} = $1 if $1 ne ReadingsVal($dev,'effect','unknown');
-  }
-  if ( $event =~ m,(?<=<ps>)([\d]+)(?=<\/ps>),x ) {
-      $cleaned->{preset} = $1 if $1 ne ReadingsVal($dev,'preset','unknown');
+  my %cleaned = {api => $event};
+  if ($event){
+    if ( $event =~ m,(?<=<sx>)([\d]+)(?=<\/sx>),x ) {
+        $cleaned{speed} = $1 if $1 != ReadingsNum($dev,'speed','unknown');
+    }
+    if ( $event =~ m,(?<=<ix>)([\d]+)(?=<\/ix>),x ) {
+        $cleaned{intensity} = $1 if $1 != ReadingsNum($dev,'intensity','unknown');
+    }
+    if ( $event =~ m,(?<=<fp>)([\d]+)(?=<\/fp>),x ) {
+        $cleaned{palette} = $1 if $1 != ReadingsNum($dev,'palette','unknown');
+    }
+    if ( $event =~ m,(?<=<fx>)([\d]+)(?=<\/fx>),x ) {
+        $cleaned{effect} = $1 if $1 != ReadingsNum($dev,'effect','unknown');
+    }
+    if ( $event =~ m,(?<=<ps>)([\d]+)(?=<\/ps>),x ) {
+        $cleaned{preset} = $1 if $1 != ReadingsNum($dev,'preset','unknown');
+    }
   }
 
   my $io = InternalVal($dev,'LASTInputDev',AttrVal($dev,'IODev',InternalVal($dev,'IODev',undef)->{NAME})) // return \%cleaned;
@@ -69,7 +71,7 @@ sub WLED_getNames {
       WLED_setReadings($dev,"palette",$1) if $data =~ m/palettes..\[([^[]*?)]/x;
     }
   });
-  return \%cleaned;
+  return defined $event ? \%cleaned : undef;
 }
 
 sub WLED_setReadings {
@@ -94,7 +96,7 @@ sub WLED_setName {
   my $dev = shift // return;
   my $read = shift // return;
   my $val = shift;
-  my $arr = ReadingsVal($dev,".".$read."s",undef) // WLED_getNames($dev);
+  my $arr = ReadingsVal($dev,".".$read."s",undef) // WLED_getNames($dev,undef);
   my $wled = lc(InternalVal($dev,"CID",""));
   $wled =~ s/_/\//;
   my $top = $wled."/api F";

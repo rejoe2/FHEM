@@ -4713,14 +4713,14 @@ attr DEVICE setList\
   dimdown:noArg BASE_ID/DEVNAME/api A=~-10\
   speed:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api SX=$EVTPART1\
   intensity:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api IX=$EVTPART1\
-  effect:{"selectnumbers,0,1,".ReadingsNum($name,".effectscount",5).",0,lin"} BASE_ID/DEVNAME/api FX=$EVTPART1\
-  effectname:{"select,".join(",",sort(split(",",ReadingsVal($name,".effects","Solid,Police"))))} {FHEM::attrT_WLED_Utils::WLED_setName($NAME,"effect",$EVTPART1)}\
+  effect:{'selectnumbers,0,1,'.ReadingsNum($name,'.effectscount',5).',0,lin'} BASE_ID/DEVNAME/api FX=$EVTPART1\
+  effectname:{'select,'.join(',',sort(split(',',ReadingsVal($name,'.effects','Solid,Police'))))} {FHEM::attrT_WLED_Utils::WLED_setName($NAME,'effect',$EVTPART1)}\
   effect_next:noArg BASE_ID/DEVNAME/api FX=~1\
   effect_prev:noArg BASE_ID/DEVNAME/api FX=~-1\
   effect_random:noArg BASE_ID/DEVNAME/api FX=r\
   effect_reset:noArg BASE_ID/DEVNAME/api FX=0\
-  palette:{"selectnumbers,0,1,".ReadingsNum($name,".palettescount",5).",0,lin"} BASE_ID/DEVNAME/api FP=$EVTPART1\
-  palettename:{'select,'.join(',',sort(split(',',ReadingsVal($name,'.palettes','Default,Party'))))}  {FHEM::attrT_WLED_Utils::WLED_setName($NAME,"palette",$EVTPART1)}\
+  palette:{'selectnumbers,0,1,'.ReadingsNum($name,'.palettescount',5).',0,lin'} BASE_ID/DEVNAME/api FP=$EVTPART1\
+  palettename:{'select,'.join(',',sort(split(',',ReadingsVal($name,'.palettes','Default,Party'))))}  {FHEM::attrT_WLED_Utils::WLED_setName($NAME,'palette',$EVTPART1)}\
   palette_next:noArg BASE_ID/DEVNAME/api FP=~1\
   palette_prev:noArg BASE_ID/DEVNAME/api FP=~-1\
   palette_random:noArg BASE_ID/DEVNAME/api FP=r\
