@@ -130,8 +130,8 @@ __END__
 </ul>
 <ul>
   <li><b>FHEM::attrT_WLED_Utils::WLED_getNames</b><br>
-  <code>FHEM::attrT_WLED_Utils::WLED_getNames($)</code><br>
-  This is used to get the available effects and palettes for usage within the widgets.
+  <code>FHEM::attrT_WLED_Utils::WLED_getNames($$)</code><br>
+  This is used to update some readings and get the available effects and palettes for usage within the widgets.
   </li>
 </ul>
 <ul>
