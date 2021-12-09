@@ -4733,16 +4733,10 @@ attr DEVICE readingList \
   BASE_ID/DEVNAME/g:.* brightness\
   BASE_ID/DEVNAME/g:.* {$EVENT ? {state=>'on'} : {state=>'off'}}\
   BASE_ID/DEVNAME/c:.* {{rgb=>substr("$EVENT",1,6)}}\
-  BASE_ID/DEVNAME/v:.* api\
-  BASE_ID/DEVNAME/v:.* {FHEM::attrT_WLED_Utils::WLED_getNames($NAME)}\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<sx>)([\d]+)(?=<\/sx>), ? $1 eq ReadingsVal($NAME,'speed','unknown') ? return : {speed=>$1} : return}\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<ix>)([\d]+)(?=<\/ix>), ? $1 eq ReadingsVal($NAME,'intensity','unknown') ? return : {intensity=>$1} : return}\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fp>)([\d]+)(?=<\/fp>), ? $1 eq ReadingsVal($NAME,'palette','unknown') ? return : {palette=>$1} : return}\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fx>)([\d]+)(?=<\/fx>), ? $1 eq ReadingsVal($NAME,'effect','unknown') ? return :{effect=>"$1"} : return}\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<ps>)([\d]+)(?=<\/ps>), ? $1 eq ReadingsVal($NAME,'preset','unknown') ? return :{preset=>$1} : return}
+  BASE_ID/DEVNAME/v:.* {FHEM::attrT_WLED_Utils::WLED_getNames($NAME,$EVENT)}
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE devStateIcon {Color::devStateIcon( $name, 'rgb', 'rgb', 'brightness', 'state' )}
-attr DEVICE webCmd rgb:bri:effectname:speed:intensity:palettename:preset
+attr DEVICE webCmd rgb:brightness:effectname:speed:intensity:palettename:preset
 attr DEVICE webCmdLabel RGB:Brightness\
 :Effect:Speed:Intensity\
 :Palette:Preset
