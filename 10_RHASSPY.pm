@@ -1332,7 +1332,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querrymark\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querrymark|keepOpenDelay\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1349,6 +1349,7 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
     $hash->{helper}->{msgDialog}->{config}->{querrymark} //= q{this is a feminine request};
+    $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay};
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
     #addToDevAttrList($msgConfig, "$hash->{prefix}EvalSpecials:textField-long ",'RHASSPY');
@@ -2441,7 +2442,7 @@ sub msgDialog_open {
         customData   => $device
     };
 
-    setMsgDialogTimeout($hash, $sendData, $hash->{keepOpenDelay});
+    setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
     return msgDialog_respond($hash, $device, $hash->{helper}->{msgDialog}->{config}->{hello});
 }
@@ -2481,6 +2482,7 @@ sub msgDialog_respond {
     Log3($hash, 5, "msgDialog_respond command is $msgCommand");
 
     AnalyzeCommand($hash, $msgCommand);
+    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay}, \&RHASSPY_msgDialogTimeout, $hash, 0);
     return $recipients;
 }
 
