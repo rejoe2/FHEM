@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test g Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-09 Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1433,9 +1433,9 @@ sub setDialogTimeout {
     $toEnable = split m{,}, $toEnable if ref $toEnable ne 'ARRAY';
     if (ref $toEnable eq 'ARRAY') {
         for (@{$toEnable}) {
-	    my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
-    	    push @ca_strings, $id;
-	}
+            my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
+            push @ca_strings, $id;
+        }
     }
 
     my $reaction = ref $response eq 'HASH' 
@@ -2422,8 +2422,8 @@ sub msgDialog_open {
         customData   => $device
     };
 
-    $msgtext = $hash->{helper}->{msgDialog}->{config}->{hello} if !$msgtext;
-    setDialogTimeout($hash, $sendData, $hash->{keepOpenDelay}, $msgtext ,'');
+    my $hello = $msgtext ? '' : $hash->{helper}->{msgDialog}->{config}->{hello};
+    setDialogTimeout($hash, $sendData, $hash->{keepOpenDelay}, $hello, '');
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
     return;
 }
@@ -2464,10 +2464,13 @@ sub msgDialog_respond {
     my $hash       = shift // return;
     my $recipients = shift // return;
     my $message    = shift // return;
+    $message = $message->{input} if ref $message eq 'HASH' && defined $message->{input};
+
     Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
-    
+
     my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
-    $msgCommand =~ s{(\$\w+)}{$1}eegx;;
+    $msgCommand =~ s{(\$\w+)}{$1}eegx;
+    Log3($hash, 5, "msgDialog_respond command is $msgCommand");
 
     AnalyzeCommand($hash, $msgCommand);
     return;
