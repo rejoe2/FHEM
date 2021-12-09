@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test f Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-08 Test g Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1431,9 +1431,11 @@ sub setDialogTimeout {
     #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
     my @ca_strings;
     $toEnable = split m{,}, $toEnable if ref $toEnable ne 'ARRAY';
-    for (@{$toEnable}) {
-        my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
-        push @ca_strings, $id;
+    if (ref $toEnable eq 'ARRAY') {
+        for (@{$toEnable}) {
+	    my $id = qq{$hash->{LANGUAGE}.$hash->{fhemId}:$_};
+    	    push @ca_strings, $id;
+	}
     }
 
     my $reaction = ref $response eq 'HASH' 
