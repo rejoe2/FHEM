@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-09 a Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-09 b Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2476,6 +2476,7 @@ sub msgDialog_respond {
     return if !$message; # empty?
 
     my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
+    $msgCommand =~ s{\\[\@]}{@}x;
     $msgCommand =~ s{(\$\w+)}{$1}eegx;
     Log3($hash, 5, "msgDialog_respond command is $msgCommand");
 
