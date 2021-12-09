@@ -2402,7 +2402,7 @@ sub setMsgDialogTimeout {
 
     my $siteId = $data->{siteId};
     my $identiy = qq($data->{customData});
-    $hash->{helper}{msgDialog}->{$identiy} = $data;
+    $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
     return;
@@ -2414,9 +2414,9 @@ sub msgDialog_close {
     my $response = shift // $hash->{helper}->{msgDialog}->{config}->{goodbye};
     Log3($hash, 5, "msgDialog_close called with $device");
 
-    my $data_old = $hash->{helper}{'.delayed'}->{$device} // return;
-
     deleteSingleRegIntTimer($device, $hash);
+    return if !defined $hash->{helper}{msgDialog}->{$device};;
+
     msgDialog_respond( $hash, $device, $response );
     #delete $hash->{helper}{'.delayed'}->{$device};
     delete $hash->{helper}{msgDialog}->{$device};
@@ -2454,11 +2454,12 @@ sub msgDialog_progress {
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
-    my $data    = $hash->{helper}->{msgDialog}->{$device}; # // msgDialog_close($hash, $device);
+    my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     return if !defined $data;
     $data->{input} = $msgtext;
+    #asrConfidence: float? = null - confidence from ASR system for input text, https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
 
     my $json = _toCleanJSON($data);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
