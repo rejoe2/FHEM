@@ -2471,6 +2471,8 @@ sub msgDialog_respond {
     my $message    = shift // return;
 
     Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
+    trim($message);
+    return if !$message; # empty?
 
     my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
     $msgCommand =~ s{(\$\w+)}{$1}eegx;
