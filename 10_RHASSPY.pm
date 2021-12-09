@@ -2458,7 +2458,7 @@ sub msgDialog_progress {
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     return if !defined $data;
-    $data->{text} = $msgtext;
+    $data->{input} = $msgtext;
 
     my $json = _toCleanJSON($data);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
