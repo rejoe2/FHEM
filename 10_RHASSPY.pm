@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-09 b Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-09 c Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2459,7 +2459,15 @@ sub msgDialog_progress {
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     return if !defined $data;
-    $data->{input} = $msgtext;
+
+    my $intentFilter = $data->{intentFilter};
+    my $sendData =  { 
+        input        => $msgtext,
+        sessionId    => $data->{sessionId},
+        intentFilter => $intentFilter,
+        id           => $data->{id},
+        siteId       => $data->{siteId}
+    };
     #asrConfidence: float? = null - confidence from ASR system for input text, https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
 
     my $json = _toCleanJSON($data);
