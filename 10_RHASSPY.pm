@@ -341,12 +341,7 @@ sub Define {
     }
     notifyRegexpChanged($hash,'',1);
 
-    if ($hash->{Babble}) {
-        my $err = defined $defs{$hash->{Babble}} ? 0 : "No Babble instantiated with name $hash->{Babble}!";
-        Log3($name, 1, "[$name] error: $err") if $err;
-        return $err if $init_done && $err;
-        $sets{Babble} = [qw( optionA optionB )];
-    }
+    return "No Babble device available with name $hash->{Babble}!" if $init_done && defined $hash->{Babble} && InternalVal($hash->{Babble},'TYPE','none') ne 'Babble';
 
     return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
 }
@@ -379,6 +374,10 @@ sub firstInit {
         && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
     initialize_msgDialog($hash);
+    if ($hash->{Babble}) {
+        InternalVal($hash->{Babble},'TYPE','none') eq 'Babble' ? $sets{Babble} = [qw( optionA optionB )] 
+        : Log3($name, 1, "[$name] error: No Babble device available with name $hash->{Babble}!");
+    }
 
     return;
 }
