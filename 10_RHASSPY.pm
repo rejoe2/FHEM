@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test c Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test d Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -315,7 +315,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.08';
+    $hash->{MODULE_VERSION} = '0.5.08a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2417,7 +2417,7 @@ sub setMsgDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = (split m{_}, $data->{sessionId},3)[1] // return;
+    my $identiy = (split m{#}, $data->{sessionId},3)[1] // return;
     $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
@@ -2450,7 +2450,7 @@ sub msgDialog_open {
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
 
     my $siteId   = $hash->{siteId};
-    my $id       = "${siteId}_${device}_" . time;
+    my $id       = "${siteId}#${device}#" . time;
     my $sendData =  {
         sessionId    => $id,
         siteId       => $siteId,
@@ -2541,7 +2541,7 @@ sub handleTtsMsgDialog {
 
     my $recipients = $data->{sessionId} // return;
     my $message    = $data->{text}      // return;
-    $recipients = (split m{_}, $recipients,3)[1] // return;
+    $recipients = (split m{#}, $recipients,3)[1] // return;
 
     Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipients and text $message");
     msgDialog_respond($hash,$recipients,$message) if defined $hash->{helper}->{msgDialog} 
@@ -2797,7 +2797,7 @@ sub respond {
 
     #no audio output in msgDialog session
     return if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{(split m{_}, $data->{sessionId},3)[1]};
+        && defined $hash->{helper}->{msgDialog}->{(split m{#}, $data->{sessionId},3)[1]};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
