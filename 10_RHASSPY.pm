@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test a Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test b Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2814,8 +2814,11 @@ sub getResponse {
     my $identifier = shift // return 'Code error! No identifier provided for getResponse!' ;
     my $subtype = shift;
 
-    return $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype} if defined $subtype;
-    return getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
+    my $responses = defined $subtype
+        ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
+        : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
+    my @arr = split m{\|}, $responses;
+    return $arr[ rand @arr ];
 }
 
 
