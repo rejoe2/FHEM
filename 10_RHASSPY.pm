@@ -2417,7 +2417,7 @@ sub setMsgDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = qq($data->{customData});
+    my $identiy = (split m{_}, $data->{sessionId},3)[1] // return;
     $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
