@@ -2417,7 +2417,7 @@ sub setMsgDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = (split m{#}, $data->{sessionId},3)[1] // return;
+    my $identiy = (split m{[#]}, $data->{sessionId},3)[1] // return;
     $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
@@ -2541,7 +2541,7 @@ sub handleTtsMsgDialog {
 
     my $recipients = $data->{sessionId} // return;
     my $message    = $data->{text}      // return;
-    $recipients = (split m{#}, $recipients,3)[1] // return;
+    $recipients = (split m{[#]}, $recipients,3)[1] // return;
 
     Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipients and text $message");
     msgDialog_respond($hash,$recipients,$message) if defined $hash->{helper}->{msgDialog} 
@@ -2797,7 +2797,7 @@ sub respond {
 
     #no audio output in msgDialog session
     return if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{(split m{#}, $data->{sessionId},3)[1]};
+        && defined $hash->{helper}->{msgDialog}->{(split m{[#]}, $data->{sessionId},3)[1]};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
