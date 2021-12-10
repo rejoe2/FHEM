@@ -2459,7 +2459,7 @@ sub msgDialog_open {
 
     setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
-    return msgDialog_respond($hash, $device, $hash->{helper}->{msgDialog}->{config}->{hello});
+    return msgDialog_respond($hash, $device, $hash->{helper}->{msgDialog}->{config}->{hello}, 0);
 }
 
 #handle messages from FHEM/messenger side
