@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-09 c Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10  Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -307,7 +307,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental|Babble)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -315,7 +315,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.07b';
+    $hash->{MODULE_VERSION} = '0.5.08';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -328,7 +328,7 @@ sub Define {
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
-    for my $key (qw( experimental handleHotword keepOpenDelay )) {
+    for my $key (qw( experimental handleHotword keepOpenDelay Babble)) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -340,6 +340,13 @@ sub Define {
         #addToAttrList(q{homebridgeMapping});
     }
     notifyRegexpChanged($hash,'',1);
+
+    if ($hash->{Babble}) {
+        my $err = defined $defs{$hash->{Babble}} ? 0 : "No Babble instantiated with name $hash->{Babble}!";
+        Log3($name, 1, "[$name] error: $err") if $err;
+        return $err if $init_done && $err;
+        $sets{Babble} = [qw( optionA optionB )];
+    }
 
     return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
 }
@@ -588,6 +595,15 @@ sub Set {
         my $overwr   = $h->{overwrite} // shift @values;
         my $training = $h->{training}  // shift @values;
         return updateSingleSlot($hash, $slotname, $slotdata, $overwr, $training);
+    }
+
+    if ($command eq 'Babble') {
+        if ($values[0] eq 'optionA') {
+            return "rhasspy command Babble A called";
+        }
+        if ($values[0] eq 'optionB') {
+            return "rhasspy command Babble B called";
+        }
     }
 
     return;
@@ -2752,6 +2768,7 @@ sub respond {
         }
     } elsif ( $topic eq 'continueSession' || $delay ) {
         $sendData->{text} = $response;
+        configure_DialogManager($hash,$data->{siteId}) if $topic ne 'continueSession';
         $sendData->{intentFilter} = 'null';
     } else {
         $sendData->{text} = $response;
@@ -2777,7 +2794,7 @@ sub respond {
     }
 =cut
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
-    setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
+    #setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
     #no audio output in msgDialog session
     return if defined $hash->{helper}->{msgDialog} 
