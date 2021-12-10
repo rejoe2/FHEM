@@ -2433,7 +2433,7 @@ sub msgDialog_close {
     deleteSingleRegIntTimer($device, $hash);
     return if !defined $hash->{helper}{msgDialog}->{$device};;
 
-    msgDialog_respond( $hash, $device, $response );
+    msgDialog_respond( $hash, $device, $response, 0 );
     #delete $hash->{helper}{'.delayed'}->{$device};
     delete $hash->{helper}{msgDialog}->{$device};
     return;
@@ -2495,6 +2495,7 @@ sub msgDialog_respond {
     my $hash       = shift // return;
     my $recipients = shift // return;
     my $message    = shift // return;
+    my $keepopen   = shift // 1;
 
     Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
     trim($message);
@@ -2506,7 +2507,7 @@ sub msgDialog_respond {
     Log3($hash, 5, "msgDialog_respond command is $msgCommand");
 
     AnalyzeCommand($hash, $msgCommand);
-    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay}, \&RHASSPY_msgDialogTimeout, $hash, 0);
+    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
     return $recipients;
 }
 
