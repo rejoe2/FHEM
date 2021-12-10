@@ -2504,8 +2504,6 @@ sub msgDialog_respond {
     my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
     $msgCommand =~ s{\\[\@]}{@}x;
     $msgCommand =~ s{(\$\w+)}{$1}eegx;
-    Log3($hash, 5, "msgDialog_respond command is $msgCommand");
-
     AnalyzeCommand($hash, $msgCommand);
     resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
     return $recipients;
