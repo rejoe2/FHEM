@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10 a Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test a Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1348,7 +1348,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querrymark|keepOpenDelay\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querymark|keepOpenDelay\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1364,7 +1364,7 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{none};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
-    $hash->{helper}->{msgDialog}->{config}->{querrymark} //= q{this is a feminine request};
+    $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
     $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay};
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
@@ -2474,18 +2474,18 @@ sub msgDialog_progress {
     #This is the place to add additional logics and decission making...
     #my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
+    Log3($hash, 5, 'msgDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
 
-    my $intentFilter = $data->{intentFilter};
     my $sendData =  { 
         input        => $msgtext,
         sessionId    => $data->{sessionId},
-        intentFilter => $intentFilter,
         id           => $data->{id},
         siteId       => $data->{siteId}
     };
     #asrConfidence: float? = null - confidence from ASR system for input text, https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
+    $sendData->{intentFilter} = $data->{intentFilter} if defined $data->{intentFilter};
 
     my $json = _toCleanJSON($data);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
@@ -5297,7 +5297,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
         <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
-        <li><i>querrymark</i> Text pattern that shall be used to distinguish the querries done in intent MsgDialog from others (will be added to all requests towards Rhasspy intent recognition system automatically)</li>
+        <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (will be added to all requests towards Rhasspy intent recognition system automatically)</li>
       </ul>
   </li>
   <li>
