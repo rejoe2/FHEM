@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10  Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10 a Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2468,10 +2468,11 @@ sub msgDialog_progress {
     my $hash    = shift // return;
     my $device  = shift // return;
     my $msgtext = shift // return;
+    my $data    = shift // $hash->{helper}->{msgDialog}->{$device}->{data};
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
-    my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
+    #my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
 
     return if !defined $data;
