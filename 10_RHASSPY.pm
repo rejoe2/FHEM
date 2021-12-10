@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test b Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test c Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2798,7 +2798,7 @@ sub respond {
 
     #no audio output in msgDialog session
     return if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}};
+        && defined $hash->{helper}->{msgDialog}->{(split m{_}, $data->{sessionId},3)[1]};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
