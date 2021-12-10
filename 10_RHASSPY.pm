@@ -2486,7 +2486,7 @@ sub msgDialog_progress {
     #asrConfidence: float? = null - confidence from ASR system for input text, https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
     $sendData->{intentFilter} = $data->{intentFilter} if defined $data->{intentFilter};
 
-    my $json = _toCleanJSON($data);
+    my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
     return;
 }
