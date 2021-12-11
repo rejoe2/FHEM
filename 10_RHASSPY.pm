@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-10 Test d Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-11 Test Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2417,7 +2417,7 @@ sub setMsgDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = (split m{[#]}, $data->{sessionId},3)[1] // return;
+    my $identiy = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
     $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
 
     resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
@@ -2450,7 +2450,7 @@ sub msgDialog_open {
     Log3($hash, 5, "msgDialog_open called with $device and (cleaned) $msgtext");
 
     my $siteId   = $hash->{siteId};
-    my $id       = "${siteId}#${device}#" . time;
+    my $id       = "${device}_${siteId}_" . time;
     my $sendData =  {
         sessionId    => $id,
         siteId       => $siteId,
@@ -2541,7 +2541,7 @@ sub handleTtsMsgDialog {
 
     my $recipients = $data->{sessionId} // return;
     my $message    = $data->{text}      // return;
-    $recipients = (split m{[#]}, $recipients,3)[1] // return;
+    $recipients = (split m{_$hash->{siteId}_}, $recipients,3)[0] // return;
 
     Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipients and text $message");
     msgDialog_respond($hash,$recipients,$message) if defined $hash->{helper}->{msgDialog} 
@@ -2784,20 +2784,21 @@ sub respond {
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     Log3($hash->{NAME}, 5, "Response is: $response");
-=pod
+
     #check for msgDialog session
+    my $identity = (split m{_$hash->{siteId}_}, $data->{sessionId},3)[0];
     if ( defined $hash->{helper}->{msgDialog} 
-      && defined $hash->{helper}->{msgDialog}->{$sendData->{customData}} ){
-        Log3($hash, 5, "respond deviated to msgDialog_respond for customData $sendData->{customData}.");
-        return msgDialog_respond($hash, $sendData->{customData}, $response);
+      && defined $hash->{helper}->{msgDialog}->{$identity} ){
+        Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
+        return msgDialog_respond($hash, $identity, $response);
     }
-=cut
+
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     #setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
     #no audio output in msgDialog session
     return if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{(split m{[#]}, $data->{sessionId},3)[1]};
+        && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
@@ -2816,6 +2817,7 @@ sub getResponse {
     my $responses = defined $subtype
         ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
         : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
+    return $responses if ref $responses eq 'HASH';
     my @arr = split m{\|}, $responses;
     return $arr[ rand @arr ];
 }
