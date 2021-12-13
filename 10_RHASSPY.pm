@@ -156,6 +156,10 @@ my $languagevars = {
        '0' => '$deviceName is open',
        '1' => '$deviceName is closed'
      }
+  },
+  'getStateResponses' => {
+     'STATE' => '$deviceName value is [$deviceName:STATE]',
+     'price' => 'prize of $reading is [$deviceName:$reading]'
   }
 };
 
@@ -208,6 +212,17 @@ my $internal_mappings = {
     'ready'  => 'inOperation',
     'acting' => 'inOperation'
   }
+};
+
+my $shuffled_answer = sub {
+    my $txts         = shift // return;
+    my $wantsreplace = shift // 0;
+    my @arr = split m{\|}, $txts;
+    return $arr[ rand @arr ] if !$wantsreplace;
+
+    my $shuffled = $arr[ rand @arr ];
+    $shuffled =~ s{(\$\w+)}{$1}eegx;
+    return $shuffled;
 };
 
 BEGIN {
@@ -919,7 +934,8 @@ sub _analyze_rhassypAttr {
            && !defined AttrVal($device,"${prefix}Channels",undef) 
            && !defined AttrVal($device,"${prefix}Colors",undef)
            && !defined AttrVal($device,"${prefix}Group",undef)
-           && !defined AttrVal($device,"${prefix}Specials",undef);
+           && !defined AttrVal($device,"${prefix}Specials",undef)
+           && !defined AttrVal($device,"${prefix}Mapping",undef);
 
     #rhasspyRooms ermitteln
     my @rooms;
@@ -961,13 +977,11 @@ sub _analyze_rhassypAttr {
     my $mappingsString = AttrVal($device, "${prefix}Mapping", q{});
     for (split m{\n}x, $mappingsString) {
         my ($key, $val) = split m{:}x, $_, 2;
-        #$key = lc($key);
-        #$val = lc($val);
-        my %currentMapping = splitMappingString($val);
-        next if !%currentMapping;
+        next if !$val;
+        my $currentMapping = splitMappingString($val) // next;
         # Übersetzen, falls möglich:
-        $currentMapping{type} = $currentMapping{type} // $key;
-        $hash->{helper}{devicemap}{devices}{$device}{intents}{$key}->{$currentMapping{type}} = \%currentMapping;
+        $currentMapping->{type} //= $key;
+        $hash->{helper}{devicemap}{devices}{$device}{intents}{$key}->{$currentMapping->{type}} = $currentMapping;
     }
 
     #Specials
@@ -1212,6 +1226,13 @@ sub _analyze_genDevType {
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
         return;
     }
+
+    if ( $gdt eq 'info' ) {
+        my $r = $defs{$device}{READINGS};
+        $currentMapping->{GetState}->{$gdt} = {currentVal => 'STATE', type => 'STATE' };
+        $currentMapping = _analyze_genDevType_setter( $hash, $device, $allset, $currentMapping );
+        $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+    }
     return;
 }
 
@@ -1254,13 +1275,15 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => { 
-            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' }
+            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' },
+        GetState => { 
+            update => 'reread|update|reload' },
         };
     for my $okey ( keys %{$allValMappings} ) {
         my $ikey = $allValMappings->{$okey};
         for ( keys %{$ikey} ) {
             my $val = $ikey->{$_};
-            $mapping->{$okey}->{$okey}->{$_} = $val if $setter =~ m{\b$val([\b:\s]|\Z)}xms;
+            $mapping->{$okey}->{$okey}->{$_} = $1 if $setter =~ m{\b($val)(?:[\b:\s]|\Z)}xmsi;
         }
     }
     my $allKeyMappings = {
@@ -1762,7 +1785,7 @@ sub getDevicesByIntentAndType {
 
     return if !defined $hash->{helper}{devicemap};
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
-        my $mapping = getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1, 1) // next;
+        my $mapping = getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1) // next;
         my $mappingType = $mapping->{type};
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
@@ -1896,7 +1919,7 @@ sub getActiveDeviceForIntentAndType {
         my $match;
 
         for (@{$devices}) {
-            my $mapping = getMapping($subhash, $_, 'GetOnOff', undef, defined $hash->{helper}{devicemap}, 1);
+            my $mapping = getMapping($subhash, $_, 'GetOnOff', undef, 1);
             if (defined $mapping ) {
                 # Gerät ein- oder ausgeschaltet?
                 my $value = _getOnOffState($subhash, $_, $mapping);
@@ -2063,7 +2086,7 @@ sub splitMappingString {
     # Tokens in Keys/Values trennen
     %parsedMapping = map {split m{=}x, $_, 2} @tokens; #Beta-User: Odd number of elements in hash assignment
 
-    return %parsedMapping;
+    return \%parsedMapping;
 }
 
 
@@ -2073,7 +2096,6 @@ sub getMapping {
     my $device     = shift // return;
     my $intent     = shift // return;
     my $type       = shift // $intent; #Beta-User: seems first three parameters are obligatory...?
-    my $fromHash   = shift // 0;
     my $disableLog = shift // 0;
 
     my $subType = $type;
@@ -2084,34 +2106,14 @@ sub getMapping {
 
     my $matchedMapping;
 
-    if ( $fromHash ) {
-        $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if  defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
-        return $matchedMapping if $matchedMapping;
-        
-        for (sort keys %{$hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}}) {
-            #simply pick first item in alphabetical order...
-            return $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$_};
-        }
+    $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if  defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
+    return $matchedMapping if $matchedMapping;
+
+    for (sort keys %{$hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}}) {
+        #simply pick first item in alphabetical order...
+        return $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$_};
     }
 
-    my $prefix = $hash->{prefix};
-    my $mappingsString = AttrVal($device, "${prefix}Mapping", undef) // return;
-
-    for (split m{\n}x, $mappingsString) {
-
-        # Nur Mappings vom gesuchten Typ verwenden
-        next if $_ !~ qr/^$intent/x;
-        $_ =~ s/$intent://x;
-        my %currentMapping = splitMappingString($_);
-
-        # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
-        if ( !defined $matchedMapping 
-              || lc($matchedMapping->{type}) ne lc($type) && lc($currentMapping{type}) eq lc($type) ) {
-              $matchedMapping = \%currentMapping;
-              #Beta-User: könnte man ergänzen durch den match "vorne" bei Reading, kann aber sein, dass es effektiver geht, wenn wir das künftig sowieso anders machen...
-              Log3($hash->{NAME}, 5, "${prefix}Mapping selected: $_") if !$disableLog;
-        }
-    }
     return $matchedMapping;
 }
 
@@ -2232,6 +2234,7 @@ sub _getValue {
         my @replace = split m{:}x, $getString;
         $device = $replace[0];
         $getString = $replace[1] // $getString;
+        return InternalVal($device,'STATE',0) if $getString eq 'STATE';
         return ReadingsVal($device, $getString, 0);
     }
 
@@ -2821,8 +2824,9 @@ sub getResponse {
         ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
         : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
     return $responses if ref $responses eq 'HASH';
-    my @arr = split m{\|}, $responses;
-    return $arr[ rand @arr ];
+    return $shuffled_answer->($responses, 1);
+    #my @arr = split m{\|}, $responses;
+    #return $arr[ rand @arr ];
 }
 
 
@@ -3343,7 +3347,7 @@ sub handleIntentSetOnOff {
         $room = getRoomName($hash, $data);
         $value = $data->{Value};
         $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetOnOff', undef, defined $hash->{helper}{devicemap});
+        $mapping = getMapping($hash, $device, 'SetOnOff');
 
         # Mapping found?
         if ( defined $device && defined $mapping ) {
@@ -3405,7 +3409,7 @@ sub handleIntentSetOnOffGroup {
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
     for my $device (@devlist) {
-        my $mapping = getMapping($hash, $device, 'SetOnOff', undef, defined $hash->{helper}{devicemap});
+        my $mapping = getMapping($hash, $device, 'SetOnOff');
 
         # Mapping found?
         next if !defined $mapping;
@@ -3451,7 +3455,7 @@ sub handleIntentSetTimedOnOff {
         $room = getRoomName($hash, $data);
         $value = $data->{Value};
         $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetOnOff', undef, defined $hash->{helper}{devicemap});
+        $mapping = getMapping($hash, $device, 'SetOnOff');
 
         # Mapping found?
         if ( defined $device && defined $mapping ) {
@@ -3556,7 +3560,7 @@ sub handleIntentSetTimedOnOffGroup {
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
     for my $device (@devlist) {
-        my $mapping = getMapping($hash, $device, 'SetOnOff', undef, defined $hash->{helper}{devicemap});
+        my $mapping = getMapping($hash, $device, 'SetOnOff');
 
         # Mapping found?
         next if !defined $mapping;
@@ -3609,7 +3613,7 @@ sub handleIntentGetOnOff {
         $device = getDeviceByName($hash, $room, $data->{Device});
         my $deviceName = $data->{Device};
         my $mapping;
-        $mapping = getMapping($hash, $device, 'GetOnOff', undef, defined $hash->{helper}{devicemap}, 0) if defined $device;
+        $mapping = getMapping($hash, $device, 'GetOnOff') if defined $device;
         my $status = $data->{State};
 
         # Mapping found?
@@ -3619,12 +3623,14 @@ sub handleIntentGetOnOff {
 
             # Define reponse
             if ( defined $mapping->{response} ) { 
-                $response = _getValue($hash, $device, $mapping->{response}, $value, $room); 
+                $response = _getValue($hash, $device, $mapping->{response}, $value, $room);
+                $response = $shuffled_answer->($response);
             }
             else {
                 my $stateResponseType = $internal_mappings->{stateResponseType}->{$status};
                 $response = $hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value};
-                $response =~ s{(\$\w+)}{$1}eegx;
+                #$response =~ s{(\$\w+)}{$1}eegx;
+                $response = $shuffled_answer->($response, 1);
             }
         }
     }
@@ -3744,7 +3750,7 @@ sub handleIntentSetNumeric {
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
 
-    my $mapping = getMapping($hash, $device, 'SetNumeric', $type, defined $hash->{helper}{devicemap}, 0);
+    my $mapping = getMapping($hash, $device, 'SetNumeric', $type);
 
     if ( !defined $mapping ) {
         if ( defined $data->{'.inBulk'} ) {
@@ -3901,7 +3907,7 @@ sub handleIntentGetNumeric {
         return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
     }
 
-    my $mapping = getMapping($hash, $device, 'GetNumeric', { type => $type, subType => $subType }, defined $hash->{helper}{devicemap}, 0)
+    my $mapping = getMapping($hash, $device, 'GetNumeric', { type => $type, subType => $subType })
         // return respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
 
     # Mapping found
@@ -3971,16 +3977,16 @@ sub handleIntentGetState {
 
     Log3($hash->{NAME}, 5, 'handleIntentGetState called');
 
-    # Mindestens Device muss existieren
-    if (exists $data->{Device}) {
-        my $room = getRoomName($hash, $data);
-        $device = getDeviceByName($hash, $room, $device);
-        my $mapping = getMapping($hash, $device, 'GetState', undef, defined $hash->{helper}{devicemap}, 0);
+    my $room = getRoomName($hash, $data);
+    $device = getDeviceByName($hash, $room, $device);
+    my $mapping = getMapping($hash, $device, 'GetState');
 
-        if ( defined $mapping->{response} ) {
-            $response = _getValue($hash, $device, $mapping->{response}, undef, $room);
-            $response = _ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
-        }
+    if ( defined $mapping->{response} ) {
+        $response = _getValue($hash, $device, $mapping->{response}, undef, $room);
+        $response = _ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
+    } elsif ( defined $data->{Type} ) {
+        my $reading = $data->{Reading} // 'STATE';
+        $response = _ReplaceReadingsVal($hash, getResponse( $hash, 'getStateResponses', $data->{Type}));
     }
     # Antwort senden
     $response = getResponse($hash, 'DefaultError') if !defined $response;
@@ -4012,7 +4018,7 @@ sub handleIntentMediaControls {
         $response = getResponse($hash, 'NoActiveMediaDevice') if !defined $device;
     }
 
-    $mapping = getMapping($hash, $device, 'MediaControls', undef, defined $hash->{helper}{devicemap}, 0);
+    $mapping = getMapping($hash, $device, 'MediaControls');
 
     if ( defined $device && defined $mapping && defined $mapping->{$command} ) {
         #check if confirmation is required
@@ -4047,7 +4053,7 @@ sub handleIntentSetScene{
     $room = getRoomName($hash, $data);
     $scene = $data->{Scene};
     $device = getDeviceByName($hash, $room, $data->{Device});
-    $mapping = getMapping($hash, $device, 'SetScene', undef, defined $hash->{helper}{devicemap});
+    $mapping = getMapping($hash, $device, 'SetScene');
     # restore HUE scenes
     $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
 
