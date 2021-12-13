@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-11 Test Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-13 msgConfig Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1358,9 +1358,12 @@ sub initialize_msgDialog {
     }
 
     return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
+    if ( !defined $hash->{helper}->{msgDialog}->{config}->{allowed} ) {
+        delete $hash->{helper}->{msgDialog};
+        return 'Setting the allowed key is mandatory!' ;
+    }
     $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi.rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
-    $hash->{helper}->{msgDialog}->{config}->{allowed}    //= q{none};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
     $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
@@ -5291,16 +5294,17 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   </li>
     <li>
     <a id="RHASSPY-attr-rhasspyMsgDialog"></a><b>rhasspyMsgDialog</b>
-    <p>If some key in this attribute are set, RHASSPY will (note: somewhen in the future...) react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and additionally for each RHASSPY instance a siteId has to be added to the intent recognition service.</p>
+    <p>If some key in this attribute are set, RHASSPY will react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and additionally for each RHASSPY instance a siteId has to be added to the intent recognition service.</p>
     Keys that may be set in this attribute:
      <ul>
-        <li><i>allowed</i> The <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices allowed to interact with RHASSPY (comma-separated device names)</li>
-        <li><i>open</i> the keyword used to initiate a dialogue</li>
-        <li><i>close</i> the keyword used to exit a dialogue</li>
+        <li><i>allowed</i> The <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
+        <li><i>open</i> A keyword or expression used to initiate a dialogue (will be converted to a regex compatible notation)</li>
+        <li><i>keepOpenDelay</i> timout limit in seconds (<b>recommended</b>). All sessions will be closed automatically when timeout has passed. Timer will be reset with each incoming message .</li>
+        <li><i>close</i> keyword used to exit a dialogue (similar to open) before timeout has reached</li>
         <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
         <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
-        <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (will be added to all requests towards Rhasspy intent recognition system automatically)</li>
+        <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (for the future: will be added to all requests towards Rhasspy intent recognition system automatically; not functional atm.)</li>
       </ul>
   </li>
   <li>
