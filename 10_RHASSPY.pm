@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-13 msgConfig Beta-User $
+# $Id: 10_RHASSPY.pm 25302 2021-12-13 GetState Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2825,7 +2825,7 @@ sub getResponse {
         ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
         : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
     return $responses if ref $responses eq 'HASH';
-    return $shuffled_answer->($responses, 1);
+    return $shuffled_answer->($responses);
     #my @arr = split m{\|}, $responses;
     #return $arr[ rand @arr ];
 }
@@ -3988,7 +3988,7 @@ sub handleIntentGetState {
         # execute Cmd
         analyzeAndRunCmd($hash, $device, $cmd);
         $response = getResponse( $hash, 'getStateResponses', 'update');
-        $response = $shuffled_answer->($response);
+        $response = $shuffled_answer->($response, 1);
     } elsif ( defined $mapping->{response} ) {
         $response = _getValue($hash, $device, $mapping->{response}, undef, $room);
         $response = _ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
