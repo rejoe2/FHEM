@@ -3983,7 +3983,7 @@ sub handleIntentGetState {
     $device = getDeviceByName($hash, $room, $device);
     my $mapping = getMapping($hash, $device, 'GetState');
 
-    if ( defined $data->{Device} ) {
+    if ( defined $data->{Update} ) {
         my $cmd = $mapping->{update} // return respond( $hash, $data, getResponse($hash, 'DefaultError'));
         # execute Cmd
         analyzeAndRunCmd($hash, $device, $cmd);
