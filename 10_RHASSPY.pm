@@ -158,8 +158,9 @@ my $languagevars = {
      }
   },
   'getStateResponses' => {
-     'STATE' => '$deviceName value is [$deviceName:STATE]',
-     'price' => 'prize of $reading is [$deviceName:$reading]'
+     'STATE'  => '$deviceName value is [$deviceName:STATE]',
+     'price'  => 'current prize of $reading in $deviceName is [$deviceName:$reading:d]',
+     'update' => 'initiated update for $deviceName'
   }
 };
 
@@ -3978,10 +3979,17 @@ sub handleIntentGetState {
     Log3($hash->{NAME}, 5, 'handleIntentGetState called');
 
     my $room = getRoomName($hash, $data);
+    my $deviceName = $device;
     $device = getDeviceByName($hash, $room, $device);
     my $mapping = getMapping($hash, $device, 'GetState');
 
-    if ( defined $mapping->{response} ) {
+    if ( defined $data->{Device} ) {
+        my $cmd = $mapping->{update} // return respond( $hash, $data, getResponse($hash, 'DefaultError'));
+        # execute Cmd
+        analyzeAndRunCmd($hash, $device, $cmd);
+        $response = getResponse( $hash, 'getStateResponses', 'update');
+        $response = $shuffled_answer->($response);
+    } elsif ( defined $mapping->{response} ) {
         $response = _getValue($hash, $device, $mapping->{response}, undef, $room);
         $response = _ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
     } elsif ( defined $data->{Type} ) {
