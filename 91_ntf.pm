@@ -153,7 +153,6 @@ sub ntf_defCmdAttrModule($) {
     $hash->{helper}{cmds}{gets}{trgFilter}             = "";
   }
   {    # attr
-    $hash->{helper}{cmds}{attr}{addStateEvent}         = '(1|0))';
     $hash->{helper}{cmds}{attr}{disable}               = '(1|0)';
     $hash->{helper}{cmds}{attr}{disabledForIntervals}  = '-disable-';
     $hash->{helper}{cmds}{attr}{disabledAfterTrigger}  = '-seconds-';
@@ -622,7 +621,6 @@ sub ntf_Attr(@)        {###################################
   return $chk  if ($chk);
   my ($aSet,$name,$aName,$aVal) = @a;
   my $hash = $defs{$name};
-
   if    ($aName eq "readLog"     ) {
     if  ($aSet eq "set"){
       if($aVal) {
@@ -849,10 +847,17 @@ sub ntf_Get($@)        {###################################
   }
   elsif($cmd eq "trgFilter") {  ###############################################
     if (defined $hash->{helper}{trg}){
-      $ret = "trigger:\n   ".join("\n   ",map{"$_ -> $hash->{helper}{trg}{$_}"} keys %{$hash->{helper}{trg}});
+      foreach my $x(keys %{$hash->{helper}{trg}}){
+        $ret .= "\n$x:";
+        $hash->{helper}{trg}{$x} =~ m/^\^\((.*)\)\$$/;
+        foreach(split('\|',$1)){
+          my($re,$va)=split(": ",$_);
+          $ret.="\n         read: $re \t=> val: $va";
+        }
+      }
     }
     else{
-      $ret = "no trigger defines";
+      $ret = "no trigger defined";
     }
   }
 
@@ -879,7 +884,7 @@ sub ntf_Notify($$;@)   {###################################
     $events = \@sim;      
   }
   else{
-    $events = deviceEvents($dev, AttrVal($name, "addStateEvent", 0));
+    $events = deviceEvents($dev, 1);
   }
   return if(!$events); # Some previous ntf deleted the array.
   my $max = int(@{$events});
@@ -981,7 +986,6 @@ sub ntf_Notify($$;@)   {###################################
   return (AttrVal($name, "forwardReturnValue", 0) ? $ret : undef);
 }
 
-
 sub ntf_prepTgrNames($$$$){################################
     my ($hash,$trgComb,$trgDevice,$trgEvnt) = @_;
     my $nameLstOld = defined $hash->{helper}{trg} 
@@ -1017,7 +1021,11 @@ sub ntf_prepTgrNames($$$$){################################
             push @trgDeviceLst,"i:NAME=".$fltr;
           }
         }
-        $trgEvnt   = AttrVal($hash->{NAME},"trgEvent"   ,"")   if(!defined $trgEvnt  );
+        my $read    = AttrVal($hash->{NAME},"trgReading",undef);
+        my $readVal = $read ? "$read: ". AttrVal($hash->{NAME},"trgReadValue",".*")   
+                         : "";
+        my @fltr    = grep/./,( $readVal,AttrVal($hash->{NAME},"trgEvent"   ,"")); 
+        $trgEvnt    = join("|",@fltr)             if(!defined $trgEvnt  );
         $names{$_} .= "|".$trgEvnt foreach(devspec2array(join(":FILTER=",@trgDeviceLst)));
       }
       foreach(keys %names){
@@ -1037,6 +1045,7 @@ sub ntf_prepTgrNames($$$$){################################
         InternalTimer(gettimeofday()+1, sub(){  notifyRegexpChanged($hash, 0,1) }, $hash);
       }
     }
+#    return 1;
 }
 
 #############
