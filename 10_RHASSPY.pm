@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25302 2021-12-13 GetState Beta-User $
+# $Id: 10_RHASSPY.pm 25341 2021-12-14 GetState+ Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2434,7 +2434,7 @@ sub setMsgDialogTimeout {
 sub msgDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
-    my $response = shift // $hash->{helper}->{msgDialog}->{config}->{goodbye};
+    my $response = shift // $shuffled_answer->($hash->{helper}->{msgDialog}->{config}->{goodbye});
     Log3($hash, 5, "msgDialog_close called with $device");
 
     deleteSingleRegIntTimer($device, $hash);
@@ -2466,7 +2466,7 @@ sub msgDialog_open {
 
     setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
-    return msgDialog_respond($hash, $device, $hash->{helper}->{msgDialog}->{config}->{hello}, 0);
+    return msgDialog_respond($hash, $device, $shuffled_answer->($hash->{helper}->{msgDialog}->{config}->{hello}), 0);
 }
 
 #handle messages from FHEM/messenger side
@@ -3296,7 +3296,7 @@ sub handleIntentShortcuts {
         $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};
         return setDialogTimeout($hash, $data, $timeout, $response);
     }
-    $response = $shortcut->{response} // getResponse($hash, 'DefaultConfirmation');
+    $response = $shuffled_answer->($shortcut->{response}) // getResponse($hash, 'DefaultConfirmation');
     my $ret;
     my $device = $shortcut->{NAME};
     my $cmd    = $shortcut->{perl};
@@ -3365,7 +3365,7 @@ sub handleIntentSetOnOff {
             # Define response
             if ( defined $mapping->{response} ) { 
                 $numericValue = $value eq 'on' ? 1 : 0;
-                $response = _getValue($hash, $device, $mapping->{response}, $numericValue, $room); 
+                $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $numericValue, $room); 
                 Log3($hash->{NAME}, 5, "Response is $response" );
             }
             else { $response = getResponse($hash, 'DefaultConfirmation'); }
@@ -3452,54 +3452,54 @@ sub handleIntentSetTimedOnOff {
     if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec};
     
     # Device AND Value must exist
-    if ( exists $data->{Device} && exists $data->{Value} ) {
-        $room = getRoomName($hash, $data);
-        $value = $data->{Value};
-        $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetOnOff');
+    return if !exists $data->{Device} || !exists $data->{Value};
 
-        # Mapping found?
-        if ( defined $device && defined $mapping ) {
-            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
-            my $cmdOn  = $mapping->{cmdOn} // 'on';
-            my $cmdOff = $mapping->{cmdOff} // 'off';
-            my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
-            $cmd .= "-for-timer";
+    $room = getRoomName($hash, $data);
+    $value = $data->{Value};
+    $device = getDeviceByName($hash, $room, $data->{Device});
+    $mapping = getMapping($hash, $device, 'SetOnOff');
 
-            my $allset = getAllSets($device);
-            return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
+    # Mapping found?
+    if ( defined $device && defined $mapping ) {
+        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
+        my $cmdOn  = $mapping->{cmdOn} // 'on';
+        my $cmdOff = $mapping->{cmdOff} // 'off';
+        my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
+        $cmd .= "-for-timer";
 
-            my $hour = 0;
-            my $now1 = time;
-            my $now = $now1;
-            my @time = localtime($now);
-            if ( defined $data->{Hourabs} ) {
-                $hour  = $data->{Hourabs};
-                $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
-            }
-            elsif ($data->{Hour}) {
-                $hour = $data->{Hour};
-            }
-            $now1 += HOURSECONDS * $hour;
-            $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
-            $now1 += $data->{Sec} if $data->{Sec};
+        my $allset = getAllSets($device);
+        return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
 
-            $now1 += +DAYSECONDS if $now1 < $now;
-            $now1 = $now1 - $now;
-
-            $cmd .= " $now1";
-            # execute Cmd
-            analyzeAndRunCmd($hash, $device, $cmd);
-            Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
-
-            # Define response
-            if ( defined $mapping->{response} ) { 
-                $numericValue = $value eq 'on' ? 1 : 0;
-                $response = _getValue($hash, $device, $mapping->{response}, $numericValue, $room); 
-                Log3($hash->{NAME}, 5, "Response is $response" );
-            }
-            else { $response = getResponse($hash, 'DefaultConfirmation'); }
+        my $hour = 0;
+        my $now1 = time;
+        my $now = $now1;
+        my @time = localtime($now);
+        if ( defined $data->{Hourabs} ) {
+            $hour  = $data->{Hourabs};
+            $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
         }
+        elsif ($data->{Hour}) {
+            $hour = $data->{Hour};
+        }
+        $now1 += HOURSECONDS * $hour;
+        $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
+        $now1 += $data->{Sec} if $data->{Sec};
+
+        $now1 += +DAYSECONDS if $now1 < $now;
+        $now1 = $now1 - $now;
+
+        $cmd .= " $now1";
+        # execute Cmd
+        analyzeAndRunCmd($hash, $device, $cmd);
+        Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+        # Define response
+        if ( defined $mapping->{response} ) { 
+            $numericValue = $value eq 'on' ? 1 : 0;
+            $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $numericValue, $room); 
+            Log3($hash->{NAME}, 5, "Response is $response" );
+        }
+        else { $response = getResponse($hash, 'DefaultConfirmation'); }
     }
     # Send response
     $response = $response  // getResponse($hash, 'DefaultError');
@@ -3624,7 +3624,7 @@ sub handleIntentGetOnOff {
 
             # Define reponse
             if ( defined $mapping->{response} ) { 
-                $response = _getValue($hash, $device, $mapping->{response}, $value, $room);
+                $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $value, $room);
                 $response = $shuffled_answer->($response);
             }
             else {
@@ -3636,7 +3636,7 @@ sub handleIntentGetOnOff {
         }
     }
     # Send response
-    $response = getResponse($hash, 'DefaultError')  if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
     return $device;
 }
@@ -3863,11 +3863,11 @@ sub handleIntentSetNumeric {
 
     # get response 
     defined $mapping->{response} 
-        ? $response = _getValue($hash, $device, $mapping->{response}, $newVal, $room) 
+        ? $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $newVal, $room) 
         : $response = getResponse($hash, 'DefaultConfirmation'); 
 
     # send response
-    $response = getResponse($hash, 'DefaultError') if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response ) if !defined $data->{'.inBulk'};
     return $device;
 }
@@ -3963,9 +3963,9 @@ sub handleIntentGetNumeric {
     }
 
     # Variablen ersetzen?
-    $response =~ s{(\$\w+)}{$1}eegx;
+    #$response =~ s{(\$\w+)}{$1}eegx;
     # Antwort senden
-    return respond( $hash, $data, $response );
+    return respond( $hash, $data, $shuffled_answer->($response, 1) );
 }
 
 
@@ -3990,8 +3990,8 @@ sub handleIntentGetState {
         $response = getResponse( $hash, 'getStateResponses', 'update');
         $response = $shuffled_answer->($response, 1);
     } elsif ( defined $mapping->{response} ) {
-        $response = _getValue($hash, $device, $mapping->{response}, undef, $room);
-        $response = _ReplaceReadingsVal($hash, $mapping->{response}) if !$response; #Beta-User: case: plain Text with [device:reading]
+        $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), undef, $room);
+        $response = _ReplaceReadingsVal($hash, $shuffled_answer->($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
     } elsif ( defined $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
         $response = _ReplaceReadingsVal($hash, getResponse( $hash, 'getStateResponses', $data->{Type}));
@@ -4036,7 +4036,7 @@ sub handleIntentMediaControls {
         analyzeAndRunCmd($hash, $device, $cmd);
         # Define voice response
         $response = defined $mapping->{response} ?
-            _getValue($hash, $device, $mapping->{response}, $command, $room)
+            _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $command, $room)
             : getResponse($hash, 'DefaultConfirmation');
     }
     $response = getResponse($hash, 'DefaultError') if !defined $response;
@@ -4078,7 +4078,7 @@ sub handleIntentSetScene{
     Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
 
     # Define response
-    $response = $mapping->{response} // getResponse( $hash, 'DefaultConfirmation' );
+    $response = $shuffled_answer->($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
 
     respond( $hash, $data, $response );
     return $device;
@@ -4127,44 +4127,30 @@ sub handleIntentGetDate {
 sub handleIntentMediaChannels {
     my $hash = shift // return;
     my $data = shift // return;
-    my $channel; my $device; my $room;
-    my $cmd;
-    my $response; # = getResponse($hash, 'DefaultError');
 
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
     # Mindestens Channel muss übergeben worden sein
-    if ( exists $data->{Channel} ) {
-        $room = getRoomName($hash, $data);
-        $channel = $data->{Channel};
+    return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') ) if !exists $data->{Channel};
 
-        # Passendes Gerät suchen
-        if ( exists $data->{Device} ) {
-            $device = getDeviceByName($hash, $room, $data->{Device});
-        } else {
-            $device = getDeviceByMediaChannel($hash, $room, $channel);
-        }
-        
-        if (defined $hash->{helper}{devicemap}) {
-            $cmd = $hash->{helper}{devicemap}{devices}{$device}{Channels}{$channel};
-        }
-        else {
-            $cmd = getKeyValFromAttr($hash, $device, 'rhasspyChannels', $channel, undef);
-        }
-        #$cmd = (split m{=}x, $cmd, 2)[1];
+    my $room = getRoomName($hash, $data);
+    my $channel = $data->{Channel};
 
-        if ( defined $device && defined $cmd ) {
-            #check if confirmation is required
-            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaChannels' );
-            $response = getResponse($hash, 'DefaultConfirmation');
-            # Cmd ausführen
-            analyzeAndRunCmd($hash, $device, $cmd);
-        }
-    }
+    # Passendes Gerät suchen
+    my $device = exists $data->{Device}
+        ? getDeviceByName($hash, $room, $data->{Device})
+        : getDeviceByMediaChannel($hash, $room, $channel);
+    return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') ) if !defined $device;
+
+    my $cmd = $hash->{helper}{devicemap}{devices}{$device}{Channels}{$channel} // return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') );
+
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaChannels' );
+    # Cmd ausführen
+    analyzeAndRunCmd($hash, $device, $cmd);
 
     # Antwort senden
-    $response = getResponse($hash, 'NoMediaChannelFound') if !defined $response;
-    respond( $hash, $data, $response );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
     return $device;
 }
 
@@ -4533,7 +4519,7 @@ sub handleIntentSetTimer {
         $response =~ s{(\$\w+)}{$1}eegx;
     }
 
-    $response = getResponse($hash, 'DefaultError') if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
 
     respond( $hash, $data, $response );
     return $name;
