@@ -1,5 +1,5 @@
 ﻿###############################################################
-# $Id: 72_FRITZBOX.pm 22125 2020-06-06 11:11:54Z tupol $
+# $Id: 72_FRITZBOX.pm 17437 2018-09-30 18:24:58Z tupol $
 #
 #  72_FRITZBOX.pm 
 #
@@ -75,7 +75,7 @@ sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_TR064_Init($$);
 sub FRITZBOX_Wlan_Run($);
 sub FRITZBOX_Web_Query($$@);
-
+sub FRITZBOX_Get_LANdevInfo(@);
 our $telnet;
 
 my %fonModel = ( 
@@ -196,6 +196,13 @@ sub FRITZBOX_Initialize($)
                 ."telnetTimeOut "
                 ."useGuiHack:0,1 "
                 ."userTickets "
+                ."readingOn:multiple,userAll,userCompact"
+                                  .",radioAll,radioCompact"
+                                  .",dectAll,dectCompact,dectName"
+                                  .",fonAll,fonCompact"
+                                  .",alarmAll,alarmCompact,alarmName,alarmState"
+                                  .",IPAll,IPCompact,IPName,IPState,IPSpeed,IPActivOnly"
+                                  ." "
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
                 
@@ -227,7 +234,7 @@ sub FRITZBOX_Define($$)
 
    $hash->{STATE}              = "Initializing";
    $hash->{INTERVAL}           = 300; 
-   $hash->{fhem}{modulVersion} = '$Date: 2020-06-06 13:11:54 +0200 (Sat, 06 Jun 2020) $';
+   $hash->{fhem}{modulVersion} = '$Date: 2018-09-30 20:24:58 +0200 (So, 30 Sep 2018) $';
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
 
@@ -319,8 +326,7 @@ sub FRITZBOX_Attr($@)
    }
 
    # Stop the sub if FHEM is not initialized yet
-  return undef    unless $init_done;
-  
+   return undef    unless $init_done;
    if ( $aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1 
         || $aName eq "disable" ) {
       $hash->{APICHECKED} = 0;
@@ -328,9 +334,27 @@ sub FRITZBOX_Attr($@)
       InternalTimer(gettimeofday()+1, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
       # FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
    }
-
-   return undef;
+   elsif($aName eq "readingOn"){
+       if($cmd eq "set"){
+           delete $hash->{fhem}{readingOn};
+           $hash->{fhem}{readingOn}{$_} = 1 foreach(grep/^(user|radio|dect|fon|alarm|IP)(All|Compact|Name|State|Speed|ActivOnly)$/,split(",",$aVal));
+           foreach("user","radio","dect","fon","alarm","IP"){
+               delete $hash->{fhem}{readingOn}{$_."Name"}  if ($hash->{fhem}{readingOn}{$_."Compact"});
+               if ($hash->{fhem}{readingOn}{$_."All"}) {
+                   delete $hash->{fhem}{readingOn}{$_."State"} ;
+                   delete $hash->{fhem}{readingOn}{$_."Speed"} ;
+                   delete $hash->{fhem}{readingOn}{$_."Name"}  ;
+               }
+           }
+       }
+       else{
+           $hash->{fhem}{readingOn}{$_."Compact"} = 1 foreach("user","radio","dect","fon","alarm","IP");
+       }
+       FRITZBOX_refreshReading($name);
+   }
+  return undef;
 } # FRITZBOX_Attr ende
+
 
 #######################################################################
 sub FRITZBOX_Set($$@) 
@@ -648,21 +672,100 @@ sub FRITZBOX_Get($@)
    elsif( lc $cmd eq "tr064servicelist" ) {
       return FRITZBOX_TR064_Get_ServiceList ($hash);
    }
+   elsif( lc $cmd eq "infolandev" ) {
+       Log 1,"General lan:".scalar(@val)." #".join("+",@val);
+      return FRITZBOX_Get_LANdevInfo ($hash,join(",",@val));
+   }
       
    my $list = "ringTones:noArg";
    $list .= " luaQuery"      if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " tr064Command"  if AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT};;
    $list .= " tr064ServiceList:noArg"      if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 ) && $hash->{TELNET}==1;
+   $list .= " infoLANdev:multiple,infoLong,".join(",",keys%{$hash->{fhem}{LAN}})   ;
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
+#######################################################################
+sub FRITZBOX_refreshReading($) {
+    my $name = shift;
+    delete $defs{$name}{READINGS}{$_} foreach(grep/^(user|radio|dect|fon|alarm|IP|mac_|WEBRADIO)/,keys%{$defs{$name}{READINGS}});
+
+    readingsBeginUpdate($defs{$name});
+      foreach (FRITZBOX_updtReading($name)){
+        my ($rn,$rv) = split(";",$_);
+        readingsBulkUpdate( $defs{$name}, $rn,$rv );
+      }
+    readingsEndUpdate( $defs{$name}, 1 );
+    
+}
+#######################################################################
+sub FRITZBOX_updtReading($) {
+    my $name = shift;
+    my $rdHash = $defs{$name}{fhem}{readingOn};
+    my @ReadingsUpdt = ();
+   # "user","radio","dect","fon","alarm","IP"
+    if($rdHash->{radioCompact}){push @ReadingsUpdt,"WEBRADIOactive;".scalar(keys%{$defs{$name}{fhem}{radio}});}
+    if($rdHash->{radioAll})    {push @ReadingsUpdt,"$_;$defs{$name}{fhem}{radio}{$_}" foreach(keys%{$defs{$name}{fhem}{radio}});}
+
+    if($rdHash->{fonCompact})  {foreach my $fon (keys%{$defs{$name}{fhem}{fon}}){push @ReadingsUpdt,"fon_${fon};".join(",",map{$_.":".$defs{$name}{fhem}{fon}{$fon}{$_}} sort keys%{$defs{$name}{fhem}{fon}{$fon}});}}
+    if($rdHash->{fonAll})      {foreach my $fon (keys%{$defs{$name}{fhem}{fon}}){push @ReadingsUpdt,"fon_${fon}_$_;$defs{$name}{fhem}{fon}{$fon}{$_}" foreach(sort keys%{$defs{$name}{fhem}{fon}{$fon}});}}
+
+    if($rdHash->{dectCompact}) {foreach my $dect (keys%{$defs{$name}{fhem}{dect}}){push @ReadingsUpdt,"dect_${dect};".join(",",map{$_.":".$defs{$name}{fhem}{dect}{$dect}{$_}} sort grep/(Id|Intern|HSFWVersion|HSManufacturer|HS_node)/,keys%{$defs{$name}{fhem}{dect}{$dect}});}}
+    if($rdHash->{dectName})    {foreach my $dect (keys%{$defs{$name}{fhem}{dect}}){push @ReadingsUpdt,"dect_${dect};".join(",",map{$_.":".$defs{$name}{fhem}{dect}{$dect}{$_}} sort grep/(Id|Intern)/,keys%{$defs{$name}{fhem}{dect}{$dect}});}}
+    if($rdHash->{dectAll})     {foreach my $dect (keys%{$defs{$name}{fhem}{dect}}){push @ReadingsUpdt,"dect_${dect}_$_;$defs{$name}{fhem}{dect}{$dect}{$_}"                              foreach(sort keys%{$defs{$name}{fhem}{dect}{$dect}});}}
+
+    if($rdHash->{userCompact}) {foreach my $user (keys%{$defs{$name}{fhem}{user}}){push @ReadingsUpdt,"${user};".join(",",map{$_.":".$defs{$name}{fhem}{user}{$user}{$_}} sort grep/(today_time)/,keys%{$defs{$name}{fhem}{dect}{$user}});}}
+    if($rdHash->{userAll})     {foreach my $user (keys%{$defs{$name}{fhem}{user}}){push @ReadingsUpdt,"${user}_$_;$defs{$name}{fhem}{user}{$user}{$_}"                               foreach(sort keys%{$defs{$name}{fhem}{user}{$user}});}}
+
+    if($rdHash->{alarmCompact}){foreach my $alarm (keys%{$defs{$name}{fhem}{alarm}}){push @ReadingsUpdt,"alarm_${alarm};".join(",",map{$_.":".$defs{$name}{fhem}{alarm}{$alarm}{$_}} sort                keys%{$defs{$name}{fhem}{dect}{$alarm}});}}
+    if($rdHash->{alarmName})   {foreach my $alarm (keys%{$defs{$name}{fhem}{alarm}}){push @ReadingsUpdt,"alarm_${alarm};".join(",",map{$_.":".$defs{$name}{fhem}{alarm}{$alarm}{$_}} sort grep/(Active)/,keys%{$defs{$name}{fhem}{alarm}{$alarm}});}}
+    if($rdHash->{alarmAll})    {foreach my $alarm (keys%{$defs{$name}{fhem}{alarm}}){push @ReadingsUpdt,"alarm_${alarm}_$_;$defs{$name}{fhem}{alarm}{$alarm}{$_}"                              foreach(sort keys%{$defs{$name}{fhem}{alarm}{$alarm}});}}
+
+    foreach my $IP (keys%{$defs{$name}{fhem}{LAN}}){
+        if($rdHash->{IPActivOnly} && !$defs{$name}{fhem}{LAN}{$IP}{active}){
+            delete $defs{$name}{READINGS}{$_} foreach(grep/^(IP_$IP)/,keys%{$defs{$name}{READINGS}});
+            next;
+        }
+        if($rdHash->{IPCompact}) {
+        if($defs{$name}{fhem}{LAN}{$IP}{active}){push @ReadingsUpdt,"IP_${IP};".join(",",map{$_.":".$defs{$name}{fhem}{LAN}{$IP}{$_}} sort grep/^(active|ip|speed)$/,keys%{$defs{$name}{fhem}{LAN}{$IP}});
+        }else                    {push @ReadingsUpdt,"IP_${IP};".          "active:".$defs{$name}{fhem}{LAN}{$IP}{active};}}
+        if($rdHash->{IPName})    {push @ReadingsUpdt,"IP_${IP};".join(",",map{$_.":".$defs{$name}{fhem}{LAN}{$IP}{$_}} sort grep/(active|ip)/,keys%{$defs{$name}{fhem}{LAN}{$IP}});}
+        if($rdHash->{IPAll})     {push @ReadingsUpdt,"IP_${IP}_$_;".                 $defs{$name}{fhem}{LAN}{$IP}{$_}            foreach(sort keys%{$defs{$name}{fhem}{LAN}{$IP}});}
+        if($rdHash->{IPState})   {push @ReadingsUpdt,"IP_${IP}_active;".             $defs{$name}{fhem}{LAN}{$IP}{active};}
+        if($rdHash->{IPSpeed})   {push @ReadingsUpdt,"IP_${IP}_speed;".              $defs{$name}{fhem}{LAN}{$IP}{speed} ;}
+        $defs{$name}{fhem}{MAC}{$defs{$name}{fhem}{LAN}{$IP}{mac}} = $IP if (defined $defs{$name}{fhem}{LAN}{$IP}{mac});
+    }
+    return @ReadingsUpdt;
+}
+
+#######################################################################
+sub FRITZBOX_Get_LANdevInfo(@){
+    my ($hash,$val) = @_;
+    my %retH;
+    foreach my $search (split(",",$val)){
+      foreach my $dev (grep/$search/, keys%{$hash->{fhem}{LAN}}){
+        my $devH = $hash->{fhem}{LAN}{$dev};
+        $retH{$dev} = 1;
+      }
+    }
+   my $ret = "";
+   foreach my $dev (sort keys %retH){
+      my $devDisp = length($dev) < 20 ? substr($dev."                    ",0,15) : $dev;
+      if ($val =~ m/infoLong/){#long
+        $ret .= "\n$devDisp: \t".join("\n\t\t",map{$_.":".$hash->{fhem}{LAN}{$dev}{$_}} sort keys%{$hash->{fhem}{LAN}{$dev}});
+      }
+      else{
+        $ret .= "\n$devDisp: \t".join(" #",map{$_.":".$hash->{fhem}{LAN}{$dev}{$_}} sort grep/^(active|online|guest|speed)$/,keys%{$hash->{fhem}{LAN}{$dev}});
+      }
+    }
+    return $ret;
+}
 # Starts the data capturing and sets the new readout timer
 #######################################################################
 sub FRITZBOX_Readout_Start($)
 {
    my ($timerpara) = @_;
-
    # my ( $name, $func ) = split( /\./, $timerpara );
    my $index = rindex( $timerpara, "." );    # rechter Punkt
    my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
@@ -1225,7 +1328,7 @@ sub FRITZBOX_Readout_Run_Shell($)
    push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # 2nd WLAN
    push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
-# Gäste WLAN
+# G�ste WLAN
    push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
    push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 # Dect
@@ -1467,94 +1570,47 @@ sub FRITZBOX_Readout_Run_Web($)
 # Dect-Geräteliste erstellen
    if ( $result->{handsetCount} =~ /[1-9]/ ) {
      $runNo = 0;
-     foreach ( @{ $result->{dectUser} } ) {
-        my $intern = $_->{Intern};
-        my $id = $_->{Id};
+     foreach my $dect( @{ $result->{dectUser} } ) {
+        my $intern = $dect->{Intern};
+        my $id = $dect->{Id};
         if ($intern) 
         {
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo,                     $_->{Name} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intern",           $intern ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_alarmRingTone",    $_->{AlarmRingTone0}, "ringtone" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_intRingTone",      $_->{IntRingTone}, "ringtone" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_radio",            $_->{RadioRingID}, "radio" ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingTone",     $_->{G722RingTone} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_custRingToneName", $_->{G722RingToneName} ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$runNo."_imagePath",        $_->{ImagePath} ;
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->dect->$dect->{Name}->$_"  , $dect->{$_} foreach (keys%{$dect});
 
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->id",   $id ;
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->userId", $runNo;
-           
            $dectFonID{$id}{Intern} = $intern;
-           $dectFonID{$id}{User} = $runNo;
+           $dectFonID{$id}{User}   = $runNo;
+           $dectFonID{$id}{Name}   = $dect->{Name};
         }
         $runNo++;
      }
      
   # Handset der internen Nummer zuordnen
-     foreach ( @{ $result->{handset} } ) {
-        my $dectUserID = $_->{User};
+     foreach my $hs ( @{ $result->{handset} } ) {
+        my $dectUserID = $hs->{User};
         next if defined $dectUserID eq "";
         my $dectUser = $dectFonID{$dectUserID}{User};
-        my $intern = $dectFonID{$dectUserID}{Intern};
+        my $intern   = $dectFonID{$dectUserID}{Intern};
         
         if ($dectUser) {
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_manufacturer", $_->{Manufacturer};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_model",        $_->{Model},         "model";
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "dect".$dectUser."_fwVersion",    $_->{FWVersion};
-
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->brand", $_->{Manufacturer};
-           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->$intern->model", $_->{Model},       "model";
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->dect->$dectFonID{$dectUserID}{Name}->HS$_"  , $hs->{$_} foreach (keys%{$hs});
         }
      }
    }
 # Analog Fons Name
-   $runNo=1;
-   foreach ( @{ $result->{fonPort} } ) {
-      if ( $_->{Name} )
+   foreach my $fon ( @{ $result->{fonPort} } ) {
+      if ( $fon->{Name} )
       {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fon".$runNo,           $_->{Name};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fon".$runNo."_out",    $_->{MSN};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fon".$runNo."_intern", $runNo;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->fon->$fon->{Name}->out"    , $fon->{MSN};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->fon->$fon->{Name}->intern" , substr($fon->{_node},4,1,);
       }
-      $runNo++;
    }
 
 # Internetradioliste erzeugen
-   $runNo = 0;
-   $rName = "radio00";
-   foreach ( @{ $result->{radio} } ) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,                 $_->{Name};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radio->".$runNo, $_->{Name};
-      $runNo++;
-      $rName = sprintf ("radio%02d",$runNo);
+   foreach my $radio ( @{ $result->{radio} } ) {
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radio->$radio->{_node}"  , $radio->{Name} if(length($radio->{Name})>1);
    }
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radioCount", $runNo;
-
-# Create WLAN-List
-   my %wlanList;
-   #to keep compatibility with firmware <= v3.67 and >=7
-   if ( ref $result->{wlanList} eq 'ARRAY' ) {
-      foreach ( @{ $result->{wlanList} } ) {
-         my $mac = $_->{mac};
-         $mac =~ s/:/_/g;
-         # Anscheinend gibt es Anmeldungen sowohl für Repeater als auch für FBoxen 
-         $wlanList{$mac}{speed} = $_->{speed}   if ! defined $wlanList{$mac}{speed} || $_->{speed} ne "0";
-         $wlanList{$mac}{speed_rx} = $_->{speed_rx} if ! defined $wlanList{$mac}{speed_rx} || $_->{speed_rx} ne "0";
-         #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
-         $wlanList{$mac}{rssi} = $_->{rssi} if ! defined $wlanList{$mac}{rssi} || $_->{rssi} ne "0";
-         $wlanList{$mac}{is_guest} = $_->{is_guest} if ! defined $wlanList{$mac}{is_guest} || $_->{is_guest} ne "0";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $wlanList{$mac}{speed_rx};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
-      }
-   }
-   
+  
 # Create LanDevice list and delete inactive devices
-   my %oldLanDevice;
-   #collect current mac-readings (to delete the ones that are inactive or disappeared)
-   foreach (keys %{ $hash->{READINGS} }) {
-      $oldLanDevice{$_} = $hash->{READINGS}{$_}{VAL}     if $_ =~ /^mac_/ && defined $hash->{READINGS}{$_}{VAL};
-   }
    %landevice = ();
    my $wlanCount = 0;
    my $gWlanCount = 0;
@@ -1562,59 +1618,32 @@ sub FRITZBOX_Readout_Run_Web($)
       foreach ( @{ $result->{lanDevice} } ) {
          my $dIp = $_->{ip};
          my $UID = $_->{UID};
-         my $dName = $_->{name};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$UID", $dName;
+         (my $dName = $_->{name}) =~ s/[ ,]/_/g;
+         
+         my $LID = $_;
+         foreach (grep!/(name)/,keys %{$LID}){
+           $LID->{$_} =~ s/:/_/g if ($_ eq "mac");
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->LAN->$dName->$_"  , $LID->{$_};
+         }
+
          $landevice{$dIp}=$dName;
          $landevice{$UID}=$dName;
-      # Create a reading if a landevice is connected
-         if ( $_->{active} ) {
-            my $mac = $_->{mac};
-            $mac =~ s/:/_/g;
-            # if ( !$_->{ethernet} && $_->{wlan} ) { # funktioniert nicht mehr seit v7
-            if ( defined $wlanList{$mac} ) {
-               # Copes with fw>=7
-               $_->{guest} = $wlanList{$mac}{is_guest}  if defined $wlanList{$mac}{is_guest} && $_->{guest} eq "";
-               $wlanCount++;
-               $gWlanCount++      if $_->{guest} eq "1";
-               $dName .= " (";
-               $dName .= "g"    if $_->{guest};
-               $dName .= "WLAN";
-               $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
-                      if defined $wlanList{$mac};
-               $dName .= ")";
-            }
-            if ( $_->{ethernet_port} ) {
-               $dName .= " (";
-               $dName .= "g"         if $_->{guest};
-               $dName .= "LAN" . $_->{ethernet_port};
-               #$dName .= "LAN" . $result_lan->{$_->{_node}};
-               $dName .= ", 1 Gbit/s"    if $_->{speed} eq "1000";
-               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
-               $dName .= ")";
-            }
-            my $rName = "mac_".$mac;
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-            # $wlanCount++      if $_->{wlan} ;
-            # $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
-            # Remove mac address from oldLanDevice-List
-            delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
+      }
+   }
+# Create WLAN-List
+   my %wlanList;
+   #to keep compatibility with firmware <= v3.67 and >=7
+   if ( ref $result->{wlanList} eq 'ARRAY' ) {
+      foreach my $wlan( @{ $result->{wlanList} } ) {
+         my $mac = $wlan->{mac};
+         $mac =~ s/:/_/g;
+         if (defined $defs{$name}{fhem}{MAC}{$mac}){
+           FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->LAN->$defs{$name}{fhem}{MAC}{$mac}->WLAN_$_"  , $wlan->{$_} foreach(grep !/mac/,keys %{$wlan});
          }
       }
    }
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_guestWlanCount", $gWlanCount);
-
-# Remove inactive or non existing mac-readings in two steps
-   foreach ( keys %oldLanDevice ) {
-      # set the mac readings to 'inactive' and delete at next readout
-      if ( $oldLanDevice{$_} ne "inactive" ) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
-      }
-      else {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
-      }
-   }
 
 # WLANs
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
@@ -1658,15 +1687,9 @@ sub FRITZBOX_Readout_Run_Web($)
    }
      
 # Alarm clock
-   $runNo = 1;
-   foreach ( @{ $result->{alarmClock} } ) {
-      next  if $_->{Name} eq "er";
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo, $_->{Name};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_state", $_->{Active}, "onoff";
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_time",  $_->{Time}, "altime";
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_target", $_->{Number}, "alnumber";
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "alarm".$runNo."_wdays", $_->{Weekdays}, "aldays";
-      $runNo++;
+   foreach my $alarm( @{ $result->{alarmClock} } ) {
+      next  if $alarm->{Name} eq "er";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->alarm->$alarm->{Name}->$_"  , $alarm->{$_} foreach(grep !/(Name|_node)/,keys %{$alarm});
    }
 
 #Get TAM readings
@@ -1692,24 +1715,10 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
 # user profiles
-   $runNo = 1;
-   $rName = "user01";
    if ( ref $result->{userProfil} eq 'ARRAY' ) {
-      foreach ( @{ $result->{userProfil} } ) {
-      # do not show data for unlimited, blocked or default access rights
-         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} ) {
-            if ( $_->{type} eq "1" && $_->{name} =~ /\(landev(.*)\)/ ) {
-               my $UID = "landevice".$1;
-               $_->{name} = $landevice{$UID};
-            }
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,                   $_->{name},            "deviceip";
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_thisMonthTime",  $_->{this_month_time}, "secondsintime";
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todayTime",      $_->{today_time},      "secondsintime";
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todaySeconds",   $_->{today_time};
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_type",           $_->{type},            "usertype";
-         }
-         $runNo++;
-         $rName = sprintf ("user%02d",$runNo);
+      foreach my $user( @{ $result->{userProfil} } ) {
+         # do not show data for unlimited, blocked or default access rights
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->user->$user->{_node}->$_"  , $user->{$_} foreach(grep !/(_node)/,keys %{$user});
       }
    }
 
@@ -1795,7 +1804,7 @@ sub FRITZBOX_Readout_Process($$)
 
    if ( defined $values{Error} ) {
       readingsBulkUpdate( $hash, "lastReadout", $values{Error} );
-      readingsBulkUpdate( $hash, "state", $values{Error} );
+      readingsBulkUpdate( $hash, "state"      , $values{Error} );
       if (defined $values{"fhem->sidTime"}) {
          $hash->{fhem}{sidTime} = $values{"fhem->sidTime"};
             FRITZBOX_Log $hash, 4, "Reset SID";
@@ -1834,23 +1843,18 @@ sub FRITZBOX_Readout_Process($$)
       my $x = 0;
       while (my ($rName, $rValue) = each(%values) ) {
       #hash values
-         if ($rName =~ /->/) {
-         # 4 levels
+         if ($rName =~ /->/) {# 4 levels
             my ($rName1,$rName2,$rName3,$rName4) = split /->/, $rName;
-         # 4th level (Internal Value)
-            if ($rName1 ne "" && defined $rName4) {
+            if    ($rName1 ne "" && defined $rName4) {# 4th level (Internal Value)
                $hash->{$rName1}{$rName2}{$rName3}{$rName4} = $rValue;
             }
-         # 3rd level (Internal Value)
-            elsif ($rName1 ne "" && defined $rName3) {
+            elsif ($rName1 ne "" && defined $rName3) {# 3rd level (Internal Value)
                $hash->{$rName1}{$rName2}{$rName3} = $rValue;
             }
-         # 1st level (Internal Value)
-            elsif ($rName1 eq "") {
+            elsif ($rName1 eq "")                    {# 1st level (Internal Value)
                $hash->{$rName2} = $rValue;
             }
-         # 2nd levels
-            else {
+            else                                     {# 2nd levels
                $hash->{$rName1}{$rName2} = $rValue;
             }
          }
@@ -1875,11 +1879,12 @@ sub FRITZBOX_Readout_Process($$)
             }
          }
       }
+      
 
    # Create state with wlan states
       if ( defined $values{"box_wlan_2.4GHz"} ) {
          my $newState = "WLAN: ";
-         if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
+         if    ( $values{"box_wlan_2.4GHz"} eq "on" ) {
             $newState .= "on";
          } 
          elsif ( $values{box_wlan_5GHz} ) {
@@ -1916,6 +1921,10 @@ sub FRITZBOX_Readout_Process($$)
       readingsBulkUpdate( $hash, "lastReadout", $msg );
       FRITZBOX_Log $hash, 4, $msg;
    }
+   foreach (FRITZBOX_updtReading($name)){
+     my ($rn,$rv) = split(";",$_);
+     readingsBulkUpdate( $defs{$name}, $rn,$rv );
+   }
 
    readingsEndUpdate( $hash, 1 );
 }
@@ -1947,7 +1956,7 @@ sub FRITZBOX_Readout_Format($$$)
    
    return $readout       unless $readout ne "";
    
-   if ($format eq "aldays") {
+   if    ($format eq "aldays") {
       if ($readout eq "0") {
          $readout = "once";
       }
@@ -4842,9 +4851,9 @@ sub FRITZBOX_fritztris($)
 1;
 
 =pod
+=item device
 =item summary Controls some features of AVM's Fritz!Box, FRITZ!Repeater and Fritz!Fon.
 =item summary_DE Steuert einige Funktionen von AVM's Fritz!Box, Fritz!Repeater und Fritz!Fon.
-=item device
 
 =begin html
 
