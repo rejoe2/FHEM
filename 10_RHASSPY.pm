@@ -39,6 +39,7 @@ use HttpUtils;
 use utf8;
 use List::Util 1.45 qw(max min uniq);
 use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
 #use Data::Dumper;
 use FHEM::Core::Timer::Register qw(:ALL);
@@ -255,7 +256,6 @@ BEGIN {
     ReadingsVal
     ReadingsNum
     devspec2array
-    gettimeofday
     toJSON
     setVolume
     AnalyzeCommandChain
@@ -2756,7 +2756,7 @@ sub respond {
     my $data     = shift // return;
     my $response = shift // return;
     my $topic    = shift // q{endSession};
-    my $delay    = shift // $hash->{keepOpenDelay};
+    my $delay    = shift // ReadingsNum($hash->{NAME}, "keepOpenDelay_$data->{siteId}", $hash->{keepOpenDelay});
 
     my $type      = $data->{requestType} // return;
 
@@ -5515,8 +5515,9 @@ yellow=rgb FFFF00</code></p>
   You may overwrite that behaviour by setting values to siteId2room readings: <code>setreading siteId2room_mobile_phone1 kitchen</code> will force RHASSPY to link your satellite <i>phone1 kitchen</i> to kitchen as room.
   <li>siteId2doubleSpeak_&lt;siteId&gt;</li>
   RHASSPY will always respond via the satellite where the dialogue was initiated from. In some cases, you may want additional output to other satellites - e.g. if they don't have (always on) sound output options. Setting this type of reading will lead to (additional!) responses to the given second satellite; naming scheme is the same as for site2room.
+  <li>keepOpenDelay_&lt;siteId&gt;</li>
+  RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by satelliteId" base; naming scheme is similar as for site2room.
 </ul>
-
 
 =end html
 =cut
