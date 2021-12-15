@@ -1388,8 +1388,8 @@ sub initialize_msgDialog {
     }
     $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi.rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
-    $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
-    $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
+    $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?|at your service|There you go again!};
+    $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.|Bye|CU|Cheers!|so long};
     $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
     $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay} // _getDialogueTimeout($hash);
 
