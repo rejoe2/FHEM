@@ -1,14 +1,14 @@
-# $Id: 10_RHASSPY.pm 25341 2021-12-14 GetState+ Beta-User $
+# $Id: 10_RHASSPY.pm 25341 2021-12-15 shuffle all + GetState Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
 #
-# Originally written 2018 by Tobias Wiedenmann (Thyraz)
+# Originally initiated 2018 by Tobias Wiedenmann (Thyraz)
 # as FHEM Snips.ai module (thanks to Matthias Kleine)
 #
 # Adapted for RHASSPY 2020/2021 by Beta-User and drhirn
 #
-# Thanks to Beta-User, rudolfkoenig, JensS, cb2sela and all the others
+# Thanks to rudolfkoenig, JensS, cb2sela and all the others
 # who did a great job getting this to work!
 #
 # This file is part of fhem.
@@ -331,7 +331,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.08a';
+    $hash->{MODULE_VERSION} = '0.5.09';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -1391,7 +1391,7 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.};
     $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
-    $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay};
+    $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay} // _getDialogueTimeout($hash);
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
     #addToDevAttrList($msgConfig, "$hash->{prefix}EvalSpecials:textField-long ",'RHASSPY');
@@ -2772,9 +2772,13 @@ sub respond {
         for my $key (keys %{$response}) {
             $sendData->{$key} = $response->{$key};
         }
-    } elsif ( $topic eq 'continueSession' || $delay ) {
+    } elsif ( $topic eq 'continueSession' ) {
         $sendData->{text} = $response;
-        configure_DialogManager($hash,$data->{siteId}) if $topic ne 'continueSession';
+        $sendData->{intentFilter} = 'null';
+    } elsif ( $delay ) {
+        $sendData->{text} = $response;
+        configure_DialogManager($hash,$data->{siteId});
+        $topic = 'continueSession';
         $sendData->{intentFilter} = 'null';
     } else {
         $sendData->{text} = $response;

@@ -120,3 +120,19 @@ attr DEVICE eventMap 1001:LeftLongPress\
 attr DEVICE icon taster
 setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WXKG02LM_Double_Switch_20211015
 
+###########################################
+# Melinera (Lidl) Smarte Lichterkette
+name:Melinera_LED_fairy_lights_ZigBee
+filter:TYPE=HUEDevice
+desc: Might fit for product distributed by Lidl
+order:X_01
+par:ICON;ICON as set, defaults to light_fairy_lights;{ AttrVal('DEVICE','icon','light_fairy_lights') }
+attr DEVICE icon ICON
+attr DEVICE configList /effect (.*)/:{"effect":"$1"}\
+/effectSpeed (.*)/:{"effectSpeed":"$1"}\
+/sparkles1 (.*)/:{"effect": "sparkles", "on": true,"effectColours": [[0,0,255],[0,255,0],[255,0,0]]}\
+/sparkles2 (.*)/:{"effect": "sparkles", "on": true,"effectColours": [[0,255,0],[255,255,255],[255,0,0]]}\
+/effectWColors (\w+)\s+(.*)/:{"effect": "$1", "on": true,"effectColours":$2}
+attr DEVICE widgetOverride effect:steady,snow,rainbow,snake,twinkle,fireworks,flag,waves,updown,vintage,fading,collide,strobe,sparkles,carnival,glow  effectSpeed:selectnumbers,0,1,10,0,lin sparkles1:noArg sparkles2:noArg
+attr DEVICE webCmd effect:effectSpeed:sparkles1:sparkles2
+setreading DEVICE attrTemplateVersion Melinera_LED_fairy_lights_ZigBee_20211215
