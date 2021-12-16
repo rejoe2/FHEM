@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25341 2021-12-15 shuffle all + GetState Beta-User $
+# $Id: 10_RHASSPY.pm 25341 2021-12-16 shuffle all + GetState Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -216,17 +216,6 @@ my $internal_mappings = {
   }
 };
 
-my $shuffled_answer = sub {
-    my $txts         = shift // return;
-    my $wantsreplace = shift // 0;
-    my @arr = split m{\|}, $txts;
-    return $arr[ rand @arr ] if !$wantsreplace;
-
-    my $shuffled = $arr[ rand @arr ];
-    $shuffled =~ s{(\$\w+)}{$1}eegx;
-    return $shuffled;
-};
-
 BEGIN {
 
   GP_Import( qw(
@@ -323,7 +312,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|keepOpenDelay|handleHotword|experimental|Babble)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -344,7 +333,7 @@ sub Define {
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
-    for my $key (qw( experimental handleHotword keepOpenDelay Babble)) {
+    for my $key (qw( experimental handleHotword sessionTimeout Babble)) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -1371,7 +1360,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querymark|keepOpenDelay\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querymark|sessionTimeout\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1391,7 +1380,7 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?|at your service|There you go again!};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.|Bye|CU|Cheers!|so long};
     $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
-    $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay} //= $hash->{keepOpenDelay} // _getDialogueTimeout($hash);
+    $hash->{helper}->{msgDialog}->{config}->{sessionTimeout} //= $hash->{sessionTimeout} // _getDialogueTimeout($hash);
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
     #addToDevAttrList($msgConfig, "$hash->{prefix}EvalSpecials:textField-long ",'RHASSPY');
@@ -2434,7 +2423,7 @@ sub setMsgDialogTimeout {
 sub msgDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
-    my $response = shift // $shuffled_answer->($hash->{helper}->{msgDialog}->{config}->{goodbye});
+    my $response = shift // _shuffle_answer($hash->{helper}->{msgDialog}->{config}->{goodbye});
     Log3($hash, 5, "msgDialog_close called with $device");
 
     deleteSingleRegIntTimer($device, $hash);
@@ -2464,9 +2453,9 @@ sub msgDialog_open {
         customData   => $device
     };
 
-    setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay});
+    setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{sessionTimeout});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
-    return msgDialog_respond($hash, $device, $shuffled_answer->($hash->{helper}->{msgDialog}->{config}->{hello}), 0);
+    return msgDialog_respond($hash, $device, _shuffle_answer($hash->{helper}->{msgDialog}->{config}->{hello}), 0);
 }
 
 #handle messages from FHEM/messenger side
@@ -2512,7 +2501,7 @@ sub msgDialog_respond {
     $msgCommand =~ s{\\[\@]}{@}x;
     $msgCommand =~ s{(\$\w+)}{$1}eegx;
     AnalyzeCommand($hash, $msgCommand);
-    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{keepOpenDelay}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
+    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{sessionTimeout}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
     return $recipients;
 }
 
@@ -2756,7 +2745,7 @@ sub respond {
     my $data     = shift // return;
     my $response = shift // return;
     my $topic    = shift // q{endSession};
-    my $delay    = shift // ReadingsNum($hash->{NAME}, "keepOpenDelay_$data->{siteId}", $hash->{keepOpenDelay});
+    my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     my $type      = $data->{requestType} // return;
 
@@ -2829,9 +2818,7 @@ sub getResponse {
         ? $hash->{helper}{lng}->{responses}->{$identifier}->{$subtype}
         : getKeyValFromAttr($hash, $hash->{NAME}, 'response', $identifier) // $hash->{helper}{lng}->{responses}->{$identifier};
     return $responses if ref $responses eq 'HASH';
-    return $shuffled_answer->($responses);
-    #my @arr = split m{\|}, $responses;
-    #return $arr[ rand @arr ];
+    return _shuffle_answer($responses);
 }
 
 
@@ -3300,7 +3287,7 @@ sub handleIntentShortcuts {
         $response = $hash->{helper}{shortcuts}{$data->{input}}{conf_req};
         return setDialogTimeout($hash, $data, $timeout, $response);
     }
-    $response = $shuffled_answer->($shortcut->{response}) // getResponse($hash, 'DefaultConfirmation');
+    $response = _shuffle_answer($shortcut->{response}) // getResponse($hash, 'DefaultConfirmation');
     my $ret;
     my $device = $shortcut->{NAME};
     my $cmd    = $shortcut->{perl};
@@ -3369,7 +3356,7 @@ sub handleIntentSetOnOff {
             # Define response
             if ( defined $mapping->{response} ) { 
                 $numericValue = $value eq 'on' ? 1 : 0;
-                $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $numericValue, $room); 
+                $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
                 Log3($hash->{NAME}, 5, "Response is $response" );
             }
             else { $response = getResponse($hash, 'DefaultConfirmation'); }
@@ -3500,7 +3487,7 @@ sub handleIntentSetTimedOnOff {
         # Define response
         if ( defined $mapping->{response} ) { 
             $numericValue = $value eq 'on' ? 1 : 0;
-            $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $numericValue, $room); 
+            $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
             Log3($hash->{NAME}, 5, "Response is $response" );
         }
         else { $response = getResponse($hash, 'DefaultConfirmation'); }
@@ -3628,14 +3615,13 @@ sub handleIntentGetOnOff {
 
             # Define reponse
             if ( defined $mapping->{response} ) { 
-                $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $value, $room);
-                $response = $shuffled_answer->($response);
+                $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $value, $room);
+                $response //= _shuffle_answer($response);
             }
             else {
                 my $stateResponseType = $internal_mappings->{stateResponseType}->{$status};
-                $response = $hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value};
-                #$response =~ s{(\$\w+)}{$1}eegx;
-                $response = $shuffled_answer->($response, 1);
+                $response = _shuffle_answer($hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value});
+                $response =~ s{(\$\w+)}{$1}eegx;
             }
         }
     }
@@ -3867,7 +3853,7 @@ sub handleIntentSetNumeric {
 
     # get response 
     defined $mapping->{response} 
-        ? $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $newVal, $room) 
+        ? $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $newVal, $room) 
         : $response = getResponse($hash, 'DefaultConfirmation'); 
 
     # send response
@@ -3967,9 +3953,10 @@ sub handleIntentGetNumeric {
     }
 
     # Variablen ersetzen?
-    #$response =~ s{(\$\w+)}{$1}eegx;
+    $response =_shuffle_answer($response);
+    $response =~ s{(\$\w+)}{$1}eegx;
     # Antwort senden
-    return respond( $hash, $data, $shuffled_answer->($response, 1) );
+    return respond( $hash, $data, $response );
 }
 
 
@@ -3992,10 +3979,10 @@ sub handleIntentGetState {
         # execute Cmd
         analyzeAndRunCmd($hash, $device, $cmd);
         $response = getResponse( $hash, 'getStateResponses', 'update');
-        $response = $shuffled_answer->($response, 1);
+        $response =~ s{(\$\w+)}{$1}eegx;
     } elsif ( defined $mapping->{response} ) {
-        $response = _getValue($hash, $device, $shuffled_answer->($mapping->{response}), undef, $room);
-        $response = _ReplaceReadingsVal($hash, $shuffled_answer->($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), undef, $room);
+        $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
     } elsif ( defined $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
         $response = _ReplaceReadingsVal($hash, getResponse( $hash, 'getStateResponses', $data->{Type}));
@@ -4040,7 +4027,7 @@ sub handleIntentMediaControls {
         analyzeAndRunCmd($hash, $device, $cmd);
         # Define voice response
         $response = defined $mapping->{response} ?
-            _getValue($hash, $device, $shuffled_answer->($mapping->{response}), $command, $room)
+            _getValue($hash, $device, _shuffle_answer($mapping->{response}), $command, $room)
             : getResponse($hash, 'DefaultConfirmation');
     }
     $response = getResponse($hash, 'DefaultError') if !defined $response;
@@ -4082,7 +4069,7 @@ sub handleIntentSetScene{
     Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
 
     # Define response
-    $response = $shuffled_answer->($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
+    $response = _shuffle_answer($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
 
     respond( $hash, $data, $response );
     return $device;
@@ -4566,7 +4553,7 @@ sub handleIntentCancelAction {
 
     deleteSingleRegIntTimer($identiy, $hash);
     delete $hash->{helper}{'.delayed'}->{$identiy};
-    respond( $hash, $data, getResponse( $hash, 'DefaultCancelConfirmation' ) );
+    respond( $hash, $data, getResponse( $hash, 'DefaultCancelConfirmation' ), undef, 0 );
 
     return $hash->{NAME};
 }
@@ -4884,6 +4871,12 @@ sub _toregex {
     trim($toclean); 
     $toclean =~ s{ }{\.}g;
     return $toclean;
+}
+
+sub _shuffle_answer {
+    my $txts = shift // return;
+    my @arr = split m{\|}, $txts;
+    return $arr[ rand @arr ];
 }
 
 1;
@@ -5303,7 +5296,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
      <ul>
         <li><i>allowed</i> The <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
         <li><i>open</i> A keyword or expression used to initiate a dialogue (will be converted to a regex compatible notation)</li>
-        <li><i>keepOpenDelay</i> timout limit in seconds (<b>recommended</b>). All sessions will be closed automatically when timeout has passed. Timer will be reset with each incoming message .</li>
+        <li><i>sessionTimeout</i> timout limit in seconds (<b>recommended</b>). All sessions will be closed automatically when timeout has passed. Timer will be reset with each incoming message .</li>
         <li><i>close</i> keyword used to exit a dialogue (similar to open) before timeout has reached</li>
         <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
@@ -5515,8 +5508,8 @@ yellow=rgb FFFF00</code></p>
   You may overwrite that behaviour by setting values to siteId2room readings: <code>setreading siteId2room_mobile_phone1 kitchen</code> will force RHASSPY to link your satellite <i>phone1 kitchen</i> to kitchen as room.
   <li>siteId2doubleSpeak_&lt;siteId&gt;</li>
   RHASSPY will always respond via the satellite where the dialogue was initiated from. In some cases, you may want additional output to other satellites - e.g. if they don't have (always on) sound output options. Setting this type of reading will lead to (additional!) responses to the given second satellite; naming scheme is the same as for site2room.
-  <li>keepOpenDelay_&lt;siteId&gt;</li>
-  RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by satelliteId" base; naming scheme is similar as for site2room.
+  <li>sessionTimeout_&lt;siteId&gt;</li>
+  RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
 </ul>
 
 =end html
