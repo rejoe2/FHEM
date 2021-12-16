@@ -1,6 +1,4 @@
-
-# $Id: 31_HUEDevice.pm 25270 +cref 2021-12-15 Beta-User $
-
+# $Id: 31_HUEDevice.pm 25270 +cref 2021-12-16 Beta-User $
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
 # I am in no way affiliated with the Philips organization.
@@ -743,14 +741,19 @@ HUEDevice_SetParam($$@)
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
     $obj->{'bri'}  = 0+$v;
+
   } elsif( $cmd eq "alert" ) {
     $obj->{'alert'}  = $value;
+
   } elsif( $cmd eq "effect" ) {
+    $obj->{'on'}  = JSON::true;
     $obj->{'effect'}  = $value;
+
     if( defined($value2) ) {
       my $json = join( ' ', @aa);
       HUEDevice_AddJson( $name, $obj, $json );
     }
+
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
   } elsif( $name &&  $cmd eq "delayedUpdate" ) {
@@ -767,12 +770,14 @@ HUEDevice_SetParam($$@)
     $obj->{habridgeupdate} = JSON::true;
 
   } elsif( $cmd =~ /\{/ ) {
-    HUEDevice_AddJson( $name, $obj, '{'.join( ' ', @aa) );
+    $value='' if( !$value );
+    HUEDevice_AddJson( $name, $obj, "$cmd$value ".join( ' ', @aa) );
 
   } else {
     return 0;
   }
 
+Log 1, Dumper $obj;
   return 1;
 }
 sub HUEDevice_Set($@);
@@ -1464,6 +1469,7 @@ HUEDevice_Parse($$)
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
 
   $hash->{v2_id} = $result->{v2_id} if( defined($result->{v2_id}) );
+
   $hash->{helper}{json} = $result;
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
@@ -2109,7 +2115,7 @@ __END__
       <li>xy &lt;x&gt;,&lt;y&gt; [&lt;ramp-time&gt;]<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
       <li>alert [none|select|lselect]</li>
-      <li>effect [none|colorloop]</li>
+      <li>effect [none|colorloop] [{&lt;json&gt;}]</li>
       <a id="HUEDevice-set-transitiontime"></a>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
@@ -2131,8 +2137,8 @@ __END__
       <a id="HUEDevice-set-rename"></a>
       <li>rename &lt;new name&gt;<br>
       Renames the device in the bridge and changes the fhem alias.</li>
-      <li>json [setsensor|configsensor] &lt;json&gt;<br>
-      send &lt;json&gt; to the state or config endpoints for this device.</li>
+      <li>json [setsensor|configsensor] {&lt;json&gt;}<br>
+      send <code>{&lt;json&gt;}</code> to the state or config endpoints for this device.</li>
       <li>habridgeupdate [ : &lt; on | off &gt; ] [ : &lt; bri | pct &gt; &lt; value &gt; ] <br>
       This command is only for usage of HA-Bridges that are emulating an Hue Hub. <br>
       It updates your HA-Bridge internal light state of the devices without changing the devices itself.
