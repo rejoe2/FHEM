@@ -2455,7 +2455,10 @@ sub msgDialog_open {
 
     setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{sessionTimeout});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
-    return msgDialog_respond($hash, $device, _shuffle_answer($hash->{helper}->{msgDialog}->{config}->{hello}), 0);
+    my $response = _shuffle_answer($hash->{helper}->{msgDialog}->{config}->{hello});
+    my $you = AttrVal($device,AttrVal($device,'rr_realname','group'),AttrVal($device,'alias',$device));
+    $response =~ s{(\$\w+)}{$1}eegx;
+    return msgDialog_respond($hash, $device, $response, 0);
 }
 
 #handle messages from FHEM/messenger side
