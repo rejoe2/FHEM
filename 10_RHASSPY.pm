@@ -3741,7 +3741,7 @@ sub handleIntentSetNumeric {
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
     if ( !defined $device && exists $data->{Device} ) {
         $device = getDeviceByName($hash, $room, $data->{Device});
-    } elsif ( defined $type && ( $type eq 'volume' || $type eq 'Lautstärke' ) ) {
+    } elsif ( defined $type && $type eq 'volume' ) {
         $device = 
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
