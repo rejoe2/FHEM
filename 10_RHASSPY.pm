@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25341 2021-12-16 shuffle all + GetState Beta-User $
+# $Id: 10_RHASSPY.pm 25341 2021-12-17 shuffle all + GetState Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -138,6 +138,11 @@ my $languagevars = {
       'waterLevel'   => 'water level in $location is $value percent',
       'knownType'    => '$mappingType in $location is $value percent',
       'unknownType'  => 'value in $location is $value percent'
+    },
+    'getStateResponses' => {
+      'STATE'  => '$deviceName value is [$device:STATE]',
+      'price'  => 'current prize of $reading in $deviceName is [$device:$reading:d]',
+      'update' => 'initiated update for $deviceName'
     }
   },
   'stateResponses' => {
@@ -157,11 +162,6 @@ my $languagevars = {
        '0' => '$deviceName is open',
        '1' => '$deviceName is closed'
      }
-  },
-  'getStateResponses' => {
-     'STATE'  => '$deviceName value is [$deviceName:STATE]',
-     'price'  => 'current prize of $reading in $deviceName is [$deviceName:$reading:d]',
-     'update' => 'initiated update for $deviceName'
   }
 };
 
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.09';
+    $hash->{MODULE_VERSION} = '0.5.10';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -785,6 +785,7 @@ sub configure_DialogManager {
     my $toDisable = shift // [qw(ConfirmAction CancelAction ChoiceRoom ChoiceDevice)];
     my $enable    = shift // q{false};
     my $timer     = shift;
+    my $retArr    = shift;
 
     #option to delay execution to make reconfiguration last action after everything else has been done and published.
     if ( defined $timer ) {
@@ -837,6 +838,9 @@ hermes/dialogueManager/configure (JSON)
         my $disable = {intentId => "$id", enable => "$enable"};
         push @disabled, $disable;
     }
+
+    return \@disabled if $retArr;
+
     my $sendData = {
         siteId  => $siteId,
         intents => [@disabled]
@@ -1377,7 +1381,7 @@ sub initialize_msgDialog {
     }
     $hash->{helper}->{msgDialog}->{config}->{open}       //= q{hi.rhasspy};
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
-    $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi! What can I do for you?|at your service|There you go again!};
+    $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi $you! What can I do for you?|at your service|There you go again!};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.|Bye|CU|Cheers!|so long};
     $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
     $hash->{helper}->{msgDialog}->{config}->{sessionTimeout} //= $hash->{sessionTimeout} // _getDialogueTimeout($hash);
@@ -2455,8 +2459,8 @@ sub msgDialog_open {
 
     setMsgDialogTimeout($hash, $sendData, $hash->{helper}->{msgDialog}->{config}->{sessionTimeout});
     return msgDialog_progress($hash, $device, $msgtext, $sendData) if $msgtext;
+    my $you = AttrVal($device,'alias',$device);
     my $response = _shuffle_answer($hash->{helper}->{msgDialog}->{config}->{hello});
-    my $you = AttrVal($device,AttrVal($device,'rr_realname','group'),AttrVal($device,'alias',$device));
     $response =~ s{(\$\w+)}{$1}eegx;
     return msgDialog_respond($hash, $device, $response, 0);
 }
@@ -2769,9 +2773,9 @@ sub respond {
         $sendData->{intentFilter} = 'null';
     } elsif ( $delay ) {
         $sendData->{text} = $response;
-        configure_DialogManager($hash,$data->{siteId});
         $topic = 'continueSession';
-        $sendData->{intentFilter} = 'null';
+        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, [qw(ConfirmAction ChoiceRoom ChoiceDevice)], 'false', undef, 1 );
+        $sendData->{intentFilter} = [@ca_strings];
     } else {
         $sendData->{text} = $response;
         $sendData->{intentFilter} = 'null';
@@ -2797,6 +2801,7 @@ sub respond {
     }
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
+    Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
     #setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
     #no audio output in msgDialog session
@@ -3366,7 +3371,7 @@ sub handleIntentSetOnOff {
         }
     }
     # Send response
-    $response = $response  // getResponse($hash, 'DefaultError');
+    $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
     return $device;
 }
@@ -3496,7 +3501,7 @@ sub handleIntentSetTimedOnOff {
         else { $response = getResponse($hash, 'DefaultConfirmation'); }
     }
     # Send response
-    $response = $response  // getResponse($hash, 'DefaultError');
+    $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
     return $device; 
 }
@@ -3854,6 +3859,8 @@ sub handleIntentSetNumeric {
         }
     }
 
+    return $device if defined $data->{'.inBulk'};
+
     # get response 
     defined $mapping->{response} 
         ? $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $newVal, $room) 
@@ -3861,7 +3868,7 @@ sub handleIntentSetNumeric {
 
     # send response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response ) if !defined $data->{'.inBulk'};
+    respond( $hash, $data, $response );
     return $device;
 }
 
@@ -3967,18 +3974,18 @@ sub handleIntentGetNumeric {
 sub handleIntentGetState {
     my $hash = shift // return;
     my $data = shift // return;
-    my $device = $data->{Device} // return;
-    my $response;
+    my $device = $data->{Device} // return respond( $hash, $data, getResponse($hash, 'NoValidData'));
 
+    my $response;
     Log3($hash->{NAME}, 5, 'handleIntentGetState called');
 
     my $room = getRoomName($hash, $data);
     my $deviceName = $device;
     $device = getDeviceByName($hash, $room, $device);
-    my $mapping = getMapping($hash, $device, 'GetState');
+    my $mapping = getMapping($hash, $device, 'GetState') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
     if ( defined $data->{Update} ) {
-        my $cmd = $mapping->{update} // return respond( $hash, $data, getResponse($hash, 'DefaultError'));
+        my $cmd = $mapping->{update} // return respond( $hash, $data, getResponse($hash, 'DefaultError') );
         # execute Cmd
         analyzeAndRunCmd($hash, $device, $cmd);
         $response = getResponse( $hash, 'getStateResponses', 'update');
@@ -3988,10 +3995,17 @@ sub handleIntentGetState {
         $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
     } elsif ( defined $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
-        $response = _ReplaceReadingsVal($hash, getResponse( $hash, 'getStateResponses', $data->{Type}));
+        $response = getResponse( $hash, 'getStateResponses', $data->{Type} );
+        $response =~ s{(\$\w+)}{$1}eegx;
+        $response = _ReplaceReadingsVal($hash, $response );
+    } else {
+        $response = getResponse( $hash, 'getStateResponses', 'STATE' );
+        $response =~ s{(\$\w+)}{$1}eegx;
+        $response = _ReplaceReadingsVal($hash, $response );
     }
+
     # Antwort senden
-    $response = getResponse($hash, 'DefaultError') if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
     return respond( $hash, $data, $response );
 }
 
@@ -4033,7 +4047,7 @@ sub handleIntentMediaControls {
             _getValue($hash, $device, _shuffle_answer($mapping->{response}), $command, $room)
             : getResponse($hash, 'DefaultConfirmation');
     }
-    $response = getResponse($hash, 'DefaultError') if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
     # Send voice response
     respond( $hash, $data, $response );
     return $device;
