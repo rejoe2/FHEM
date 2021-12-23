@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25341 2021-12-17 shuffle all + GetState Beta-User $
+# $Id: 10_RHASSPY.pm 25360 2021-12-23 streamline Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2707,7 +2707,7 @@ sub analyzeMQTTmessage {
 
     if ($mute) {
         $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
-        respond( $hash, $data, q{ } );
+        respond( $hash, $data, q{ }, 'endSession', 0 );
         #Beta-User: Da fehlt mir der Soll-Ablauf für das "room-listening"-Reading; das wird ja über einen anderen Topic abgewickelt
         return \@updatedList;
     }
@@ -3162,8 +3162,10 @@ sub RHASSPY_ParseHttpResponse {
                 $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
             }
         }
-        my @ids = uniq(split q{,},$siteIds);
-        readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
+        if ( $siteIds ) {
+            my @ids = uniq(split m{,},$siteIds);
+            readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
+        }
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 
@@ -3338,38 +3340,38 @@ sub handleIntentShortcuts {
 sub handleIntentSetOnOff {
     my $hash = shift // return;
     my $data = shift // return;
-    my ($value, $numericValue, $device, $room, $siteId, $mapping, $response);
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
     # Device AND Value must exist
-    if ( exists $data->{Device} && exists $data->{Value} ) {
-        $room = getRoomName($hash, $data);
-        $value = $data->{Value};
-        $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetOnOff');
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Device} || !defined $data->{Value};
 
-        # Mapping found?
-        if ( defined $device && defined $mapping ) {
-            #check if confirmation is required
-            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOff', $device );
-            my $cmdOn  = $mapping->{cmdOn} // 'on';
-            my $cmdOff = $mapping->{cmdOff} // 'off';
-            my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
+    my $room = getRoomName($hash, $data);
+    my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+    my $value = $data->{Value};
 
-            # execute Cmd
-            analyzeAndRunCmd($hash, $device, $cmd);
-            Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+    # Mapping found?
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOff', $device );
+    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOff = $mapping->{cmdOff} // 'off';
+    my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
 
-            # Define response
-            if ( defined $mapping->{response} ) { 
-                $numericValue = $value eq 'on' ? 1 : 0;
-                $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
-                Log3($hash->{NAME}, 5, "Response is $response" );
-            }
-            else { $response = getResponse($hash, 'DefaultConfirmation'); }
-        }
+    # execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+    # Define response
+    my $response;
+    if ( defined $mapping->{response} ) { 
+        #my $numericValue = $value eq 'on' ? 1 : 0;
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $value eq 'on' ? 1 : 0, $room); 
+        Log3($hash->{NAME}, 5, "Response is $response" );
     }
+    else { $response = getResponse($hash, 'DefaultConfirmation'); }
+
+
     # Send response
     $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
@@ -3409,11 +3411,8 @@ sub handleIntentSetOnOffGroup {
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
     for my $device (@devlist) {
-        my $mapping = getMapping($hash, $device, 'SetOnOff');
+        my $mapping = getMapping($hash, $device, 'SetOnOff') // next;
 
-        # Mapping found?
-        next if !defined $mapping;
-        
         my $cmdOn  = $mapping->{cmdOn} // 'on';
         my $cmdOff = $mapping->{cmdOff} // 'off';
         my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
@@ -3443,63 +3442,61 @@ sub handleIntentSetOnOffGroup {
 sub handleIntentSetTimedOnOff {
     my $hash = shift // return;
     my $data = shift // return;
-    my ($value, $numericValue, $device, $room, $siteId, $mapping, $response);
 
     Log3($hash->{NAME}, 5, "handleIntentSetTimedOnOff called");
 
     return respond( $hash, $data, getResponse( $hash, 'duration_not_understood' ) ) 
     if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec};
-    
-    # Device AND Value must exist
-    return if !exists $data->{Device} || !exists $data->{Value};
 
-    $room = getRoomName($hash, $data);
-    $value = $data->{Value};
-    $device = getDeviceByName($hash, $room, $data->{Device});
-    $mapping = getMapping($hash, $device, 'SetOnOff');
+    # Device AND Value must exist
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Device} || !defined $data->{Value};
+
+    my $room = getRoomName($hash, $data);
+    my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+    my $value = $data->{Value};
 
     # Mapping found?
-    if ( defined $device && defined $mapping ) {
-        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
-        my $cmdOn  = $mapping->{cmdOn} // 'on';
-        my $cmdOff = $mapping->{cmdOff} // 'off';
-        my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
-        $cmd .= "-for-timer";
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
+    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOff = $mapping->{cmdOff} // 'off';
+    my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
+    $cmd .= "-for-timer";
 
-        my $allset = getAllSets($device);
-        return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
+    my $allset = getAllSets($device);
+    return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
 
-        my $hour = 0;
-        my $now1 = time;
-        my $now = $now1;
-        my @time = localtime($now);
-        if ( defined $data->{Hourabs} ) {
-            $hour  = $data->{Hourabs};
-            $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
-        }
-        elsif ($data->{Hour}) {
-            $hour = $data->{Hour};
-        }
-        $now1 += HOURSECONDS * $hour;
-        $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
-        $now1 += $data->{Sec} if $data->{Sec};
-
-        $now1 += +DAYSECONDS if $now1 < $now;
-        $now1 = $now1 - $now;
-
-        $cmd .= " $now1";
-        # execute Cmd
-        analyzeAndRunCmd($hash, $device, $cmd);
-        Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
-
-        # Define response
-        if ( defined $mapping->{response} ) { 
-            $numericValue = $value eq 'on' ? 1 : 0;
-            $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
-            Log3($hash->{NAME}, 5, "Response is $response" );
-        }
-        else { $response = getResponse($hash, 'DefaultConfirmation'); }
+    my $hour = 0;
+    my $now1 = time;
+    my $now = $now1;
+    my @time = localtime($now);
+    if ( defined $data->{Hourabs} ) {
+        $hour  = $data->{Hourabs};
+        $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
     }
+    elsif ($data->{Hour}) {
+        $hour = $data->{Hour};
+    }
+    $now1 += HOURSECONDS * $hour;
+    $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
+    $now1 += $data->{Sec} if $data->{Sec};
+
+    $now1 += +DAYSECONDS if $now1 < $now;
+    $now1 = $now1 - $now;
+
+    $cmd .= " $now1";
+    # execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+    # Define response
+    my $response;
+    if ( defined $mapping->{response} ) { 
+        my $numericValue = $value eq 'on' ? 1 : 0;
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
+        Log3($hash->{NAME}, 5, "Response is $response" );
+    }
+    else { $response = getResponse($hash, 'DefaultConfirmation'); }
     # Send response
     $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
