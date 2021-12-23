@@ -4920,9 +4920,9 @@ __END__
 - Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
   Irgendwie müssen wir die neue siteId in den Slot Rooms bringen (erl. mit extrarooms?)
 
-# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700
+# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
 
-# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)?
+# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)? (erl. (?))
 
 =end ToDo
 
