@@ -4903,18 +4903,13 @@ __END__
 
 # Farben:
   Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
-  Gibt auch Lampen, die können nur ct
+  Gibt auch Lampen, die können nur ct (Beta-User: unklare Frage: der fragliche Zweig wird nur bei "falschem ct" angesteuert, ansonsten wird schon vorher "nativ" ct verwendet)
 
 # Custom Intents
  - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
-   also gar nicht ausgegeben und:
+   also gar nicht ausgegeben und: (Beta-User: klingt nach "silent cancelation", grade keine Idee).
 
-   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868.
-
-# "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
-Denkbare Verwendung:
-- siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent? (tweak)
-- Bestätigungs-Mapping (special) (ist noch offen)
+   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868. (Beta-User: nicht mehr zuordenbar)
 
 # Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
 - kein "match in room" bei GetNumeric
@@ -4923,11 +4918,9 @@ Denkbare Verwendung:
 - gDT: mehr und bessere mappings?
 - Farbe und Farbtemperatur (fast fertig?)
 - Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
-  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen
+  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen (erl. mit extrarooms?)
 
 # Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700
-
-# Keine shortcuts-Intents, wenn Attribut nicht gesetzt: Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
 
 # Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)?
 
@@ -4944,7 +4937,7 @@ https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
 # Wetterdurchsage
 Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
-https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
+https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754 (evtl. ersetzt durch STATE-Abfrage/gDT info?)
 
 =end ToClarify
 
