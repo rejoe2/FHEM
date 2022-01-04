@@ -3390,7 +3390,7 @@ copy DEVICE DEVICE_CH#
 deleteattr DEVICE_CH# stateFormat
 deleteattr DEVICE_CH# devStateIcon
 attr DEVICE_CH# jsonMap params_switch_#_state:state params_switch_#_aenergy_total:aenergy_total params_switch_#_apower:apower params_switch_#_temperature_tC:temperature params_switch_#_temperature_tF:0
-attr DEVICE_CH# $\DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:#}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_CH# readingList $\DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:#}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE_CH# setList toggle:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Toggle","params": {"id":#}}\
   off:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":#,"on":false}}\
   on:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":#,"on":true}}\
