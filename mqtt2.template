@@ -3372,6 +3372,7 @@ name:shellypro4pm
 filter:TYPE=MQTT2_DEVICE
 desc:Incomlete first version of split template for second generation shelly devices (names with "plus", with power measurement). NOTE: as channels 2-4 do not work, only channel 2 is created for further testing...
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
 order:A_20d
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
@@ -3401,10 +3402,11 @@ rename DEVICE_CH2 DEVICE_CH3
 rename DEVICE_CH1 DEVICE_CH2
 loop:#:2:3:4
 defmod DEVICE_CH# MQTT2_\DEVICE DEVICE_CH#
+attr DEVICE_CH# devicetopic DEV_TPC
 loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220104_2
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 202201043
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model shellypro4pm
 
 
