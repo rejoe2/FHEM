@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 25419 2022-01-04 19:50:06Z Beta-User $
+# $Id: mqtt2.template 25447 2022-01-09 20:51:33Z Otto123 $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -27,6 +27,7 @@ par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp \
   (tele|stat|shellies|valetudo|Advantech)/([^/]+)/.*:.* "$2"\
+  (shellyp(lus|ro4pm)[^/:_]{4,}+)/.*:.* "$1"\
   zigbee2mqtt/bridge/.*:.* "zigbee2mqtt"\
   sonos/connected.* "sonos"\
   tvheadend/[^/:]+.* "tvheadend"\
@@ -39,15 +40,16 @@ attr DEVICE bridgeRegexp \
   go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
   owntracks/[^/]+/([^/:]+).* "owntracks_$1"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
+  instar/([^/]+)/.*:.* "instar_$1"\
   homeassistant/.*/config:.* ""\
-  instar/([^/]+)/.*:.* "instar_$1"
+  tasmota/discovery/[^/:]+/(config|sensors):.* ""
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith|IODev).*");return undef}
 attr DEVICE autocreate 1
 attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results... Especially make sure to not have two regexpes that may both match!
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20210305
+setreading DEVICE attrTemplateVersion 20220110
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -150,7 +152,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
   $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
   $\DEVICETOPIC/bridge/devices:.* devices\
-  $\DEVICETOPIC/bridge/info:.* info
+  $\DEVICETOPIC/bridge/info:.* info\
   $\DEVICETOPIC/bridge/groups:.* groups\
   $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
@@ -939,12 +941,14 @@ attr DEVICE setList \
 attr DEVICE stateFormat Measured: temperature Battery: battery %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:btnLock current_heating_setpoint:desired-temp local_temperature:temperature
+attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:btnLock current_heating_setpoint:desired-temp local_temperature:temperature battery:batteryPercent voltage:batterymV
+attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_eurotronic_spirit
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210211
+setreading DEVICE attrTemplateVersion 20220110
+
 
 name:zigbee2mqtt_thermostat_with_weekrofile
 desc: Developed for <a href="https://zigbee.blakadder.com/Moes_HY368-ZB.html">Model HY368-ZB manufactured by Moes</a> via zigbee2mqtt <br>Might not completely work for all firmware versions and also some commands seem not yet to be fully integrated on the zigbee2mqtt side... <br>To contribute, participate in <a href="https://forum.fhem.de/index.php/topic,116535.0.html">Forum Thread</a>
@@ -981,13 +985,13 @@ Measured: temperature Battery: batteryPercent %
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode battery:batteryPercent voltage:batterymV
 attr DEVICE setStateList on off
-attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20211019
+setreading DEVICE attrTemplateVersion 20220110
 
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1145005.html#msg1145005
 name:zigbee2mqtt_thermostat_without_weekprofile
@@ -1009,14 +1013,14 @@ attr DEVICE setList \
 attr DEVICE periodicCmd temperature:55
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode voltage:batterymV
 attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
-attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210406
+setreading DEVICE attrTemplateVersion 20220110
 
 ###########################################
 # TASMOTA
@@ -1097,12 +1101,10 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE stateFormat {\
-  ReadingsVal($name, "state", "off") . " "\
-  ReadingsVal($name, "POWER2", "off") . " "\
-  . sprintf("%.1f°C ",ReadingsVal($name,"SI7021_Temperature",0))\
-  . sprintf("%.0f%%",ReadingsVal($name,"SI7021_Humidity",0))\
-  }
+attr DEVICE stateFormat { ReadingsVal($name, 'state', 'off') . ' ' .\
+  ReadingsVal($name, 'motion', 'off') . ' '\
+  . sprintf("%.1f°C ",ReadingsNum($name,'temperature',0))\
+  . sprintf("%.0f%%",ReadingsNum($name,'humidity',0)) }
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1110,23 +1112,24 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
-  STATTOPIC/POWER2:.* POWER2\
+  STATTOPIC/POWER2:.* motion\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE devStateIcon {\
-  my $state = lc ReadingsVal($name, "POWER2", "off");\
+  my $state = lc ReadingsVal($name, 'motion', 'off');\
   my $devStateIcon = 'building_security@green';\
   if ($state eq "on") {\
     $devStateIcon = 'building_security@red';\
   }\
-  "<div>" . FW_makeImage(lc ReadingsVal($name, "state", "off"))\
+  "<div>" . FW_makeImage(lc ReadingsVal($name, 'state', 'off'))\
     . FW_makeImage($devStateIcon) . sprintf(\
     "&nbsp;&nbsp;[Temp: %.1f°C / Feucht: %.0f%%]",\
-    ReadingsVal($name,"SI7021_Temperature",0),\
-    ReadingsVal($name,"SI7021_Humidity",0)\
+    ReadingsVal($name,"temperature",0),\
+    ReadingsVal($name,"humidity",0)\
     ) . "</div>"\
   }
+attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:0 Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 HSBColor:0 Color:0 SI7021_Temperature:temperature SI7021_Humidity:humidity SI7021_DewPoint:DewPoint
 attr DEVICE model tasmota_1ch+motion+SI7021
-setreading DEVICE attrTemplateVersion 20210515
+setreading DEVICE attrTemplateVersion 20220108
 
 name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -2624,7 +2627,7 @@ par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = q(emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum($name,'emeter_0_energy',0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum($name,'emeter_1_energy',0)}); my $old =  AttrVal('DEVICE','userReadings',undef); !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power','unknown'); my $cons2 = ReadingsVal($name,'emeter_1_power','unknown'); my $total1 = ReadingsVal($name,'emeter_0_kWh','unknown'); my $total2 = ReadingsVal($name,'emeter_1_kWh','unknown'); my $total_sum = $total1+$total2; '<a href="http://' .ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>2 Phases total: $total_sum kWh</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power','unknown'); my $cons2 = ReadingsVal($name,'emeter_1_power','unknown'); my $total1 = ReadingsVal($name,'emeter_0_kWh','unknown'); my $total2 = ReadingsVal($name,'emeter_1_kWh','unknown'); my $total_w = $cons1+$cons2; my $total_sum = $total1+$total2; '<a href="http://' .ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>2 Phases total: $total_w W / $total_sum kWh</div>"}
 attr DEVICE stateFormat { my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power','unknown'); my $cons2 = ReadingsVal($name,'emeter_1_power','unknown'); my $total1 = ReadingsVal($name,'emeter_0_kWh','unknown'); my $total2 = ReadingsVal($name,'emeter_1_kWh','unknown'); return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
@@ -2654,7 +2657,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly2em
-setreading DEVICE attrTemplateVersion 20211112
+setreading DEVICE attrTemplateVersion 20220109
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -2667,8 +2670,8 @@ par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}'; my $old =  AttrVal("DEVICE","userReadings",undef); !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off"); my $cons1 = ReadingsVal($name,"emeter_0_power","unknown"); my $cons2 = ReadingsVal($name,"emeter_1_power","unknown"); my $cons3 = ReadingsVal($name,"emeter_2_power","unknown"); my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown"); my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown"); my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown"); my $total_sum = $total1+$total2+$total3; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh<br>3 Phases total: $total_sum kWh</div>"}
-attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off"); my $cons1 = ReadingsVal($name,"emeter_0_power","unknown"); my $cons2 = ReadingsVal($name,"emeter_1_power","unknown"); my $cons3 = ReadingsVal($name,"emeter_2_power","unknown"); my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown"); my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown"); my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown"); return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
+attr DEVICE devStateIcon {my $onl = FW_makeImage(ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons1 = ReadingsVal($name,'emeter_0_power',0); my $cons2 = ReadingsVal($name,'emeter_1_power',0); my $cons3 = ReadingsVal($name,'emeter_2_power',0); my $total1 = ReadingsVal($name,'emeter_0_kWh',0); my $total2 = ReadingsVal($name,'emeter_1_kWh',0); my $total3 = ReadingsVal($name,'emeter_2_kWh',0); my $total_sum = $total1+$total2+$total3; my $total_w =$cons1+$cons2+$cons3; my $ip = ReadingsVal($name,'ip','unknown'); qq(<a href="http://$ip"target="_blank">$onl</a> <a href="/fhem?cmd.dummy=set $name toggle&XHR=1">$light</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh<br>3 Phases total: $total_w W / $total_sum kWh</div>)}
+attr DEVICE stateFormat { my $light = ReadingsVal($name,'state','off'); my $cons1 = ReadingsVal($name,'emeter_0_power',0); my $cons2 = ReadingsVal($name,'emeter_1_power',0); my $cons3 = ReadingsVal($name,'emeter_2_power',0); my $total1 = ReadingsVal($name,'emeter_0_kWh',0); my $total2 = ReadingsVal($name,'emeter_1_kWh',0); my $total3 = ReadingsVal($name,'emeter_2_kWh',0); return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
@@ -2706,7 +2709,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20210126
+setreading DEVICE attrTemplateVersion 20220109
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -3344,12 +3347,12 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen';; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state params_switch_0_aenergy_total:aenergy_total params_switch_0_apower:apower temperature_tC:temperature temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
+attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total params_switch_0_apower:apower temperature_tC:temperature temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220104
+setreading DEVICE attrTemplateVersion 20220110
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -3360,10 +3363,10 @@ desc:Early version of a base template for second generation shelly devices (name
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state params_switch_0_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE model shellyPlus_1pm
-setreading DEVICE attrTemplateVersion 20220104
+setreading DEVICE attrTemplateVersion 20220110
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -4511,13 +4514,60 @@ get_dest:noArg { $\DEVICETOPIC.valetudoRE($EVENT) }\
 goto:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
 map:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
 reset_consumable:main,side,filter,sensor { $\DEVICETOPIC.valetudoRE($EVENT) }\
-zone:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
+zone:{'multiple-strict,'.ReadingsVal($name,'zones','none')} { $\DEVICETOPIC.valetudoRE($EVENT) }\
 x_raw_payload:textField { $\DEVICETOPIC.valetudoRE($EVENT) }
 attr DEVICE userReadings autoReturn:valetudo_state_name:.Idle {fhem("sleep $name:bin_in_time:.0 waitbin;set $name charge");return 'return'}
 attr DEVICE setStateList charge fan_power get_dest goto locate map pause reset_consumable spot start stop zone x_raw_payload
 attr DEVICE event-on-change-reading .*
 attr DEVICE model roborockRE
 setreading DEVICE attrTemplateVersion 20210510
+
+# new valtudo Template contributed by Otto123, should replace the old valetudo/rockrobo Template
+name:valetudo
+filter:TYPE=MQTT2_DEVICE
+desc:use this to control a rooted vacuum with valetudo. For further details visit https://github.com/Hypfer/Valetudo<br><br>NOTE: Initial version
+order:X_03b
+par:BASE_TOPIC;BASE_TOPIC typically is valetudo;{ AttrVal("DEVICE","readingList","") =~ m,(valetudo)[/].*:, ? $1 : undef }
+par:DEV_ID;DEV_ID is random by Firmware;{ AttrVal("DEVICE","readingList","") =~ m,valetudo[/]([^/]+)[/].*:, ? $1 : undef }
+{ Svn_GetFile("contrib/AttrTemplate/99_valetudoUtils.pm", "FHEM/99_valetudoUtils.pm", sub(){CommandReload(undef, "99_valetudoUtils")}) }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE alias DEV_ID
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE icon vacuum_top
+attr DEVICE readingList \
+  $\DEVICETOPIC/\x24state:.* _state\
+  $\DEVICETOPIC/AttachmentStateAttribute/dustbin:.* dustbin\
+  $\DEVICETOPIC/AttachmentStateAttribute/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/BatteryStateAttribute/level:.* batteryPercent\
+  $\DEVICETOPIC/BatteryStateAttribute/status:.* batteryState\
+  $\DEVICETOPIC/BasicControlCapability/operation:.* operation\
+  $\DEVICETOPIC/CurrentStatisticsCapability/area:.* area\
+  $\DEVICETOPIC/CurrentStatisticsCapability/time:.* time\
+  $\DEVICETOPIC/ConsumableMonitoringCapability/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/FanSpeedControlCapability/preset:.* fanSpeed\
+  $\DEVICETOPIC/LocateCapability/locate:.* locate\
+  $\DEVICETOPIC/MapData/map-data:.* {}\
+  $\DEVICETOPIC/MapData/segments:.* segments\
+  $\DEVICETOPIC/StatusStateAttribute/status:.* state\
+  $\DEVICETOPIC/StatusStateAttribute/detail:.* stateDetail\
+  $\DEVICETOPIC/StatusStateAttribute/error:.* stateError\
+  $\DEVICETOPIC/WaterUsageControlCapability/preset:.* waterUsage\
+  $\DEVICETOPIC/WifiConfigurationCapability/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/ZoneCleaningCapability/presets:.* presets\
+  $\DEVICETOPIC/ZoneCleaningCapability/start:.* start
+attr DEVICE setList \
+  operation:PAUSE,START,STOP,HOME   $\DEVICETOPIC/BasicControlCapability/operation/set $EVTPART1\
+  clean_segment:{"multiple-strict,".valetudo_w($name,"segments")} { valetudo_c($NAME,$EVENT) }\
+  clean_zone:{valetudo_w($name,"presets")} { valetudo_c($NAME,$EVENT) }\
+  fanSpeed:off,min,low,medium,high,turbo,max   $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
+  waterUsage:off,min,low,medium,high,turbo,max   $\DEVICETOPIC/WaterUsageControlCapability/preset/set $EVTPART1\
+  locate:PERFORM   $\DEVICETOPIC/LocateCapability/locate/set $EVTPART1\
+  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }
+attr DEVICE userReadings ip4:ips:.* {(split ',',ReadingsVal($name,'ips','error'))[0]}
+attr DEVICE event-on-change-reading .*
+attr DEVICE setStateList operation clean_segment clean_zone fanSpeed waterUsage x_raw_payload
+attr DEVICE model valetudo
+setreading DEVICE attrTemplateVersion 20220109 or prior
 
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
