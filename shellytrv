@@ -1,0 +1,996 @@
+RAW:
+
+defmod MQTT2_shellytrv_60A423D0D846 MQTT2_DEVICE shellytrv_60A423D0D846
+attr MQTT2_shellytrv_60A423D0D846 readingList shellytrv_60A423D0D846:shellies/shellytrv-60A423D0D846/online:.* online\
+shellytrv_60A423D0D846:shellies/shellytrv-60A423D0D846/announce:.* { json2nameValue($EVENT, 'announce_', $JSONMAP) }\
+shellytrv_60A423D0D846:shellies/announce:.* { json2nameValue($EVENT, 'announce_', $JSONMAP) }\
+shellytrv_60A423D0D846:shellies/shellytrv-60A423D0D846/info:.* { json2nameValue($EVENT, 'info_', $JSONMAP) }\
+shellytrv_60A423D0D846:shellies/shellytrv-60A423D0D846/settings:.* { json2nameValue($EVENT, 'settings_', $JSONMAP) }
+attr MQTT2_shellytrv_60A423D0D846 room MQTT2_DEVICE
+
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-04 15:28:24 IODev MQTT2_FHEM_Server
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_fw_ver 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_id shellytrv-60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_ip 192.168.0.18
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_mac 60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_model SHTRV-01
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 announce_new_fw false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_actions_stats_skipped 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_bat_value 100
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_bat_voltage 4.040
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_calibrated true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_cfg_changed_cnt 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_charger false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_cloud_connected false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_cloud_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_dbg_flags 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_fs_free 59456
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_fs_size 65536
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_fw_info_device shellytrv-60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_fw_info_fw 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_has_update false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_mac 60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_mqtt_connected true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_ps_mode 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_ram_free 30864
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_ram_total 97280
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_serial 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_pos 100.0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_schedule true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_schedule_profile 1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_target_t_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_target_t_units C
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_target_t_value 21.0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_tmp_is_valid true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_tmp_units C
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_thermostats_1_tmp_value 20.8
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_time 15:01
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_unixtime 1641909660
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_update_has_update false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_update_new_version 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_update_old_version 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_update_status unknown
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_uptime 262808
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_wifi_sta_connected true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_wifi_sta_ip 192.168.0.18
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_wifi_sta_rssi -47
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 14:00:59 info_wifi_sta_ssid SBSTR10
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-08 13:01:17 online true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_build_info_build_id 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_build_info_build_timestamp 2021-12-23T14:48:05Z
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_build_info_build_version 2021122314
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_child_lock false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_cloud_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_coiot_enabled true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_coiot_peer 192.168.0.255:5683
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_coiot_update_period 3600
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_device_hostname shellytrv-60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_device_mac 60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_device_num_outputs 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_device_type SHTRV-01
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_discoverable false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_display_brightness 4
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_display_flipped false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_fw 20211223-144805/v2.1.0@d30148ec
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_hwinfo_batch_id 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_hwinfo_hw_revision dev-prototype
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_lat 50.937930
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_lng 6.879540
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_login_default_username admin
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_login_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_login_unprotected false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_login_username admin
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_clean_session true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_enable true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_id shellytrv-60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_max_qos 0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_retain false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_server 34.252.101.96
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_mqtt_update_period 60
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_name TRV1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_pin_code rNoiaf
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_sleep_mode_period 60
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_sleep_mode_unit m
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_sntp_enabled true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_sntp_server time.google.com
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_ext_t_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile 1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile_names_1 Livingroom
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile_names_2 Livingroom 1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile_names_3 Bedroom
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile_names_4 Bedroom 1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_profile_names_5 Holiday
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_rules_1 0620-0123456-21
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_schedule_rules_2 2300-0123456-16
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_target_t_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_target_t_units C
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_target_t_value 21.0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_thermostats_1_temperature_offset 0.0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_time 06:20
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_timezone Europe/Berlin
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_tz_dst false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_tz_dst_auto true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_tz_utc_offset 3600
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_tzautodetect true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_ap_enabled false
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_ap_ssid shellytrv-60A423D0D846
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_dns 192.168.0.1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_enabled true
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_gw 192.168.0.1
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_ip 192.168.0.18
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_ipv4_method static
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_mask 255.255.255.0
+setstate MQTT2_shellytrv_60A423D0D846 2022-01-11 05:20:00 settings_wifi_sta_ssid SBSTR10
+
+
+LOG:
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 online: true
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_id: shellytrv-60A423D0D846
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_ip: 192.168.0.18
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_new_fw: false
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_fw_ver: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_model: SHTRV-01
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_mac: 60A423D0D846
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_id: shellytrv-60A423D0D846
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_ip: 192.168.0.18
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_new_fw: false
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_fw_ver: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_model: SHTRV-01
+2022-01-04_15:28:24 MQTT2_shellytrv_60A423D0D846 announce_mac: 60A423D0D846
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_uptime: 22
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30864
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_time: 16:28
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641310100
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 21.2
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.111
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_15:28:27 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_ap_enabled: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_login_default_username: admin
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_time: 16:28
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_value: 21.0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_device_num_outputs: 0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_sntp_enabled: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_lat: 50.937930
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_sleep_mode_unit: m
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_rules_1: 0620-0123456-21
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_name: TRV1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_tz_utc_offset: 3600
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_ap_ssid: shellytrv-60A423D0D846
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_device_hostname: shellytrv-60A423D0D846
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_enabled: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_child_lock: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_id: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_2: Livingroom 1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_login_enabled: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_timestamp: 2021-12-23T14:48:05Z
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_3: Bedroom
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_ext_t_enabled: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_dns: 192.168.0.1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_units: C
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_cloud_enabled: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_temperature_offset: 0.0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ipv4_method: static
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_server: 34.252.101.96
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_lng: 6.879540
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_4: Bedroom 1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_5: Holiday
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_tzautodetect: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_max_qos: 0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_tz_dst_auto: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_login_unprotected: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_login_username: admin
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_id: shellytrv-60A423D0D846
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_display_brightness: 4
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_mask: 255.255.255.0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ip: 192.168.0.18
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile: 1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_coiot_update_period: 3600
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_device_mac: 60A423D0D846
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_1: Livingroom
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_coiot_peer: 192.168.0.255:5683
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_discoverable: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_tz_dst: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ssid: SBSTR10
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_hwinfo_hw_revision: dev-prototype
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_hwinfo_batch_id: 0
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_enable: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_pin_code: rNoiaf
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_version: 2021122314
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_display_flipped: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_retain: false
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_device_type: SHTRV-01
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_timezone: Europe/Berlin
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_gw: 192.168.0.1
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_clean_session: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_enabled: true
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_sntp_server: time.google.com
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_sleep_mode_period: 60
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_rules_2: 2300-0123456-16
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_mqtt_update_period: 60
+2022-01-04_15:28:30 MQTT2_shellytrv_60A423D0D846 settings_coiot_enabled: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 2880
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_time: 17:16
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641312960
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.2
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -46
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.127
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_16:16:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 3600
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 17:28
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641313680
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.127
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_16:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 7200
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 18:28
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641317280
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 21.0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -46
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.124
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_17:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 10800
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 19:28
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641320880
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.9
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.125
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_18:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 13260
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30864
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_time: 20:09
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641323340
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 21.9
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_19:09:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 14400
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 20:28
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641324480
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 22.1
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_19:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 17700
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_time: 21:23
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641327780
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 21.0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.122
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_20:23:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 18000
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30864
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_time: 21:28
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641328080
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.9
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.122
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_20:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 20940
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30864
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_time: 22:17
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641331020
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.9
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_21:17:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 21600
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 21.0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_time: 22:28
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641331680
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.8
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_21:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 23520
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30704
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_time: 23:00
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641333600
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.1
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -48
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_22:00:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_ap_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_login_default_username: admin
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_time: 23:00
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_value: 16.0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_device_num_outputs: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_sntp_enabled: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_lat: 50.937930
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_sleep_mode_unit: m
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_rules_1: 0620-0123456-21
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_name: TRV1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_tz_utc_offset: 3600
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_ap_ssid: shellytrv-60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_device_hostname: shellytrv-60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_child_lock: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_id: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_2: Livingroom 1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_login_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_3: Bedroom
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_timestamp: 2021-12-23T14:48:05Z
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_ext_t_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_dns: 192.168.0.1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_cloud_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_target_t_units: C
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_temperature_offset: 0.0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ipv4_method: static
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_server: 34.252.101.96
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_lng: 6.879540
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_4: Bedroom 1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_5: Holiday
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_tzautodetect: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_max_qos: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_tz_dst_auto: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_login_unprotected: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_login_username: admin
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_id: shellytrv-60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_display_brightness: 4
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_mask: 255.255.255.0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ip: 192.168.0.18
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile: 1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_coiot_update_period: 3600
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_device_mac: 60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_profile_names_1: Livingroom
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_coiot_peer: 192.168.0.255:5683
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_discoverable: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_tz_dst: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_ssid: SBSTR10
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_hwinfo_hw_revision: dev-prototype
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_hwinfo_batch_id: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_enable: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_pin_code: rNoiaf
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_build_info_build_version: 2021122314
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_display_flipped: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_retain: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_device_type: SHTRV-01
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_timezone: Europe/Berlin
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_gw: 192.168.0.1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_clean_session: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_wifi_sta_enabled: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_sntp_server: time.google.com
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_sleep_mode_period: 60
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_thermostats_1_schedule_rules_2: 2300-0123456-16
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_mqtt_update_period: 60
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 settings_coiot_enabled: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_uptime: 23521
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_time: 23:00
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641333601
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -48
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_22:00:02 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 25200
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30864
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_time: 23:28
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641335280
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 18.8
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_22:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_uptime: 28800
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_time: 00:28
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641338880
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.1
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -46
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.122
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-04_23:28:00 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 32400
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 01:28
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641342480
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 19.7
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.124
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-05_00:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 36000
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 02:28
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641346080
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.122
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-05_01:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 39600
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ssid: SBSTR10
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_device: shellytrv-60A423D0D846
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_total: 97280
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_fw_info_fw: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_units: C
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_connected: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_time: 03:28
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_update_status: unknown
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_cloud_enabled: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_update_old_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_actions_stats_skipped: 0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_value: 100
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_enabled: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule: true
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_pos: 100.0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_connected: true
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_cfg_changed_cnt: 0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_unixtime: 1641349680
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_mac: 60A423D0D846
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_mqtt_connected: true
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_serial: 0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_value: 20.0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_schedule_profile: 1
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_update_has_update: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_size: 65536
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_ps_mode: 0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_charger: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_fs_free: 59456
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_rssi: -47
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_dbg_flags: 0
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_update_new_version: 20211223-144805/v2.1.0@d30148ec
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_is_valid: true
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_bat_voltage: 4.123
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_has_update: false
+2022-01-05_02:27:59 MQTT2_shellytrv_60A423D0D846 info_wifi_sta_ip: 192.168.0.18
+2022-01-05_03:27:59 MQTT2_shellytrv_60A423D0D846 info_calibrated: true
+2022-01-05_03:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_target_t_value: 16.0
+2022-01-05_03:27:59 MQTT2_shellytrv_60A423D0D846 info_uptime: 43200
+2022-01-05_03:27:59 MQTT2_shellytrv_60A423D0D846 info_ram_free: 30784
+2022-01-05_03:27:59 MQTT2_shellytrv_60A423D0D846 info_thermostats_1_tmp_units: C
