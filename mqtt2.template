@@ -11,7 +11,7 @@
 ###########################################
 name:General_Info
 filter:TYPE=MQTT2_DEVICE
-desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
+desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread</a> for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
 order:000000
 
 ###############
@@ -3384,12 +3384,12 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20220114
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -3400,10 +3400,10 @@ desc:Early version of a base template for second generation shelly devices (name
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE model shellyPlus_1pm
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20220114
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -3415,7 +3415,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
 order:A_20d
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE  readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/events/rpc:.* { return if $EVENT =~ m{switch:[1-3]}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
   fhem2shelly/rpc:.* {}
@@ -3446,7 +3446,7 @@ attr DEVICE_CH# devicetopic DEV_TPC
 loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 202201043
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220114
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model shellypro4pm
 
 
