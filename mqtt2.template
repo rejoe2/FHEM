@@ -3363,7 +3363,7 @@ setreading DEVICE attrTemplateVersion 20200831
 # Shelly Plus 1 using original firmware.
 name:shellyPlus_1
 filter:TYPE=MQTT2_DEVICE
-desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings.
+desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
 par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20
@@ -3390,13 +3390,14 @@ attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
 setreading DEVICE attrTemplateVersion 20220114
+set DEVICE x_reboot
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
 # Shelly Plus 1PM using original firmware.
 name:shellyPlus_1pm
 filter:TYPE=MQTT2_DEVICE
-desc:Early version of a base template for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings.
+desc:Early version of a base template for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
