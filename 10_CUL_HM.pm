@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25272 2021-12-01 Beta-User $
+# $Id: 10_CUL_HM.pm 25298 2022-01-17 Beta-User $
 
 package main;
 
@@ -1296,7 +1296,11 @@ sub CUL_HM_Attr(@) {#################################
           delete $attr{$chNm}{$attrName};
         }
       }
-      CUL_HM_assignIO($hash) if $attrName eq 'ignore' && !IsDummy($hash) || $attrName eq 'dummy' && !IsIgnored($hash);
+      if ( $attrName eq 'ignore' && !IsDummy($hash) || $attrName eq 'dummy' && !IsIgnored($hash) ) {
+        RemoveInternalTimer('ActionDetector'); #Beta-User: should solve https://forum.fhem.de/index.php/topic,125490.0.html
+        InternalTimer(gettimeofday()+5,'CUL_HM_ActCheck', 'ActionDetector', 0);
+        CUL_HM_assignIO($hash);
+      }
     }
   }
   elsif($attrName eq "commStInCh"){
@@ -2446,7 +2450,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       elsif(defined $mI[5]){
         $ctrlMode   = hex($mI[5]);
-        $bTime      = (($ctrlMode       ) & 0x3f)." min" if($ctrlMode == 3);#message with boost
+        $bTime      = (($ctrlMode       ) & 0x3f)." min" if(($ctrlMode &0xc0) == 0xc0);#message with boost
 #        $uk0        = ($ctrlMode       ) & 0x3f ;#unknown
         $ctrlMode   =  ($ctrlMode   >> 6) & 0x3  ;
       }
@@ -4728,7 +4732,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "regTable") {  ################################################
-    return "no HMinfo instance defined!" if !defined &HMinfo_GetFn;
     return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
   }       
   elsif($cmd eq "regList") {  #################################################
@@ -4812,7 +4815,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if (defined $tplH{$tt}){
         $info .= "\n$tplTyp{$tt}:";
         foreach (@{$tplH{$tt}}){
-          last if !defined &HMinfo_templateList;
           my ($r)=split("\n",HMinfo_templateList($_));
           $info .= "\n   ".$r;
         }
@@ -4946,10 +4948,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     if ($cfgState =~ m/(unknown|ok)/){
     }
     else{
-      if (!defined &HMinfo_getTxt2Check) {
-        $ret .= '\n   no HMinfo device defined!';
-        return $ret ;
-      }
       foreach(sort keys %{$hash->{helper}{cfgChk}}){
         my( $Fkt,$shtxt,$txt) = HMinfo_getTxt2Check($_);
         $ret .= "\n   $shtxt: $txt";
@@ -5484,7 +5482,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "tplDel") { ###################################################
     return "template missing" if (!defined $a[2]);
     my ($p,$t) = split(">",$a[2]);
-    HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
+    if (defined &HMinfo_templateDel){
+      HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
+    }
     return;
   }
   elsif($cmd eq "virtual") { ##################################################
@@ -7525,7 +7525,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "no HMinfo defined" if (!defined $defs{$hm});
 
     my @par =  map{$params{$_}} sort keys%params;
-    my $ret = HMinfo_SetFn($defs{$hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
+    my $ret = "not supported w/o HMinfo";
+    if (defined &HMinfo_SetFn){
+      $ret = HMinfo_SetFn($defs{$hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
+    }
     return $ret;
   }
   elsif($cmd =~ m/tplPara(..)(.)_.*/) { #######################################
@@ -7544,7 +7547,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $pv[$pNo] = $a[2];
     }
 
-    my $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tn,$p,@pv);
+    my $ret = "not supported w/o HMinfo";
+    if (defined &HMinfo_SetFn){
+      $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tn,$p,@pv);
+    }
     return $ret;
   }
 
@@ -11098,7 +11104,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   my ($name,$q) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   my $devN = CUL_HM_getDeviceName($name);
-  return if (AttrVal($devN,"subType","") eq "virtual");
+  return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
 
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device

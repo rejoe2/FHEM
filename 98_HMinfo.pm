@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 25159 2021-10-30 17:37:57Z martinp876 $
+# $Id: 98_HMinfo.pm 25293 2022-01-17 Beta-User $
 package main;
 use strict;
 use warnings;
@@ -130,6 +130,7 @@ sub HMinfo_Attr(@) {###########################################################
     my $sec = $h*3600+$m*60;
     return "give at least one minute" if ($sec < 60);
     $hash->{helper}{autoUpdate} = $sec;
+    RemoveInternalTimer("sUpdt:$name"); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125342.msg1199568.html#msg1199568
     InternalTimer(gettimeofday()+$sec,"HMinfo_autoUpdate","sUpdt:".$name,0);
   }
   elsif($attrName eq "hmAutoReadScan"){# 00:00 hh:mm
@@ -432,10 +433,14 @@ sub HMinfo_status($){##########################################################
 
   my %tmp; # remove duplicates
   $hash->{iI_HM_IOdevices} = "";
-  $tmp{ReadingsVal($_,"cond",
-       InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach( @IOdev);
-  foreach my $IOstat (sort keys %tmp){
-    $hash->{iI_HM_IOdevices} .= "$IOstat: ".join(",",sort keys %{$tmp{$IOstat}}).";";
+  
+  
+  $tmp{InternalVal($_,"owner_CCU","noVccu")}{ReadingsVal($_,"cond",InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach(@IOdev);
+  foreach my $vccu (sort keys %tmp){
+    $hash->{iI_HM_IOdevices} .= $hash->{iI_HM_IOdevices} eq "" ? "$vccu>": " $vccu>";
+    foreach my $IOstat (sort keys %{$tmp{$vccu}}){
+      $hash->{iI_HM_IOdevices} .= "$IOstat:".join(",",sort keys %{$tmp{$vccu}{$IOstat}}).";";
+    }
   }
 
   # ------- what about protocol events ------
@@ -1264,7 +1269,7 @@ sub HMinfo_startBlocking(@){###################################################
   my $hash = $defs{$name};
   Log3 $hash,5,"HMinfo $name start blocking:$fkt";
   my $id = ++$hash->{nb}{cnt};
-  my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME};$param", 
+  my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME},$param", 
                         "HMinfo_bpPost", 30, 
                         "HMinfo_bpAbort", "$name:0");
   $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -1999,7 +2004,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $id = ++$hash->{nb}{cnt};
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
     HMinfo_startBlocking($name,"HMinfo_purgeConfig", "$fn");
-    my $bl = BlockingCall("HMinfo_purgeConfig", join(";",("$name;$id;none",$fn)), 
+    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -2008,7 +2013,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "saveConfig")      {##action: saveConfig-----------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none;$fn",$opt,$filter)), 
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none",$fn,$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -2905,6 +2910,8 @@ sub HMinfo_bpPost($) {#bp finished ############################################
 
   my @entityChk;
   my ($test,$testId,$ent,$issue) = ("","","","");
+  return if(!$ret);# nothing to post
+  
   foreach my $eLine (split("-ret-",$ret)){
     next if($eLine eq "");
     if($eLine =~m/^ (id....)$/){
