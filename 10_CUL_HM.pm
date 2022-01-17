@@ -2,6 +2,8 @@
 ##############################################
 # CUL HomeMatic handler
 # $Id: 10_CUL_HM.pm 25298 2022-01-17 Beta-User $
+#
+# open issues: https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
 
 package main;
 
