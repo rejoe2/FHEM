@@ -5654,7 +5654,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $chnNo = substr($channel,6,2);
       CUL_HM_PushCmdStack($hash,"++".$flag.'01'.$id.$dst.$chnNo.'0E');
     }
-    CUL_HM_stateUpdatDly($name,20) if (scalar(@chnIdList));
+    #CUL_HM_stateUpdatDly($name,20) if (scalar(@chnIdList)); #Beta-User: disable due to frank proposal in https://forum.fhem.de/index.php/topic,125378.msg1201572.html#msg1201572
     $state = "";
   }
   elsif($cmd eq "getSerial") { ################################################
@@ -11110,7 +11110,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   my ($name,$q) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   my $devN = CUL_HM_getDeviceName($name);
-  return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
+  return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN) || IsDisabled($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
 
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
@@ -11130,7 +11130,9 @@ sub CUL_HM_qEntity($$){  # add to queue
   CUL_HM_cfgStateDelay($devN)  if($q eq "qReqConf");
 
   if (!$wu) {
-    my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
+    my $wT = !$modules{CUL_HM}{helper}{initDone} ? '90' : #Beta-User: Test for frank in https://forum.fhem.de/index.php/topic,125378.0.html
+            (@{$modules{CUL_HM}{helper}{qReqStat}})
+                                 ? 
                                 "1" :
                                 $modules{CUL_HM}{hmAutoReadScan};
     RemoveInternalTimer("CUL_HM_procQs");
@@ -11188,8 +11190,8 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         CUL_HM_Set($defs{$eN},$eN,"getConfig");
       }
       else{
-         my $ign = CUL_HM_getAttrInt($eN,'ignore');
-         CUL_HM_Set($defs{$eN},$eN,'statusRequest') if (!$ign);
+         my $ign = CUL_HM_getAttrInt($eN,'ignore') + IsDisabled($eN);
+         CUL_HM_Set($defs{$eN},$eN,'statusRequest') if (!$ign) ;
          CUL_HM_unQEntity($eN,'qReqStat') if (!$dq->{$q});
          InternalTimer(gettimeofday()+20,'CUL_HM_readStateTo','sUpdt:'.$eN,0) if (!$ign);
       }
@@ -11314,8 +11316,8 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
   
-  if($modules{CUL_HM}{AttrListDef} && $modules{CUL_HM}{AttrListDef}{$attrName}){
-  }
+  #if($modules{CUL_HM}{AttrListDef} && $modules{CUL_HM}{AttrListDef}{$attrName}){
+  #}
   
   if($name && $defs{$name}){
     my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
@@ -11326,9 +11328,7 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
     $val =~ s/(\d*).*/$1/;
     return int($val);
   }
-  else{
-    return $default;
-  }
+  return $default;
 }
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
