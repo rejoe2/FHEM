@@ -1,9 +1,13 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-01-17 Beta-User $
+# $Id: 10_CUL_HM.pm 25298 2022-01-18 Beta-User $
 #
-# open issues: https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
+# open issues: 
+# https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
+# https://forum.fhem.de/index.php/topic,124090.msg1186368.html#msg1186368
+# https://forum.fhem.de/index.php/topic,121139.msg1182503.html#msg1182503
+
 
 package main;
 
@@ -1788,7 +1792,7 @@ sub CUL_HM_Parse($$) {#########################################################
       } 
       else { 
         DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
-        CommandAttr(undef,"$sname room CUL_HM");
+        CommandAttr(undef,"$sname room CUL_HM") if !AttrVal((devspec2array('TYPE=autocreate'))[0],'device_room',0); #Beta-User: see https://forum.fhem.de/index.php/topic,125507.msg1201540.html#msg1201540
       }
       $acdone = 1;
     } 
