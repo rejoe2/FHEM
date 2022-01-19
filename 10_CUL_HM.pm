@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-01-18 Beta-User $
+# $Id: 10_CUL_HM.pm 25298 2022-01-19 Beta-User $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
@@ -11110,7 +11110,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   my ($name,$q) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   my $devN = CUL_HM_getDeviceName($name);
-  return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN) || IsDisabled($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
+  return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN) || IsDummy($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
 
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
@@ -11190,7 +11190,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         CUL_HM_Set($defs{$eN},$eN,"getConfig");
       }
       else{
-         my $ign = CUL_HM_getAttrInt($eN,'ignore') + IsDisabled($eN);
+         my $ign = CUL_HM_getAttrInt($eN,'ignore') + IsDummy($eN);
          CUL_HM_Set($defs{$eN},$eN,'statusRequest') if (!$ign) ;
          CUL_HM_unQEntity($eN,'qReqStat') if (!$dq->{$q});
          InternalTimer(gettimeofday()+20,'CUL_HM_readStateTo','sUpdt:'.$eN,0) if (!$ign);

@@ -5582,16 +5582,17 @@ sub
 notifyRegexpCheck2
 {
     my $re = shift // return 'No Expression to check provided!';
-    my @list;
+    my $numdef = keys %defs;
     my @fm = devspec2array($re);
-    if (@fm) { 
+    if (@fm  && $fm[0] ne $re ) {
+        return "$re: matches all devices (ignored)" if $numdef == @fm;
         my $lst = join q{,}, @fm;
-        return "$re: devspec $lst (OK)";
+        return "$re: devspec for devices only - $lst (OK)";
     }
     my $consume = $re =~ s{\A\s*(\(.+\))\.\*\z}{$1}x;
     my $outer = $re =~ m{\A\s*\((.+)\)\s*\z}x; #check if outer brackets are given
-    my $numdef = keys %defs;
     my $first = 1;
+    my @list;
     while ($re) {
         (my $dev, $re) = split m{:}x, $re, 2; #get the first seperator for device/reading+rest?
         if ( $first && $outer ) {
@@ -5673,8 +5674,10 @@ notifyRegexpChanged2
     return;
   }
   #delete($hash->{disableNotifyFn});
+  my $numdef = keys %defs;
   my @fm = devspec2array($re);
-  if (@fm) { 
+  if (@fm && $fm[0] ne $re) {
+    return delete $hash->{NOTIFYDEV_2} if $numdef == @fm ;
     my $lst = join q{,}, @fm;
     $hash->{NOTIFYDEV_2} = $lst;
     return;
@@ -5682,9 +5685,8 @@ notifyRegexpChanged2
 
   $re =~ s{\A\s*(\(.+\))\.\*\z}{$1}x;
   my $first = 1;
-  my $outer = $re =~ m{\A\s*\((.+)\)\s*\z}x; #check if outer brackets are given
+  my $outer = $re =~ m{\A\s*\(.+\)\s*\z}x; #check if outer brackets are given
   my @list;
-  my $numdef = keys %defs;
   while ($re) {
     (my $dev, $re) = split m{:}x, $re, 2; #get the first seperator for device/reading+rest?
     if ( $first && $outer ) {
@@ -5696,7 +5698,7 @@ notifyRegexpChanged2
             $dev =~ s{\A.}{}x;
         }
     }
-    $dev =~ s{\A\s*\((.+)\)\s*\z}{$1}x; #remove outer brackets if given
+    $dev =~ s{\A\s*\((.+)\)\s*\z}{$1}x if $outer; #remove outer brackets if given
     #Log3('global',3 , "re splitted to $dev and $re") if $re;
     return delete $hash->{NOTIFYDEV_2} if $dev eq '.*';
 
