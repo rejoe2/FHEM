@@ -5562,25 +5562,24 @@ createNtfyHash()
 sub
 notifyRegexpCheck($)
 {
-  join("\n", map {
-    if($_ !~ m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/) {
-      "$_: no match (ignored)"
-    } elsif($defs{$1})               {
-      "$_: device $1 (OK)";
-    } else {
-      my @ds = devspec2array($1);
-      if($ds[0] ne $1) {
-        "$_: devspec ".join(",",@ds)." (OK)";
-      } else {
-        "$_: unknown (ignored)";
-      }
+  if ($featurelevel<6.2) {
+      return
+      join("\n", map {
+        if($_ !~ m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/) {
+          "$_: no match (ignored)"
+        } elsif($defs{$1})               {
+          "$_: device $1 (OK)";
+        } else {
+          my @ds = devspec2array($1);
+          if($ds[0] ne $1) {
+            "$_: devspec ".join(",",@ds)." (OK)";
+          } else {
+            "$_: unknown (ignored)";
+          }
+        }
+      } split(/\|/, $_[0]));
     }
-  } split(/\|/, $_[0]));
-}
 
-sub
-notifyRegexpCheck2
-{
     my $re = shift // return 'No Expression to check provided!';
     my $numdef = keys %defs;
     my @fm = devspec2array($re);
@@ -5609,8 +5608,6 @@ notifyRegexpCheck2
 
         while ($dev) {
           (my $part, $dev) = notifyRegexpChangedsplitByPipe($dev);
-          #Log3('global',3 , "dev splitted to $part and $dev") if $dev;
-
           push @list, q{.*: matches all (ignored)} if $part eq '.*';
           if ($defs{$part}) {
               push @list, qq{$part: device $part (OK)};
@@ -5627,9 +5624,9 @@ notifyRegexpCheck2
           }
         }
         (my $other, $re) = notifyRegexpChangedsplitByPipe($re);
-        push @list, "$other: irrelevant part (OK)";
+        $list[-1] .= "; $other: irrelevant part (OK)" if $other;
     }
-    push @list, ".*: irrelevant part (OK)" if $consume;
+    $list[-1] .= "; .*: irrelevant part (OK)" if $consume;
     return join "\n", @list;
 }
 
@@ -5637,103 +5634,83 @@ sub
 notifyRegexpChanged($$;$)
 {
   my ($hash, $re, $disableNotifyFn) = @_;
-  notifyRegexpChanged2($hash, $re, $disableNotifyFn);
 
   %ntfyHash = ();
   if($disableNotifyFn) {
     delete($hash->{NOTIFYDEV});
-    delete($hash->{NOTIFYDEV_1});
     $hash->{disableNotifyFn}=1;
     return;
   }
   delete($hash->{disableNotifyFn});
-  my @list2 = split(/\|/, $re);
-  my @list = grep { m/./ }                                     # Forum #62369
-             map  { (m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/ && 
-                     ($defs{$1} || devspec2array($1) ne $1)) ? $1 : ""} @list2;
-  if(@list && int(@list) == int(@list2)) {
-    my %h = map { $_ => 1 } @list;
-    @list = keys %h; # remove duplicates
-    $hash->{NOTIFYDEV} = join(",", @list);
-    $hash->{NOTIFYDEV_1} = join(",", @list);
-  } else {
-    delete($hash->{NOTIFYDEV});
-    delete($hash->{NOTIFYDEV_1});
-  }
-}
+  if ($featurelevel<6.2) {
 
-sub
-notifyRegexpChanged2
-{
-  my ($hash, $re, $disableNotifyFn) = @_;
-  #Log3('global',3 , "nRC2 called for $hash->{NAME}");
-  #%ntfyHash = ();
-  if($disableNotifyFn) {
-    delete($hash->{NOTIFYDEV_2});
-  #  $hash->{disableNotifyFn}=1;
-    return;
+      my @list2 = split(/\|/, $re);
+      my @list = grep { m/./ }                                     # Forum #62369
+                 map  { (m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/ && 
+                         ($defs{$1} || devspec2array($1) ne $1)) ? $1 : ""} @list2;
+      if(@list && int(@list) == int(@list2)) {
+        my %h = map { $_ => 1 } @list;
+        @list = keys %h; # remove duplicates
+        $hash->{NOTIFYDEV} = join(",", @list);
+      } else {
+        delete($hash->{NOTIFYDEV});
+      }
+      return; #end for featurelevels up to 6.1
   }
-  #delete($hash->{disableNotifyFn});
+
   my $numdef = keys %defs;
   my @fm = devspec2array($re);
   if (@fm && $fm[0] ne $re) {
-    return delete $hash->{NOTIFYDEV_2} if $numdef == @fm ;
-    my $lst = join q{,}, @fm;
-    $hash->{NOTIFYDEV_2} = $lst;
+    return delete $hash->{NOTIFYDEV} if $numdef == @fm; #regex was provided, matching all devices
+    $hash->{NOTIFYDEV} = $re;
     return;
   }
 
-  $re =~ s{\A\s*(\(.+\))\.\*\z}{$1}x;
-  my $first = 1;
-  my $outer = $re =~ m{\A\s*\(.+\)\s*\z}x; #check if outer brackets are given
+  $re =~ s{\A\s*(\(.+\))\.\*\z}{$1}x;       # remove outer backets and closing .*
+  my $first = 1;                            # we may have to treat enclosing brackets separately
+  my $outer = $re =~ m{\A\s*\(.+\)\s*\z}x;  # check if outer brackets are given
   my @list;
   while ($re) {
-    (my $dev, $re) = split m{:}x, $re, 2; #get the first seperator for device/reading+rest?
-    if ( $first && $outer ) {
+    (my $dev, $re) = split m{:}x, $re, 2;   # get the first seperator for device/reading+rest?
+    if ( $first && $outer ) {               # special treatment for outer brackets, checked by uneven number of brackes in expression that may be device/devspec
         $first = 0;
         my $ops = $dev =~ tr/(//;
         my $clos = $dev =~ tr/)//;
         if ( $ops > $clos ) {
-            chop($re);
-            $dev =~ s{\A.}{}x;
+            chop($re);                      # in case if: remove last bracket from rest
+            $dev =~ s{\A.}{}x;              # in case if: remove first bracket from devspec
         }
     }
     $dev =~ s{\A\s*\((.+)\)\s*\z}{$1}x if $outer; #remove outer brackets if given
-    #Log3('global',3 , "re splitted to $dev and $re") if $re;
-    return delete $hash->{NOTIFYDEV_2} if $dev eq '.*';
+    return delete $hash->{NOTIFYDEV} if $dev eq '.*';
 
     while ($dev) {
       (my $part, $dev) = notifyRegexpChangedsplitByPipe($dev);
-      #Log3('global',3 , "dev splitted to $part and $dev") if $dev;
-
-      return delete $hash->{NOTIFYDEV_2} if $part eq '.*';
+      return delete $hash->{NOTIFYDEV} if $part eq '.*';
       my @darr = devspec2array($part);
-      return delete $hash->{NOTIFYDEV_2} if !@darr || !$defs{$part} && $darr[0] eq $part || $numdef == @darr;
-      @list = (@list, @darr);
+      return delete $hash->{NOTIFYDEV} if !@darr || !$defs{$part} && $darr[0] eq $part || $numdef == @darr;
+      push @list, $part;
     }
-    (undef, $re) = notifyRegexpChangedsplitByPipe($re);
-    #Log3('global',3 , "re now cleaned to $re");
+    (undef, $re) = notifyRegexpChangedsplitByPipe($re); # remove irrelevant stuff like reading names and values left to next pipe at highest level, then repeat checks with remaining chars right to pipe
   }
-  return delete($hash->{NOTIFYDEV2}) if !@list;
+  return delete($hash->{NOTIFYDEV}) if !@list; #we got results at all?
   my %h = map { $_ => 1 } @list;
   @list = keys %h; # remove duplicates
-  $hash->{NOTIFYDEV_2} = join q{,}, @list;
+  $hash->{NOTIFYDEV} = join q{,}, @list;
   return;
 }
 
 sub notifyRegexpChangedsplitByPipe {
     my $string = shift // return (undef,undef);
-    # String in pipe-getrennte Tokens teilen, wenn die Klammerebene 0 ist
-    my $lastChar = q{x};
+    # split string in two pipe-separated tokens, but only in case if there is the same number of (unescaped) opening and closing brackets left to the pipe; returns tokes without pipe used for splitting
+    my $lastChar = q{x}; # just something different to escape character \
     my $bracketLevel = 0;
-    my $token = q{};
-    my @chars = split q{}, $string;
-    my $i = 0;
+    my $token = q{};                # start empty
+    my @chars = split q{}, $string; # transform string to char array
+    my $i = 0;                      # counter, needed to transform string to "" at last char of the string
     for my $char ( @chars ) {
-        #Log3('global',3,"char is $char, last was $lastChar, level is $bracketLevel");
         if ($char eq '|' && $lastChar ne '\\' && !$bracketLevel) {
             $string = substr $string, length($token) + 1;
-            #Log3('global',3 , "pipe detected, exiting with token $token, string $string");
             return ($token, $string);
         }
         $i++;
@@ -5744,12 +5721,9 @@ sub notifyRegexpChangedsplitByPipe {
             $bracketLevel--;
         }
         $token .= $char;
-        if ( $i == scalar @chars ) {
-          $string = substr $string, length $token;
-        }
+        return ($token,'') if $i == @chars; # done, end of string, no more pipe chars
         $lastChar = $char;
     }
-    #Log3('global',3 , "no more pipes detected, exiting with token $token, string $string");
     return ($token, $string);
 }
 
