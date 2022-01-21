@@ -9629,7 +9629,7 @@ sub CUL_HM_updtRegDisp($$$) {
 }
 sub CUL_HM_cfgStateDelay($) {#update cfgState: schedule for devices
   my $name = shift;
-  return if IsIgnored($name) || IsDummy($name); #Beta-User: extend frank proposal from https://forum.fhem.de/index.php/topic,125378.msg1202384.html#msg1202384
+  return if IsIgnored($name); #Beta-User: extend frank proposal from https://forum.fhem.de/index.php/topic,125378.msg1202384.html#msg1202384 by  || IsDummy($name)?
   CUL_HM_cfgStateUpdate("cfgStateUpdate:".CUL_HM_getDeviceName($name));
 }
 sub CUL_HM_cfgStateUpdate($) {#update cfgState
