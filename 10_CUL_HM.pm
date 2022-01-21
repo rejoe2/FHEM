@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-01-19 Beta-User $
+# $Id: 10_CUL_HM.pm 25298 2022-01-21 Beta-User $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
@@ -540,7 +540,7 @@ sub CUL_HM_updateConfig($){##########################
     foreach(sort keys %{$attr{$name}}){
       delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,'set',$_,$attr{$name}{$_}));  
     }
-    CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
+    #CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev}); #frank, https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
     if(CUL_HM_getPeers($name,"Config") == 2){
       CUL_HM_qAutoRead($name,1);
@@ -559,9 +559,10 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_setAssotiat($name);
   }
   
-  delete $modules{CUL_HM}{helper}{updtCfgLst};
+  #delete $modules{CUL_HM}{helper}{updtCfgLst}; #frank, https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
   if(!$modules{CUL_HM}{helper}{initDone}){
     Log 1,"CUL_HM finished initial cleanup";
+    InternalTimer(gettimeofday() + 66, 'CUL_HM_startQueues', 'CUL_HM_startQueues', 0); #frank, https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273 ff
     if (defined &HMinfo_init){# force reread
       $modules{HMinfo}{helper}{initDone} = 0;
       InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
@@ -569,6 +570,15 @@ sub CUL_HM_updateConfig($){##########################
   }
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
+}
+
+sub CUL_HM_startQueues() { #frank, https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
+  Log3('global',4,'CUL_HM start Queues'); #Beta-User: changed verbose level
+  for my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
+    CUL_HM_qStateUpdatIfEnab($name) if($defs{$name}->{helper}{role}{dev});
+  }
+  delete $modules{CUL_HM}{helper}{updtCfgLst};
+  return;
 }
 
 sub CUL_HM_initializeVirtuals {
@@ -9619,6 +9629,7 @@ sub CUL_HM_updtRegDisp($$$) {
 }
 sub CUL_HM_cfgStateDelay($) {#update cfgState: schedule for devices
   my $name = shift;
+  return if IsIgnored($name) || IsDummy($name); #Beta-User: extend frank proposal from https://forum.fhem.de/index.php/topic,125378.msg1202384.html#msg1202384
   CUL_HM_cfgStateUpdate("cfgStateUpdate:".CUL_HM_getDeviceName($name));
 }
 sub CUL_HM_cfgStateUpdate($) {#update cfgState
@@ -11078,7 +11089,8 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   my ($name,$q) = @_;
   my $devN = CUL_HM_getDeviceName($name);
   
-  return if (AttrVal($devN,"subType","") eq "virtual");
+  #return if (AttrVal($devN,"subType","") eq "virtual"); frank https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
+  return if (AttrVal($devN,'subType','') eq 'virtual') || IsIgnored($devN) || IsDummy($devN); #Beta-User: extend frank proposal
 
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
@@ -11123,6 +11135,7 @@ sub CUL_HM_qEntity($$){  # add to queue
   }
   my $rxt = CUL_HM_getRxType($defs{$name});
   my $wu = ($rxt & 0x1C) ? 'Wu' : ''; #normal or wakeup q?
+  $wu = '' if($rxt & 0x80 && CUL_HM_getAttrInt($name,"burstAccess")); #frank: conditional burst, https://forum.fhem.de/index.php/topic,125378.msg1202342.html#msg1202342
   $q .= $wu;
   my $qa = $modules{CUL_HM}{helper}{$q};
   @{$qa} = CUL_HM_noDup(@{$qa},$devN); #we only q device - channels are stored in the device
