@@ -418,7 +418,7 @@ sub msgDialog_progress {
   my $history = "";
 
   for ( keys %{$dialog} ) {
-    if($_ !~ m/(setOnly|match|commands|message)/){
+    if($_ !~ m/(?:setOnly|match|commands|message)/){
       $history = join q{|}, @history;
 
       last;
