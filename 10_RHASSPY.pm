@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2021-12-29 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-01-24 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -219,10 +219,8 @@ my $internal_mappings = {
 BEGIN {
 
   GP_Import( qw(
-    addToAttrList
-    addToDevAttrList
-    delFromDevAttrList
-    delFromAttrList
+    addToAttrList delFromDevAttrList
+    addToDevAttrList delFromAttrList
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
@@ -261,7 +259,7 @@ BEGIN {
     makeReadingName
     FileRead
     getAllSets
-    notifyRegexpChanged
+    notifyRegexpChanged setNotifyDev
     deviceEvents
     trim
   ) )
@@ -320,7 +318,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.11';
+    $hash->{MODULE_VERSION} = '0.5.12';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -1522,11 +1520,12 @@ sub disable_msgDialog {
         $devsp ? $devsp .= 'TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
     my @ntfdevs = devspec2array($devsp);
-    my $monitored = join q{|}, @ntfdevs;
-
-    $monitored 
-        ? notifyRegexpChanged($hash,$monitored,0)
-        : notifyRegexpChanged($hash,'',1);
+    if (@ntfdevs) {
+        setNotifyDev($hash,$devsp);
+        delete $hash->{disableNotifyFn};
+    } else {
+        notifyRegexpChanged($hash,'',1);
+    }
 
     delete $hash->{helper}{msgDialog} if !$enable;
     return;
