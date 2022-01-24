@@ -28,7 +28,7 @@ use strict;
 use warnings;
 use Carp qw(carp);
 use GPUtils qw(:all);
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Encode;
 use HttpUtils;
 use utf8;
@@ -104,7 +104,7 @@ sub Initialize {
     "disable:0,1 ".
     "disabledForIntervals ".
     "evalSpecials:textField-long ".
-    "msgCommand readCfgFile".
+    "msgCommand configFile ".
     $readingFnAttributes
   ;
   return;
@@ -136,22 +136,41 @@ sub Define {
   addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long", 'msgDialog');
   addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField", 'msgDialog');
 
-  $DEF = msgDialog_evalSpecials($hash, $DEF);
-  if ( !eval{ $DEF = decode_json($DEF); 1;} ){
-    Log3($SELF, 2, "$TYPE ($SELF) - DEF is not a valid JSON: $@");
-    return("Usage: define <name> $TYPE {JSON}\n\n$@");
+  setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)');
+
+  return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
+}
+
+sub firstInit {
+  my $hash = shift // return;
+  my $name = $hash->{NAME};
+
+  my $cfg  = AttrVal($hash->{NAME},'configFile',undef);
+  my $content;
+  if ($cfg) {
+    (my $ret, $content) = _readConfigFromFile($hash, $cfg);
+    return $ret if $ret;
+  } else {
+    $content = InternalVal($name, 'DEF', '');
   }
+
+  my $content2 = msgDialog_evalSpecials($hash, $content);
+  if ( !eval{ $content2 = decode_json($content2); 1;} ){
+    Log3($hash, 2, "msgDialog ($name) - DEF or configFile is not a valid JSON: $@");
+    return("Usage: define <name> msgDialog {JSON}\n\n$@");
+  }
+  $hash->{DIALOG} = $content;
 
   my @TRIGGER;
 
-  for (keys(%{$DEF})){
-    next if defined $DEF->{$_}->{setOnly};
+  for (keys(%{$content2})){
+    next if ref $content2->{$_} ne 'HASH';
+    next if defined $content2->{$_}->{setOnly} && $content->{$_}->{setOnly} eq 'true';
 
     push(@TRIGGER, $_);
   }
 
   $hash->{TRIGGER} = join q{,}, @TRIGGER;
-  setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)');
 
   msgDialog_update_msgCommand($hash);
   msgDialog_reset($hash);
@@ -160,15 +179,13 @@ sub Define {
   return;
 }
 
-sub Set($@) {
-  my ($hash, @a) = @_;
+sub Set {
+  my ($hash,$SELF,$argument,@values) = @_;
   my $TYPE = $hash->{TYPE};
 
-  return qq("set $TYPE" needs at least one argument) if @a < 2;
+  return qq("set $TYPE" needs at least one argument) if !$argument;
 
-  my $SELF = shift @a;
-  my $argument = shift @a;
-  my $value = join(" ", @a) if (@a);
+  my $value = join q{ }, @values;
   my %sets = (
     reset         => 'reset:noArg',
     say           => 'say:textField',
@@ -181,21 +198,21 @@ sub Set($@) {
     "Unknown argument $argument, choose one of ".join q{ }, values %sets
    if !defined $sets{$argument};
 
-  if($argument eq "reset"){
+  if ( $argument eq 'reset' ){
     msgDialog_reset($hash);
   }
-  elsif($argument eq "updateAllowed"){
+  elsif( $argument eq 'updateAllowed'){
     msgDialog_updateAllowed();
   }
 
-  return if(IsDisabled($SELF));
+  return if IsDisabled($SELF);
 
-  if($argument eq "say" && $value){
-    my $recipients = join(",", ($value =~ m/@(\S+)\s+/g));
-    $recipients = AttrVal($SELF, "allowed", "") unless($recipients);
+  if ( $argument eq 'say' && $value ){
+    my $recipients = join q{,}, ($value =~ m/@(\S+)\s+/g);
+    $recipients = AttrVal($SELF, 'allowed', '') if !$recipients;
     my (undef, $say) = ($value =~ m/(^|\s)([^@].+)/g);
 
-    return unless($recipients || $say);
+    return if !$recipients && !$say;
 
     msgDialog_progress($hash, $recipients, $say, 1);
   }
@@ -203,124 +220,139 @@ sub Set($@) {
   return;
 }
 
-sub Get($@) {
-  my ($hash, @a) = @_;
+sub Get {
+  my ($hash,$SELF,$argument,@values) = @_;
   my $TYPE = $hash->{TYPE};
 
-  return "\"get $TYPE\" needs at least one argument" if(@a < 2);
+  return "\"get $TYPE\" needs at least one argument" if !$argument;
 
-  my $SELF = shift @a;
-  my $argument = shift @a;
-  my $value = join(" ", @a) if (@a);
+  my $value = join q{ }, @values;
   my %gets = (
     "trigger" => "trigger:noArg"
   );
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Get");
 
-  return(
-    "Unknown argument $argument, choose one of ".join(" ", values %gets)
-  ) unless(exists($gets{$argument}));
+  return "Unknown argument $argument, choose one of ".join q{ }, values %gets
+    if !exists $gets{$argument};
 
-  return if(IsDisabled($SELF));
+  return if IsDisabled($SELF);
 
-  if($argument eq "trigger"){
-    return(join("\n", split(",", InternalVal($SELF, "TRIGGER", undef))));
+  if($argument eq 'trigger'){
+    return join q{\n}, split q{,}, InternalVal($SELF, 'TRIGGER', undef);
   }
 
   return;
 }
 
-sub Attr(@) {
+sub Attr {
   my ($cmd, $SELF, $attribute, $value) = @_;
-  my ($hash) = $defs{$SELF};
+  my $hash = $defs{$SELF};
   my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Attr");
 
-  if($attribute eq "disable"){
+  if ($attribute eq 'disable'){
     if($cmd eq "set" and $value == 1){
-      readingsSingleUpdate($hash, "state", "Initialized", 1);
+      return readingsSingleUpdate($hash, "state", "Initialized", 1); #Beta-User: really?!?
     }
-    else{
-      readingsSingleUpdate($hash, "state", "disabled", 1);
-    }
+    return readingsSingleUpdate($hash, "state", "disabled", 1);
   }
-  elsif($attribute eq "msgCommand"){
-    if($cmd eq "set"){
+
+  if ( $attribute eq 'msgCommand'){
+    if($cmd eq 'set'){
       $attr{$SELF}{$attribute} = $value;
     }
     else{
-      delete($attr{$SELF}{$attribute});
+      delete $attr{$SELF}{$attribute};
     }
 
-    msgDialog_update_msgCommand($hash);
+    return msgDialog_update_msgCommand($hash);
+  }
+
+  if ( $attribute eq 'configFile' ) {
+    if ($cmd ne 'set') {
+        delete $hash->{CONFIGFILE};
+        delete $hash->{DIALOG};
+        $value = undef;
+        delete $attr{$SELF}{$attribute};
+    }
+    $attr{$SELF}{$attribute} = $value;
+    return firstInit($hash);
   }
 
   return;
 }
 
-sub Notify($$) {
-  my ($hash, $dev_hash) = @_;
+sub Notify {
+  my $hash     = shift // return;
+  my $dev_hash = shift // return;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
   my $device = $dev_hash->{NAME};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Notify");
 
-  return if(IsDisabled($SELF));
+  return if IsDisabled($SELF);
 
   my @events = @{deviceEvents($dev_hash, 1)};
 
-  return if !@events || AttrVal($SELF, 'allowed', '') !~ m/(^|,)($device|everyone)(,|$)/;
+  return if !@events || AttrVal($SELF, 'allowed', '') !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
 
   for my $event (@events){
-    next if $event !~ m/(fhemMsgPushReceived|fhemMsgRcvPush): (.+)/;
+    next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush):.(.+)}xms;
 
     Log3($SELF, 4 , "$TYPE ($SELF) triggered by \"$device $event\"");
 
-    msgDialog_progress($hash, $device, $2);
+    msgDialog_progress($hash, $device, $1);
   }
 
   return;
 }
 
 # module Fn ###################################################################
-sub msgDialog_evalSpecials($$) {
-  my ($hash, $string) = @_;
+sub msgDialog_evalSpecials {
+  my $hash   = shift // return;
+  my $string = shift // return;
+
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_evalSpecials");
 
-  my $msgConfig = $modules{msgConfig}{defptr}{NAME}
-    if($modules{msgConfig}{defptr});
+  my $msgConfig;
+  $msgConfig = $modules{msgConfig}{defptr}{NAME}
+    if $modules{msgConfig}{defptr};
   $string =~ s/\$SELF/$SELF/g;
   my $evalSpecials =
     AttrVal($msgConfig, "$TYPE\_evalSpecials", "").
     " ".
-    AttrVal($SELF, "evalSpecials", "")
+    AttrVal($SELF, 'evalSpecials', '')
   ;
 
-  return($string) if($evalSpecials eq " ");
+  return $string if $evalSpecials eq ' ';
 
   (undef, $evalSpecials) = parseParams($evalSpecials, "\\s", " ");
 
-  return($string) unless($evalSpecials);
+  return $string if !$evalSpecials;
 
-  for(keys(%{$evalSpecials})){
-    $evalSpecials->{$_} = eval $evalSpecials->{$_}
+  for (keys(%{$evalSpecials})) {
+    $evalSpecials->{$_} = AnalyzePerlCommand($hash, $evalSpecials->{$_})
       if($evalSpecials->{$_} =~ m/^{.*}$/);
   }
 
   my $specials = join q{|}, keys %{$evalSpecials};
   $string =~ s/%($specials)%/$evalSpecials->{$1}/g;
 
-  return($string);
+  return $string;
 }
 
-sub msgDialog_progress($$$;$) {
-  my ($hash, $recipients, $message, $force) = @_;
+sub msgDialog_progress {
+  my $hash       = shift // return;
+  my $recipients = shift // return;
+  my $message    = shift // return;
+  my $force      = shift;
+
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
   $recipients = join q{,}, devspec2array($msgDialog_devspec)
@@ -337,11 +369,11 @@ sub msgDialog_progress($$$;$) {
   );
 
   my @oldHistory;
-  @oldHistory = split("\\|", ReadingsVal($SELF, "$recipients\_history", ""))
+  @oldHistory = split "\\|", ReadingsVal($SELF, "$recipients\_history", "")
     if !$force;
-  push(@oldHistory, split("\\|", $message));
+  push @oldHistory, split "\\|", $message;
   my (@history);
-  my $dialog =$hash->{DEF};
+  my $dialog = $hash->{DIALOG};
   $dialog = msgDialog_evalSpecials($hash, $dialog);
   $dialog =~ s/\$recipient/$recipients/g;
   if ( !eval{ $dialog = decode_json($dialog); 1;} ){
@@ -352,39 +384,42 @@ sub msgDialog_progress($$$;$) {
   for (@oldHistory){
     $message = $_;
 
-    if(defined($dialog->{$message})){
+    if ( defined $dialog->{$message} ){
       $dialog = $dialog->{$message};
-      push(@history, $message);
+      push @history, $message;
     }
     else{
-      for (keys(%{$dialog})){
-        next unless(
-          $dialog->{$_} =~ m/HASH/ &&
-          defined($dialog->{$_}{match}) &&
-          $message =~ m/^$dialog->{$_}{match}$/
-        );
+      for (keys %{$dialog}){
+        next if $dialog->{$_} !~ m/HASH/ 
+                || !defined($dialog->{$_}{match}) 
+                || $message !~ m/^$dialog->{$_}{match}$/
+        ;
 
         $dialog = $dialog->{$_};
-        push(@history, $_);
+        push @history, $_;
 
         last;
       }
     }
   }
 
-  return if(@history != @oldHistory || !$force && $dialog->{setOnly});
+  return if @history != @oldHistory || !$force && $dialog->{setOnly};
 
-  $dialog = eval{JSON->new->encode($dialog)};
+  #$dialog = eval{JSON->new->encode($dialog)};
+  if ( !eval{ $dialog = encode_json($dialog); 1;} ) {
+    return Log3($SELF, 2, "$TYPE ($SELF) - Error encoding JSON: $@");
+  }
+
   $dialog =~ s/\$message/$message/g;
-  if ( !eval{ $dialog = decode_json($dialog); 1;} ){
+  if ( !eval{ $dialog = decode_json($dialog); 1;} ) {
     return Log3($SELF, 2, "$TYPE ($SELF) - Error decoding JSON: $@");
   }
   #$dialog = eval{JSON->new->decode($dialog)};
   my $history = "";
 
-  for (keys(%{$dialog})){
+  for ( keys %{$dialog} ) {
     if($_ !~ m/(setOnly|match|commands|message)/){
-      $history = join("|", @history);
+      $history = join q{|}, @history;
 
       last;
     }
@@ -392,7 +427,7 @@ sub msgDialog_progress($$$;$) {
 
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, $_."_history", $history)
-    for (split(",", $recipients));
+    for ( split q{,}, $recipients );
   readingsBulkUpdate($hash, "state", "$recipients: $message");
   readingsEndUpdate($hash, 1);
 
@@ -405,48 +440,51 @@ sub msgDialog_progress($$$;$) {
 
     for (@commands){
       $_ =~ s/;/;;/g if($_ =~ m/^{.*}$/s);
-      my $ret = AnalyzeCommandChain(undef, $_);
+      my $ret = AnalyzeCommandChain($hash, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")
         if($ret);
     }
   }
 
-  if($dialog->{message}){
-    my @message =
+  return if !$dialog->{message};
+
+  my @message =
       $dialog->{message} =~ m/ARRAY/ ?
         @{$dialog->{message}}
       : $dialog->{message}
-    ;
+  ;
 
-    for (@message){
+  for (@message){
       if($_ =~ m/^{.*}$/s){
         $_ =~ s/;/;;/g;
-        $_ = AnalyzePerlCommand(undef, $_);
+        $_ = AnalyzePerlCommand($hash, $_);
       }
-    }
-
-    my $message = join("\n", @message);
-    my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
-    $msgCommand = eval($msgCommand);
-
-    fhem($msgCommand);
   }
+
+  $message = join q{\n}, @message;
+  my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
+    #$msgCommand = eval($msgCommand);
+  $msgCommand =~ s{\\[\@]}{@}x;
+  $msgCommand = s{(\$\w+)}{$1}eegx;
+
+  #fhem($msgCommand);
+  AnalyzeCommand($hash, $msgCommand);
 
   return;
 }
 
-sub msgDialog_reset($) {
-  my ($hash) = @_;
+sub msgDialog_reset {
+  my $hash = shift // return;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_reset");
 
-  delete($hash->{READINGS});
+  delete $hash->{READINGS};
 
-  readingsSingleUpdate($hash, "state", "Initialized", 1)
-    unless(IsDisabled($SELF));
+  readingsSingleUpdate($hash, 'state', 'Initialized', 1)
+    if !IsDisabled($SELF);
 
   return;
 }
@@ -454,14 +492,15 @@ sub msgDialog_reset($) {
 sub msgDialog_updateAllowed {
   Log3('global',5, "msgDialog - entering msgDialog_updateAllowed");
 
-  my $allowed = join(",", sort(devspec2array($msgDialog_devspec)));
+  my $allowed = join q{,}, sort devspec2array($msgDialog_devspec);
 
   $modules{msgDialog}{AttrList} =~
     s/allowed:multiple-strict,\S*/allowed:multiple-strict,everyone,$allowed/;
+  return;
 }
 
-sub msgDialog_update_msgCommand($) {
-  my ($hash) = @_;
+sub msgDialog_update_msgCommand {
+  my $hash = shift // return;
   my $SELF = $hash->{NAME};
   my $TYPE = $hash->{TYPE};
   my $msgConfig = $modules{msgConfig}{defptr}{NAME};
@@ -469,7 +508,7 @@ sub msgDialog_update_msgCommand($) {
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_update_msgCommand");
 
   $hash->{MSGCOMMAND} =
-    AttrVal($SELF, "msgCommand",
+    AttrVal($SELF, 'msgCommand',
       AttrVal($msgConfig, "$TYPE\_msgCommand",
         'msg push \@$recipients $message'
       )
@@ -479,9 +518,38 @@ sub msgDialog_update_msgCommand($) {
   return;
 }
 
+sub _getDataFile {
+    my $hash     = shift // return;
+    my $filename = shift;
+    my $name = $hash->{NAME};
+    $filename = $filename // AttrVal($name,'configFile',undef);
+    my @t = localtime gettimeofday();
+    $filename = ResolveDateWildcards($filename, @t);
+    $hash->{CONFIGFILE} = $filename; # for configDB migration
+    return $filename;
+}
+
+sub _readConfigFromFile {
+    my $hash = shift // return 'no device reference provided!', undef;
+    my $cfg  = shift // return 'no filename provided!', undef;
+
+    my $name = $hash->{NAME};
+    my $filename = _getDataFile($hash, $cfg);
+    Log3($name, 5, "trying to read config from $filename");
+    my ($ret, @content) = FileRead($filename);
+    if ($ret) {
+        Log3($name, 1, "$name failed to read configFile $filename!") ;
+        return $ret, undef;
+    }
+    my @cleaned = grep { $_ !~ m{\A\s*[#]}x } @content;
+
+    return 0, join q{ }, @cleaned;
+}
+
 1;
 
 __END__
+
 # commandref ##################################################################
 =pod
 =encoding utf8
