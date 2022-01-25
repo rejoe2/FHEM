@@ -1,11 +1,11 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 16814 2022-01-24 Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-01-25 +package Beta-User $
 
 # copyright ###################################################################
 #
 # 76_msgDialog.pm
 #
-# Copyright by igami
+# Originally initiated by igami
 #
 # This file is part of FHEM.
 #
@@ -26,16 +26,13 @@
 package FHEM::Communication::msgDialog; ##no critic qw(Package)
 use strict;
 use warnings;
-use Carp qw(carp);
+#use Carp qw(carp);
 use GPUtils qw(:all);
 use JSON qw(decode_json encode_json);
-use Encode;
-use HttpUtils;
-use utf8;
-use List::Util 1.45 qw(max min uniq);
-use Scalar::Util qw(looks_like_number);
+#use Encode;
+#use HttpUtils;
+#use utf8;
 use Time::HiRes qw(gettimeofday);
-use POSIX qw(strftime);
 
 sub ::msgDialog_Initialize { goto &Initialize }
 
@@ -45,44 +42,29 @@ my $msgDialog_devspec = "TYPE=(ROOMMATE|GUEST):FILTER=msgContactPush=.+";
 BEGIN {
 
   GP_Import( qw(
-    addToAttrList delFromDevAttrList
-    addToDevAttrList delFromAttrList
+    addToDevAttrList 
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
     readingsEndUpdate
-    readingsDelete
     Log3
-    defs attr cmds modules L
-    DAYSECONDS HOURSECONDS MINUTESECONDS
+    defs attr modules L
     init_done
     InternalTimer
     RemoveInternalTimer
-    AssignIoPort
-    CommandAttr
-    CommandDeleteAttr
-    IOWrite
     readingFnAttributes
     IsDisabled
     AttrVal
     InternalVal
     ReadingsVal
-    ReadingsNum
     devspec2array
-    toJSON
-    setVolume
     AnalyzeCommandChain
     AnalyzeCommand
-    CommandDefMod
-    CommandDelete
     EvalSpecials
     AnalyzePerlCommand
     perlSyntaxCheck
     parseParams
     ResolveDateWildcards
-    HttpUtils_NonblockingGet
-    FmtDateTime
-    makeReadingName
     FileRead
     getAllSets
     setNotifyDev
@@ -161,11 +143,12 @@ sub firstInit {
   }
   $hash->{DIALOG} = $content;
 
+  delete $hash->{TRIGGER};
   my @TRIGGER;
 
   for (keys(%{$content2})){
     next if ref $content2->{$_} ne 'HASH';
-    next if defined $content2->{$_}->{setOnly} && $content->{$_}->{setOnly} eq 'true';
+    next if defined $content2->{$_}->{setOnly}; # && $content2->{$_}->{setOnly} eq 'true';
 
     push(@TRIGGER, $_);
   }
@@ -752,7 +735,6 @@ __END__
       <code>"msg push \@$recipients $message"</code>.<br>
       This attribute is available in the msgConfig device.
     </li>
-    <li>
   </ul>
   <br>
 
