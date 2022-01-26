@@ -1,6 +1,6 @@
 # Id ##########################################################################
 # $Id: 76_msgDialog.pm 25556 2022-01-25 +package Beta-User $
-
+#
 # copyright ###################################################################
 #
 # 76_msgDialog.pm
@@ -28,16 +28,16 @@ use strict;
 use warnings;
 #use Carp qw(carp);
 use GPUtils qw(:all);
-use JSON qw(decode_json encode_json);
-#use Encode;
+use JSON (); # qw(decode_json encode_json);
+use Encode;
 #use HttpUtils;
-#use utf8;
+use utf8;
 use Time::HiRes qw(gettimeofday);
 
 sub ::msgDialog_Initialize { goto &Initialize }
 
 # variables ###################################################################
-my $msgDialog_devspec = "TYPE=(ROOMMATE|GUEST):FILTER=msgContactPush=.+";
+my $msgDialog_devspec = 'TYPE=(ROOMMATE|GUEST):FILTER=msgContactPush=.+';
 
 BEGIN {
 
@@ -107,6 +107,12 @@ sub Define {
     "\"apt-get install libjson-perl\""
     )
   }
+  return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
+}
+
+sub firstInit {
+  my $hash = shift // return;
+  my $name = $hash->{NAME};
 
   return(
     "No global configuration device defined: ".
@@ -115,19 +121,12 @@ sub Define {
 
   my $msgConfig = $modules{msgConfig}{defptr}{NAME};
 
-  addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long", 'msgDialog');
-  addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField", 'msgDialog');
+  addToDevAttrList($msgConfig, "msgDialog_evalSpecials:textField-long", 'msgDialog');
+  addToDevAttrList($msgConfig, "msgDialog_msgCommand:textField", 'msgDialog');
 
   setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)');
 
-  return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
-}
-
-sub firstInit {
-  my $hash = shift // return;
-  my $name = $hash->{NAME};
-
-  my $cfg  = AttrVal($hash->{NAME},'configFile',undef);
+  my $cfg  = AttrVal($name,'configFile',undef);
   my $content;
   if ($cfg) {
     (my $ret, $content) = _readConfigFromFile($hash, $cfg);
@@ -137,7 +136,7 @@ sub firstInit {
   }
 
   my $content2 = msgDialog_evalSpecials($hash, $content);
-  if ( !eval{ $content2 = decode_json($content2); 1;} ){
+  if ( !eval{ $content2 = JSON->new->decode($content2); 1;} ){ #decode_json will cause problems with utf8
     Log3($hash, 2, "msgDialog ($name) - DEF or configFile is not a valid JSON: $@");
     return("Usage: define <name> msgDialog {JSON}\n\n$@");
   }
@@ -146,11 +145,11 @@ sub firstInit {
   delete $hash->{TRIGGER};
   my @TRIGGER;
 
-  for (keys(%{$content2})){
+  for (keys %{$content2}){
     next if ref $content2->{$_} ne 'HASH';
     next if defined $content2->{$_}->{setOnly}; # && $content2->{$_}->{setOnly} eq 'true';
 
-    push(@TRIGGER, $_);
+    push @TRIGGER, $_;
   }
 
   $hash->{TRIGGER} = join q{,}, @TRIGGER;
@@ -359,7 +358,7 @@ sub msgDialog_progress {
   my $dialog = $hash->{DIALOG};
   $dialog = msgDialog_evalSpecials($hash, $dialog);
   $dialog =~ s/\$recipient/$recipients/g;
-  if ( !eval{ $dialog = decode_json($dialog); 1;} ){
+  if ( !eval{ $dialog = JSON->new->decode($dialog); 1;} ){
     return Log3($SELF, 2, "$TYPE ($SELF) - Error decoding JSON: $@");
   }
   #$dialog = eval{decode_json($dialog)};
@@ -389,12 +388,12 @@ sub msgDialog_progress {
   return if @history != @oldHistory || !$force && $dialog->{setOnly};
 
   #$dialog = eval{JSON->new->encode($dialog)};
-  if ( !eval{ $dialog = encode_json($dialog); 1;} ) {
+  if ( !eval{ $dialog = JSON->new->encode($dialog); 1;} ) {
     return Log3($SELF, 2, "$TYPE ($SELF) - Error encoding JSON: $@");
   }
 
   $dialog =~ s/\$message/$message/g;
-  if ( !eval{ $dialog = decode_json($dialog); 1;} ) {
+  if ( !eval{ $dialog = JSON->new->decode($dialog); 1;} ) {
     return Log3($SELF, 2, "$TYPE ($SELF) - Error decoding JSON: $@");
   }
   #$dialog = eval{JSON->new->decode($dialog)};
