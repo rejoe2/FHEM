@@ -67,7 +67,7 @@ BEGIN {
     ResolveDateWildcards
     FileRead
     getAllSets
-    setNotifyDev
+    setNotifyDev setDisableNotifyFn
     deviceEvents
     trim
   ) )
@@ -124,7 +124,7 @@ sub firstInit {
   addToDevAttrList($msgConfig, "msgDialog_evalSpecials:textField-long", 'msgDialog');
   addToDevAttrList($msgConfig, "msgDialog_msgCommand:textField", 'msgDialog');
 
-  setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)');
+  setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)') if !IsDisabled($name);
 
   my $cfg  = AttrVal($name,'configFile',undef);
   my $content;
@@ -237,9 +237,12 @@ sub Attr {
 
   if ($attribute eq 'disable'){
     if($cmd eq "set" and $value == 1){
+      setDisableNotifyFn($hash, 1)
       return readingsSingleUpdate($hash, "state", "Initialized", 1); #Beta-User: really?!?
     }
-    return readingsSingleUpdate($hash, "state", "disabled", 1);
+    readingsSingleUpdate($hash, "state", "disabled", 1);
+    return firstInit($hash) if $init_done;
+    return;
   }
 
   if ( $attribute eq 'msgCommand'){

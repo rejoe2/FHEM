@@ -2162,7 +2162,7 @@ sub CUL_HM_Parse($$) {#########################################################
                      && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
                          || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
             $flr = sprintf("%02X", hex($flr)|0x01);
-            $m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement
+            #$m =~ s/^(..)../$1$flr/s; #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
           }
           CUL_HM_SndCmd($h, $m);
         }
@@ -3483,8 +3483,18 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"SDunknownMsg:$mh{p}"] if(!@evtEt);
     }
 
-    if($ioId eq $mh{dst} && ($mh{mFlgH}&0x20)){  # Send Ack/Nack
-      push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}.($mh{mFlg}.$mh{mTp} eq "A001" ? "80":"00");
+    if($ioId eq $mh{dst} && ($mh{mFlgH}&0x20)){  # Send Ack/Nack #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+      #push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}.($mh{mFlg}.$mh{mTp} eq "A001" ? "80":"00");
+      if ($mh{mFlg}.$mh{mTp} eq 'A001') {
+        push @ack,$mh{shash},$mh{mNo}.'8002'.$ioId.$mh{src}.'80';
+      }
+      else {
+        push @ack,$mh{shash},$mh{mNo}.'8002'.$ioId.$mh{src}.'00'  #noansi: additional CUL ACK
+            if (   $ioId eq $mh{dst}
+                && !$mh{wakupAck} #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+                && !$mh{devH}->{IODev}->{helper}{VTS_ACK} # for TSCUL VTS0.17 up
+                && $mh{devH}->{IODev}->{TYPE} !~ m/^(?:HMLAN|HMUARTLGW)$/s ); #noansi: additional CUL ACK 
+      }
     }
   }
   elsif($mh{st} eq "threeStateSensor") { ######################################
@@ -3513,6 +3523,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )];
       push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."00"
         if (   $ioId eq $mh{dst}
+            && !$mh{wakupAck} #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
             && !$mh{devH}->{IODev}->{helper}{VTS_ACK}
             && $mh{devH}->{IODev}->{TYPE} !~ m/^(HMLAN|HMUARTLGW)$/); #noansi: additional CUL ACK 
     }
@@ -3671,7 +3682,8 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($ioId eq $mh{dst}){# if fhem is destination check if we need to react
     if(   $mh{mTp} =~ m/^4./    #Push Button event
        && !$mh{AckDone}          #noansi: allready done device specific
-       && ($mh{mFlgH} & 0x20)){  #response required Flag
+       && ($mh{mFlgH} & 0x20)    #response required Flag
+       && !$mh{wakupAck}){       #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
                 # fhem CUL shall ack a button press
       if ($mh{md} =~ m/^(HM-SEC-SC.*|ROTO_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
         push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."0101".((hex($mI[0])&1)?"C8":"00")."00";
@@ -3689,6 +3701,7 @@ sub CUL_HM_Parse($$) {#########################################################
   push @ack,$mh{shash}, $mh{mNo}."8002".$ioId.$mh{src}."00"
       if(   ($ioId eq $mh{dst})   #are we adressee
          && ($mh{mFlgH} & 0x20)   #response required Flag
+         && !$mh{wakupAck}        #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
          && @evtEt            #only ack if we identified it
          && (!scalar(@ack))   #sender requested ACK
          );
@@ -3719,7 +3732,7 @@ sub CUL_HM_Parse($$) {#########################################################
                  && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
                      || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
         $flr = sprintf("%02X", hex($flr)|0x01);
-        $m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement
+        #$m =~ s/^(..)../$1$flr/s; #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
       }
       CUL_HM_SndCmd($h, $m);
     }
@@ -3769,6 +3782,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             }
             $devHlpr->{prt}{sleeping} = 0;
             CUL_HM_ProcessCmdStack($mhp->{devH});
+            $mhp->{wakupAck} = 1; #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
           }
         }
         $devHlpr->{prt}{sleeping} = 1 if (!$devHlpr->{prt}{sProc}); # set back to sleeping with next trigger, if nothing to do
@@ -3782,6 +3796,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #noansi: Ack with wakeup bit set for CUL
           }
           CUL_HM_ProcessCmdStack($mhp->{devH});
+          $mhp->{wakupAck} = 1; #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
         }
       }
     }
