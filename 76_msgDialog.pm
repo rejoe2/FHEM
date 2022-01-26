@@ -27,7 +27,7 @@ package FHEM::Communication::msgDialog; ##no critic qw(Package)
 use strict;
 use warnings;
 #use Carp qw(carp);
-use GPUtils qw(:all);
+use GPUtils qw(GP_Import);
 use JSON (); # qw(decode_json encode_json);
 use Encode;
 #use HttpUtils;
@@ -132,8 +132,10 @@ sub firstInit {
     (my $ret, $content) = _readConfigFromFile($hash, $cfg);
     return $ret if $ret;
   } else {
-    $content = InternalVal($name, 'DEF', '');
+    $content = InternalVal($name, 'DEF', '{}');
   }
+  delete $hash->{TRIGGER};
+
 
   my $content2 = msgDialog_evalSpecials($hash, $content);
   if ( !eval{ $content2 = JSON->new->decode($content2); 1;} ){ #decode_json will cause problems with utf8
@@ -142,7 +144,6 @@ sub firstInit {
   }
   $hash->{DIALOG} = $content;
 
-  delete $hash->{TRIGGER};
   my @TRIGGER;
 
   for (keys %{$content2}){

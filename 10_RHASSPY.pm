@@ -32,7 +32,7 @@ package RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
 use Carp qw(carp);
-use GPUtils qw(:all);
+use GPUtils qw(GP_Import);
 use JSON qw(decode_json);
 use Encode;
 use HttpUtils;
