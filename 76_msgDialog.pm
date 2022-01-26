@@ -121,10 +121,13 @@ sub firstInit {
 
   my $msgConfig = $modules{msgConfig}{defptr}{NAME};
 
-  addToDevAttrList($msgConfig, "msgDialog_evalSpecials:textField-long", 'msgDialog');
-  addToDevAttrList($msgConfig, "msgDialog_msgCommand:textField", 'msgDialog');
+  addToDevAttrList($msgConfig, 'msgDialog_evalSpecials:textField-long', 'msgDialog');
+  addToDevAttrList($msgConfig, 'msgDialog_msgCommand:textField', 'msgDialog');
 
-  setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)') if !IsDisabled($name);
+  if (!IsDisabled($name) ) {
+      setDisableNotifyFn($hash, 0);
+      setNotifyDev($hash,'TYPE=(ROOMMATE|GUEST)');
+  }
 
   my $cfg  = AttrVal($name,'configFile',undef);
   my $content;
@@ -237,7 +240,7 @@ sub Attr {
 
   if ($attribute eq 'disable'){
     if($cmd eq "set" and $value == 1){
-      setDisableNotifyFn($hash, 1)
+      setDisableNotifyFn($hash, 1);
       return readingsSingleUpdate($hash, "state", "Initialized", 1); #Beta-User: really?!?
     }
     readingsSingleUpdate($hash, "state", "disabled", 1);
@@ -322,7 +325,7 @@ sub msgDialog_evalSpecials {
 
   return $string if !$evalSpecials;
 
-  for (keys(%{$evalSpecials})) {
+  for ( keys %{$evalSpecials} ) {
     $evalSpecials->{$_} = AnalyzePerlCommand($hash, $evalSpecials->{$_})
       if($evalSpecials->{$_} =~ m/^{.*}$/);
   }
@@ -429,7 +432,7 @@ sub msgDialog_progress {
       my $ret = AnalyzeCommandChain($hash, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")
-        if($ret);
+        if $ret;
     }
   }
 
@@ -451,8 +454,10 @@ sub msgDialog_progress {
   $message = join q{\n}, @message;
   my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
     #$msgCommand = eval($msgCommand);
+  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand was: $msgCommand");
   $msgCommand =~ s{\\[\@]}{@}x;
   $msgCommand = s{(\$\w+)}{$1}eegx;
+  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand now is: $msgCommand");
 
   #fhem($msgCommand);
   AnalyzeCommand($hash, $msgCommand);
