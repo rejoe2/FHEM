@@ -5604,6 +5604,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
                  AMADCommBridge=AMADBridge<br>
                  allowed=AMADDev_A</code></p>
   </li>
+  <li>
   <a id="RHASSPY-attr-rhasspyTTS"></a><b>rhasspyTTS</b>
     <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId. If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
       Example:<br>
