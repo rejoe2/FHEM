@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 25556 2022-01-25 +package Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-01-28 +package Beta-User $
 #
 # copyright ###################################################################
 #
@@ -457,11 +457,8 @@ sub msgDialog_progress {
     #$msgCommand = eval($msgCommand);
   Log3($SELF, 4, "$TYPE ($SELF) - msgCommand was: $msgCommand, with rep $recipients and msg $message");
   $msgCommand =~ s{\\[\@]}{@}x;
-  #$msgCommand = s{(\$\w+)}{$1}eegx;
-  $msgCommand = s{(\$\w+)}{$1}eegx;
+  $msgCommand =~ s{(\$\w+)}{$1}eegx;
   Log3($SELF, 4, "$TYPE ($SELF) - msgCommand now is: $msgCommand");
-
-  #fhem($msgCommand);
   AnalyzeCommand($hash, $msgCommand);
 
   return;
