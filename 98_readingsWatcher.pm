@@ -632,7 +632,7 @@ __END__
 <h3>readingsWatcher</h3>
 <ul>
    The module monitors readings in other modules that its readings or their times change at certain intervals and<br>
-   if necessary, triggers events that can be processed further with other modules (for example, notify, DOIF).<br>
+   if necessary, triggers events that can be processed further with other modules (for example, <a href="#notify">notify</a>, <a href="#DOIF">DOIF</a>).<br>
    Forum : <a href="https://forum.fhem.de/index.php/topic,49408.0.html">https://forum.fhem.de/index.php/topic,49408.0.html</a><br><br>
   
    <a id="readingsWatcher-define"></a>
@@ -705,7 +705,7 @@ __END__
 <h3>readingsWatcher</h3>
 <ul>
   Das Modul überwacht Readings in anderen Modulen darauf das sich dessen Readings bzw. deren Zeiten in bestimmten Abständen
-  ändern<br> und löst ggf. Events aus, die mit anderen Modulen (z.B. notify,DOIF) weiter verarbeitet werden können.<br>
+  ändern<br> und löst ggf. Events aus, die mit anderen Modulen (z.B. <a href="#notify">notify</a>, <a href="#DOIF">DOIF</a>) weiter verarbeitet werden können.<br>
   Forum : <a href="https://forum.fhem.de/index.php/topic,49408.0.html">https://forum.fhem.de/index.php/topic,49408.0.html</a><br><br>
  
   <a id="readingsWatcher-define"></a>
