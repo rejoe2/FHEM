@@ -452,10 +452,12 @@ sub msgDialog_progress {
   }
 
   $message = join q{\n}, @message;
-  my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
+  #my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
+  my $msgCommand = InternalVal($SELF, 'MSGCOMMAND', '');
     #$msgCommand = eval($msgCommand);
-  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand was: $msgCommand");
+  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand was: $msgCommand, with rep $recipients and msg $message");
   $msgCommand =~ s{\\[\@]}{@}x;
+  #$msgCommand = s{(\$\w+)}{$1}eegx;
   $msgCommand = s{(\$\w+)}{$1}eegx;
   Log3($SELF, 4, "$TYPE ($SELF) - msgCommand now is: $msgCommand");
 
