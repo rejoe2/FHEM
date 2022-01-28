@@ -8520,7 +8520,8 @@ sub CUL_HM_respPendTout($) {
     elsif ($pHash->{try}){         #send try failed - revert, wait for wakeup
       # device might still be busy with writing flash or similar
       # we have to wait for next wakeup
-      unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6));
+      unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6))
+          if (substr($pHash->{rspWait}{cmd},8,2) ne "58"); #noansi: do not repeat TC duty cycle => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
       delete $pHash->{try};
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
       CUL_HM_protState($hash,"CMDs_pending");
