@@ -451,7 +451,7 @@ sub msgDialog_progress {
       }
   }
 
-  $message = join q{\n}, @message;
+  $message = join q{ \n}, @message;
   #my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
   my $msgCommand = InternalVal($SELF, 'MSGCOMMAND', '');
     #$msgCommand = eval($msgCommand);
