@@ -853,7 +853,6 @@ __END__
 
 <a id="archetype"></a>
 <h3>archetype</h3>
-( en | <a href="commandref_DE.html#archetype">de</a> )
 <div>
   <ul>
     With an archetype, attributes are transferred to inheritors, other devices.
@@ -1102,7 +1101,7 @@ __END__
       </li>
       <br>
       <li>
-        <code><a href="#readingList">readingList</a></code>
+        <code><a href="#dummy-attr-readingList">readingList</a></code>
       </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
@@ -1115,7 +1114,7 @@ __END__
       </li>
       <br>
       <li>
-        <code><a href="#setList">setList</a></code>
+        <code><a href="#dummy-attr-setList">setList</a></code>
       </li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
@@ -1168,7 +1167,6 @@ attr SVG_link_archetype attributes group</pre>
 
 <a id="archetype"></a>
 <h3>archetype</h3>
-( <a href="commandref.html#archetype">en</a> | de )
 <div>
   <ul>
     Mit einem archetype werden Attribute auf Erben (inheritors), andere
@@ -1424,7 +1422,7 @@ attr SVG_link_archetype attributes group</pre>
       </li>
       <br>
       <li>
-        <code><a href="#readingList">readingList</a></code>
+        <code><a href="#dummy-attr-readingList">readingList</a></code>
       </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
@@ -1437,7 +1435,7 @@ attr SVG_link_archetype attributes group</pre>
       </li>
       <br>
       <li>
-        <code><a href="#setList">setList</a></code>
+        <a href="#dummy-attr-setList"><code>setList</code></a>
       </li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
