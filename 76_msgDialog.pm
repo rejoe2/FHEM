@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 25556 2022-01-28 +package Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-01-31 +package Beta-User $
 #
 # copyright ###################################################################
 #
@@ -225,7 +225,7 @@ sub Get {
   return if IsDisabled($SELF);
 
   if($argument eq 'trigger'){
-    return join q{\n}, split q{,}, InternalVal($SELF, 'TRIGGER', undef);
+    return join "\n", split q{,}, InternalVal($SELF, 'TRIGGER', undef);
   }
 
   return;
@@ -451,7 +451,8 @@ sub msgDialog_progress {
       }
   }
 
-  $message = join q{ \n}, @message;
+  #$message = join q{ \n}, @message;
+  $message = join "\n", @message;
   #my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
   my $msgCommand = InternalVal($SELF, 'MSGCOMMAND', '');
     #$msgCommand = eval($msgCommand);
