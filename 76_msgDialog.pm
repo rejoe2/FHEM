@@ -424,7 +424,7 @@ sub msgDialog_progress {
     ;
 
     for (@commands){
-      $_ =~ s{;}{;;}g if $_ =~ m{\A{.*}\z}s;
+      $_ =~ s{;}{;;}g if $_ =~ m{\A\{.*\}\z}s;
       my $ret = AnalyzeCommandChain($hash, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")
@@ -441,7 +441,7 @@ sub msgDialog_progress {
   ;
 
   for (@message){
-      if($_ =~  m{\A{.*}\z}s){
+      if($_ =~  m{\A\{.*\}\z}s){
         $_ =~ s{;}{;;}g;
         $_ = AnalyzePerlCommand($hash, $_);
       }
