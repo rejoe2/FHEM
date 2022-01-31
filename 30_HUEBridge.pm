@@ -1,5 +1,4 @@
-
-# $Id: 30_HUEBridge.pm 25575 2022-01-28 10:43:31Z justme1968 $
+# $Id: 30_HUEBridge.pm 25591 2022-01-31 cref Beta-User $
 
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
@@ -21,6 +20,8 @@ use HttpUtils;
 
 use IO::Socket::INET;
 
+use vars qw(%defs);
+
 sub
 HUEBridge_loadHUEDevice()
 {
@@ -30,7 +31,8 @@ HUEBridge_loadHUEDevice()
   }
 }
 
-sub HUEBridge_Initialize($)
+sub
+HUEBridge_Initialize($)
 {
   my ($hash) = @_;
 
@@ -47,11 +49,23 @@ sub HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 forceAutocreate:1,0 ignoreUnknown:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterEvent:1,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
 
   HUEBridge_loadHUEDevice();
+
+  if( $init_done ) {
+    foreach my $chash ( values %defs ) {
+      next if( !$chash );
+      next if( $chash->{TYPE} ne 'HUEBridge' );
+      my $name = $chash->{NAME};
+      if( $chash->{has_v2_api} ) {
+
+        CommandSet( undef, "$name reconnect" );
+      }
+    }
+  }
 
   return FHEM::Meta::InitMod( __FILE__, $hash );
 }
@@ -141,7 +155,7 @@ HUEBridge_Read($)
               delete $hash->{helper}{ignored}{$code};
             }
 
-          } elsif( !$hash->{helper}{ignored}{$code} ) {
+          } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, "ignoreUnknown", undef) ) {
             Log3 $name, 2, "$name: websocket: event for unknown device received: $code";
           }
 
@@ -334,7 +348,8 @@ HUEBridge_Notify($$)
   return undef;
 }
 
-sub HUEBridge_Undefine($$)
+sub
+HUEBridge_Undefine($$)
 {
   my ($hash,$arg) = @_;
 
@@ -721,7 +736,8 @@ HUEbridge_groupOfLights($$)
   return $group;
 }
 
-sub HUEBridge_Set($@);
+sub
+HUEBridge_Set($@);
 sub
 HUEBridge_Set($@)
 {
@@ -735,6 +751,7 @@ HUEBridge_Set($@)
 
   # usage check
   if($cmd eq 'reconnect') {
+    Log3 $name, 2, "$name: reconnecting";
     HUEBridge_closeWebsocket($hash);
     HUEBridge_closeEventStream($hash);
 
@@ -831,7 +848,7 @@ HUEBridge_Set($@)
     return "usage: deletegroup <id>" if( @args != 1 );
 
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue group" if( $defs{$arg}{ID} != m/^G/ );
+      return "$arg is not a hue group" if( $defs{$arg}{ID} !~ m/^G/ );
       $defs{$arg}{ID} =~ m/G(.*)/;
       $arg = $1;
     }
@@ -1503,12 +1520,24 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'ignored' ) {
     return join( "\n", sort keys %{$hash->{helper}{ignored}} );
 
-  } elsif($cmd eq 'getv2resources' ) {
-    HUEBridge_getv2resources($hash, 1);
+  } elsif($cmd eq 'refreshv2resources' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+    HUEBridge_refreshv2resources($hash, 1);
 
     return "done";
 
+  } elsif($cmd eq 'v2resourcetypes' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+    my %result;
+    foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+      next if( $arg && $arg ne $entry->{type} );
+      $result{$entry->{id}} = 1 if( $arg );
+      $result{$entry->{type}} = 1 if( !$arg );
+    }
+    return join( "\n", keys %result );
+
   } elsif($cmd eq 'v2resource' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
     if( $arg ) {
       my $ret;
       foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
@@ -1523,16 +1552,33 @@ HUEBridge_Get($@)
     }
     return Dumper $hash->{helper}{resource};
 
-  } elsif($cmd eq 'v2resourcetypes' ) {
-    my %result;
+  } elsif($cmd eq 'v2devices' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+    return "usage: $cmd [lights|sensors]" if( $arg && $arg eq '?' );
+
+    my $ret;
     foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
-      next if( $arg && $arg ne $entry->{type} );
-      $result{$entry->{id}} = 1 if( $arg );
-      $result{$entry->{type}} = 1 if( !$arg );
+      next if( $entry->{type} ne 'device' );
+      my(undef, $t, $id) = split( '/', $entry->{id_v1} );
+      next if( $arg && $arg ne $t );
+      my $code = $name ."-". $id;
+      my $fhem_name = '';
+         $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $ret .= sprintf( "%-36s %-2s %-15s %s", $entry->{id}, $id, $fhem_name, $entry->{metadata}{name} );
+      $ret .= "\n";
+
+      foreach my $service ( sort {$a->{rtype} cmp $b->{rtype}} @{$entry->{services}} ) {
+        $ret .= sprintf( "     %-36s %s", $service->{rid}, $service->{rtype} );
+        $ret .= "\n";
+      }
+      $ret .= "\n";
     }
-    return join( "\n", keys %result );
+    $ret = sprintf( "%-36s %-2s %-15s %s\n", "ID", "V1", "FEHM", "NAME", ).
+            sprintf( "     %-36s %s\n","ID", "TYPE" ).$ret if( $ret );
+    return $ret;
 
   } elsif($cmd eq 'v2scenes' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
     my $ret;
     foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
       next if( $entry->{type} ne 'scene' );
@@ -1549,7 +1595,7 @@ HUEBridge_Get($@)
     }
 
     if( $hash->{has_v2_api} ) {
-      $list .= " v2resource v2resourcetypes v2scenes";
+      $list .= " v2devices v2resource v2resourcetypes v2scenes";
     }
 
     return "Unknown argument $cmd, choose one of $list";
@@ -1861,11 +1907,29 @@ HUEBridge_Autocreate($;$$)
 {
   my ($hash,$force,$sensors)= @_;
   my $name = $hash->{NAME};
+     $force = AttrVal($name, 'forceAutocreate', $force);
 
   if( !$force ) {
+    my $type = $hash->{TYPE};
+
     foreach my $d (keys %defs) {
-      next if($defs{$d}{TYPE} ne "autocreate");
-      return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+      next if($defs{$d}{TYPE} ne 'autocreate');
+
+      if(AttrVal($defs{$d}{NAME},'disable',undef)) {
+        Log3 $name, 2, "$name: autocreate is disabled, please enable it at least for $type. see: ignoreTypes" if( !AttrVal($name, 'ignoreUnknown', undef) );
+        return undef;
+
+      } elsif( my $it = AttrVal($name, 'ignoreTypes', '') ) {
+        if($it && $name =~ m/$it/i) {
+          Log3 $name, 2, "$name: autocreate is disabled for $type, please enable" if( !AttrVal($name, 'ignoreUnknown', undef) );
+          return undef;
+
+        } elsif($it && "$type:$name" =~ m/$it/i) {
+          Log3 $name, 2, "$name: autocreate is disabled for this bridge, please enable" if( !AttrVal($name, 'ignoreUnknown', undef) );
+          return undef;
+        }
+
+      }
     }
   }
 
@@ -2271,7 +2335,7 @@ HUEBridge_schedule($$;$)
   InternalTimer(gettimeofday()+$delay, $fn, $hash, 0);
 }
 sub
-HUEBridge_getv2resources($;$)
+HUEBridge_refreshv2resources($;$)
 {
   my ($hash,$blocking) = @_;
   my $name = $hash->{NAME};
@@ -2382,7 +2446,7 @@ HUEBridge_dispatch($$$;$)
       if( !$key ) {
         Log3 $name, 5, "$name: ignoring: $value";
 
-        HUEBridge_getv2resources($hash);
+        HUEBridge_refreshv2resources($hash);
         next;
       }
 
@@ -2444,13 +2508,13 @@ HUEBridge_dispatch($$$;$)
                 my $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 if( !$device ) {
                   Log3 $name, 2, "$name: EventStream: event for unknown device received, trying to refresh resouces";
-                  HUEBridge_getv2resources($hash, 1);
+                  HUEBridge_refreshv2resources($hash, 1);
                   $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 }
                 my $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 if( !$service ) {
                   Log3 $name, 2, "$name: EventStream: event for unknown service received, trying to refresh resouces";
-                  HUEBridge_getv2resources($hash, 1);
+                  HUEBridge_refreshv2resources($hash, 1);
                   $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 }
 #Log 1, Dumper $device;
@@ -2460,6 +2524,8 @@ HUEBridge_dispatch($$$;$)
                   $obj->{state}{presence} = $data->{motion}{motion} if( defined($data->{motion}) );
 
                 } elsif( $data->{type} eq 'button' ) {
+                  RemoveInternalTimer($chash, 'updateFinalButtonState' );
+
                   my $input = $service->{metadata}{control_id};
                   my $eventtype = $data->{button}{last_event};
 #Log 1, "input: $input";
@@ -2573,9 +2639,11 @@ HUEBridge_dispatch($$$;$)
                   }
 
                   delete $hash->{helper}{ignored}{$code};
+                  InternalTimer(gettimeofday()+1, "updateFinalButtonState", $chash, 0) if( $data->{type} eq 'button'
+                                                                                             && AttrVal( $name,'queryAfterEvent', 0 ) );
                 }
 
-              } elsif( !$hash->{helper}{ignored}{$code} ) {
+              } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
                 Log3 $name, 3, "$name: EventStream: update for unknown device received: $code";
 
               }
@@ -2584,7 +2652,7 @@ HUEBridge_dispatch($$$;$)
           } elsif( $event->{type} eq 'add' ) {
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
-            HUEBridge_schedule($hash,'HUEBridge_getv2resources');
+            HUEBridge_schedule($hash,'HUEBridge_refreshv2resources');
 
           } elsif( $event->{type} eq 'delete' ) {
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
@@ -2667,7 +2735,7 @@ HUEBridge_dispatch($$$;$)
 
               delete $hash->{helper}{ignored}{$code};
 
-            } elsif( !$hash->{helper}{ignored}{$code} ) {
+            } elsif( $hash->{has_v2_api} && !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
               Log3 $name, 3, "$name: data for unknown sensor received: $code";
 
               HUEBridge_schedule($hash,'HUEBridge_Autocreate');
@@ -2685,7 +2753,7 @@ HUEBridge_dispatch($$$;$)
 
               delete $hash->{helper}{ignored}{$code};
 
-            } elsif( !$hash->{helper}{ignored}{$code} ) {
+            } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
               Log3 $name, 2, "$name: data for unknown group received: $code";
 
               HUEBridge_schedule($hash,'HUEBridge_Autocreate');
@@ -2718,7 +2786,7 @@ HUEBridge_dispatch($$$;$)
               delete $hash->{helper}{ignored}{$code};
             }
 
-          } elsif( !$hash->{helper}{ignored}{$code} ) {
+          } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
             Log3 $name, 3, "$name: data for unknown device received: $code";
 
           }
@@ -3083,15 +3151,21 @@ __END__
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
       default is 2. will be deleted if v2 api is detected and eventstream connects.</li>
     <a id="HUEBridge-attr-createEventTimestampReading"></a><li>createEventTimestampReading<br>
-      timestamp reading for every event received</li>
-      0 -> update reading without fhem event
-      1 -> update reading with fhem event
-      undef -> don't create reading
+      timestamp reading for every event received<br>
+      0 -> update reading without fhem event<br>
+      1 -> update reading with fhem event<br>
+      undef -> don't create reading</li>
     <a id="HUEBridge-attr-createGroupReadings"></a><li>createGroupReadings<br>
-      create 'artificial' readings for group devices.</li>
-      0 -> create readings only for group devices where createGroupReadings ist set to 1
-      1 -> create readings for all group devices where createGroupReadings ist not set or set to 1
-      undef -> do nothing
+      create 'artificial' readings for group devices.<br>
+      0 -> create readings only for group devices where createGroupReadings ist set to 1<br>
+      1 -> create readings for all group devices where createGroupReadings ist not set or set to 1<br>
+      undef -> do nothing</li>
+    <a id="HUEBridge-attr-forceAutocreate"></a><li>forceAutocreate<br>
+      try to create devices even if autocreate is disabled.</li>
+    <a id="HUEBridge-attr-ignoreUnknown"></a><li>ignoreUnknown<br>
+      don't try to create devices after data or events with unknown references are received.</li>
+    <a id="HUEBridge-attr-queryAfterEvent"></a><li>queryAfterEvent<br>
+      the bridge will request the real button state 1 sec after the final event in a quick series. default is 0.</li>
     <a id="HUEBridge-attr-queryAfterSet"></a><li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
     <a id="HUEBridge-attr-noshutdown"></a><li>noshutdown<br>

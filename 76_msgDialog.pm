@@ -214,7 +214,7 @@ sub Get {
 
   my $value = join q{ }, @values;
   my %gets = (
-    "trigger" => "trigger:noArg"
+    trigger => 'trigger:noArg'
   );
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Get");
@@ -225,7 +225,7 @@ sub Get {
   return if IsDisabled($SELF);
 
   if($argument eq 'trigger'){
-    return join "\n", split q{,}, InternalVal($SELF, 'TRIGGER', undef);
+    return join "\n", split q{,}, InternalVal($SELF, 'TRIGGER', undef); #we need the soft variant
   }
 
   return;
@@ -239,11 +239,11 @@ sub Attr {
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Attr");
 
   if ($attribute eq 'disable'){
-    if($cmd eq "set" and $value == 1){
+    if($cmd eq 'set' and $value == 1){
       setDisableNotifyFn($hash, 1);
-      return readingsSingleUpdate($hash, "state", "Initialized", 1); #Beta-User: really?!?
+      return readingsSingleUpdate($hash, 'state', 'Initialized', 1); #Beta-User: really?!?
     }
-    readingsSingleUpdate($hash, "state", "disabled", 1);
+    readingsSingleUpdate($hash, 'state', 'disabled', 1);
     return firstInit($hash) if $init_done;
     return;
   }
@@ -313,11 +313,9 @@ sub msgDialog_evalSpecials {
   $msgConfig = $modules{msgConfig}{defptr}{NAME}
     if $modules{msgConfig}{defptr};
   $string =~ s/\$SELF/$SELF/g;
-  my $evalSpecials =
-    AttrVal($msgConfig, "$TYPE\_evalSpecials", "").
-    " ".
-    AttrVal($SELF, 'evalSpecials', '')
-  ;
+  my $evalSpecials = AttrVal($msgConfig, 'msgDialog_evalSpecials', '');
+    $evalSpecials .= ' ';
+    $evalSpecials .= AttrVal($SELF, 'evalSpecials', '');
 
   return $string if $evalSpecials eq ' ';
 
@@ -331,7 +329,7 @@ sub msgDialog_evalSpecials {
   }
 
   my $specials = join q{|}, keys %{$evalSpecials};
-  $string =~ s/%($specials)%/$evalSpecials->{$1}/g;
+  $string =~ s{%($specials)%}{$evalSpecials->{$1}}g;
 
   return $string;
 }
@@ -364,11 +362,10 @@ sub msgDialog_progress {
   my (@history);
   my $dialog = $hash->{DIALOG};
   $dialog = msgDialog_evalSpecials($hash, $dialog);
-  $dialog =~ s/\$recipient/$recipients/g;
+  $dialog =~ s{\$recipient}{$recipients}g;
   if ( !eval{ $dialog = JSON->new->decode($dialog); 1;} ){
     return Log3($SELF, 2, "$TYPE ($SELF) - Error decoding JSON: $@");
   }
-  #$dialog = eval{decode_json($dialog)};
 
   for (@oldHistory){
     $message = $_;
@@ -379,9 +376,9 @@ sub msgDialog_progress {
     }
     else{
       for (keys %{$dialog}){
-        next if $dialog->{$_} !~ m/HASH/ 
+        next if $dialog->{$_} !~ m{HASH} 
                 || !defined($dialog->{$_}{match}) 
-                || $message !~ m/^$dialog->{$_}{match}$/
+                || $message !~ m{\A$dialog->{$_}{match}\z}
         ;
 
         $dialog = $dialog->{$_};
@@ -399,15 +396,14 @@ sub msgDialog_progress {
     return Log3($SELF, 2, "$TYPE ($SELF) - Error encoding JSON: $@");
   }
 
-  $dialog =~ s/\$message/$message/g;
+  $dialog =~ s{\$message}{$message}g;
   if ( !eval{ $dialog = JSON->new->decode($dialog); 1;} ) {
     return Log3($SELF, 2, "$TYPE ($SELF) - Error decoding JSON: $@");
   }
-  #$dialog = eval{JSON->new->decode($dialog)};
-  my $history = "";
+  my $history = '';
 
   for ( keys %{$dialog} ) {
-    if($_ !~ m/(?:setOnly|match|commands|message)/){
+    if($_ !~ m{(?:setOnly|match|commands|message)}){
       $history = join q{|}, @history;
 
       last;
@@ -417,18 +413,18 @@ sub msgDialog_progress {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, $_."_history", $history)
     for ( split q{,}, $recipients );
-  readingsBulkUpdate($hash, "state", "$recipients: $message");
+  readingsBulkUpdate($hash, 'state', "$recipients: $message");
   readingsEndUpdate($hash, 1);
 
   if($dialog->{commands}){
     my @commands =
-      $dialog->{commands} =~ m/ARRAY/ ?
+      $dialog->{commands} =~ m{ARRAY} ?
         @{$dialog->{commands}}
       : $dialog->{commands}
     ;
 
     for (@commands){
-      $_ =~ s/;/;;/g if($_ =~ m/^{.*}$/s);
+      $_ =~ s{;}{;;}g if $_ =~ m{\A{.*}\z}s;
       my $ret = AnalyzeCommandChain($hash, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")
@@ -439,27 +435,22 @@ sub msgDialog_progress {
   return if !$dialog->{message};
 
   my @message =
-      $dialog->{message} =~ m/ARRAY/ ?
+      $dialog->{message} =~ m{ARRAY} ?
         @{$dialog->{message}}
       : $dialog->{message}
   ;
 
   for (@message){
-      if($_ =~ m/^{.*}$/s){
-        $_ =~ s/;/;;/g;
+      if($_ =~  m{\A{.*}\z}s){
+        $_ =~ s{;}{;;}g;
         $_ = AnalyzePerlCommand($hash, $_);
       }
   }
 
-  #$message = join q{ \n}, @message;
-  $message = join "\n", @message;
-  #my $msgCommand = '"'.InternalVal($SELF, "MSGCOMMAND", "").'"';
+  $message = join "\n", @message; #we need the soft variant
   my $msgCommand = InternalVal($SELF, 'MSGCOMMAND', '');
-    #$msgCommand = eval($msgCommand);
-  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand was: $msgCommand, with rep $recipients and msg $message");
   $msgCommand =~ s{\\[\@]}{@}x;
   $msgCommand =~ s{(\$\w+)}{$1}eegx;
-  Log3($SELF, 4, "$TYPE ($SELF) - msgCommand now is: $msgCommand");
   AnalyzeCommand($hash, $msgCommand);
 
   return;
@@ -481,12 +472,12 @@ sub msgDialog_reset {
 }
 
 sub msgDialog_updateAllowed {
-  Log3('global',5, "msgDialog - entering msgDialog_updateAllowed");
+  Log3('global',5, 'msgDialog - entering msgDialog_updateAllowed');
 
   my $allowed = join q{,}, sort devspec2array($msgDialog_devspec);
 
   $modules{msgDialog}{AttrList} =~
-    s/allowed:multiple-strict,\S*/allowed:multiple-strict,everyone,$allowed/;
+    s{allowed:multiple-strict,\S*}{allowed:multiple-strict,everyone,$allowed};
   return;
 }
 
