@@ -114,10 +114,10 @@ sub archetype_Define($$) {
     $modules{$TYPE}{derive_attributes} = $hash;
   }
 
-  $hash->{DEF} = "defined_by=$SELF" unless($DEF);
-  $hash->{NOTIFYDEV} = "global";
-  $hash->{STATE} = "active"
-    unless(AttrVal($SELF, "stateFormat", undef) || IsDisabled($SELF));
+  $hash->{DEF} = "defined_by=$SELF" if !$DEF;
+  $hash->{NOTIFYDEV} = 'global';
+  $hash->{STATE} = 'active'
+    if !AttrVal($SELF, 'stateFormat', undef) || IsDisabled($SELF);
 
   return;
 }
@@ -129,21 +129,21 @@ sub archetype_Undef($$) {
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Undef");
 
   delete $modules{$TYPE}{derive_attributes}
-    if($hash->{DEF} eq "derive attributes");
+    if($hash->{DEF} eq 'derive attributes');
 
   return;
 }
 
 sub archetype_Set($@) {
-	my ($hash, @arguments) = @_;
+  my ($hash, @arguments) = @_;
   my $SELF = shift @arguments;
   my $TYPE = $hash->{TYPE};
 
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Set");
 
-  return "\"set $TYPE\" needs at least one argument" unless(@arguments);
+  return "\"set $TYPE\" needs at least one argument" if !@arguments;
 
-	my $argument = shift @arguments;
+  my $argument = shift @arguments;
   my $value = join(" ", @arguments) if(@arguments);
   my %archetype_sets;
 
@@ -161,13 +161,13 @@ sub archetype_Set($@) {
       , "raw" => "raw:textField"
     );
     $archetype_sets{(split(":", $_))[0]} = $_
-      foreach (split(/[\s]+/, AttrVal($SELF, "setList", "")));
+      for ( split /[\s]+/, AttrVal($SELF, 'setList', '') );
   }
 
   return(
       "Unknown argument $argument, choose one of "
     . join(" ", values %archetype_sets)
-  ) unless(exists($archetype_sets{$argument}));
+  ) if !exists $archetype_sets{$argument};
 
   if($argument eq "addToAttrList"){
     addToAttrList($value);
@@ -202,7 +202,7 @@ sub archetype_Set($@) {
     (my $command, $value) = split(/[\s]+/, $value, 2);
 
     return "\"set $TYPE\" $argument at least one command and argument"
-      unless($value);
+      if !$value;
 
     Log3($SELF, 3, "$TYPE ($SELF) - $command <inheritors> $value");
 
@@ -233,7 +233,7 @@ sub archetype_Get($@) {
 
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Get");
 
-  return "\"get $TYPE\" needs at least one argument" unless(@arguments);
+  return "\"get $TYPE\" needs at least one argument" if !@arguments;
 
   my $argument = shift @arguments;
   my $value = join(" ", @arguments) if(@arguments);
@@ -256,9 +256,9 @@ sub archetype_Get($@) {
   return(
       "Unknown argument $argument, choose one of "
     . join(" ", values %archetype_gets)
-  ) unless(exists($archetype_gets{$argument}));
+  ) if !exists $archetype_gets{$argument};
 
-  return "$SELF is disabled" if(IsDisabled($SELF));
+  return "$SELF is disabled" if IsDisabled($SELF);
 
   if($argument =~ /^(inheritors|relations)$/){
     Log3($SELF, 3, "$TYPE ($SELF) - starting request $argument");
@@ -291,7 +291,7 @@ sub archetype_Get($@) {
         @ret = archetype_derive_attributes($SELF, 1);
       }
       else{
-        foreach (archetype_devspec($SELF)){
+        for (archetype_devspec($SELF)){
           for my $attribute (@attributes){
             my $desired =
               AttrVal(
@@ -417,20 +417,20 @@ sub archetype_Notify($$) {
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Notify");
 
   return if(IsDisabled($SELF));
-  return unless(AttrVal($SELF, "autocreate", 1));
+  return if !AttrVal($SELF, 'autocreate', 1);
 
   my @events = @{deviceEvents($dev_hash, 1)};
 
-  return unless(@events);
+  return if !@events;
 
-  foreach my $event (@events){
-    next unless($event);
+  for my $event (@events){
+    next if !$event;
 
     Log3($SELF, 4, "$TYPE ($SELF) - triggered by event: \"$event\"");
 
     my ($argument, $name, $attr, $value) = split(/[\s]+/, $event, 4);
 
-    return unless($name);
+    return if !$name;
 
     if($argument eq "DEFINED" && grep(/\b$name\b/, archetype_devspec($SELF))){
       Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance $name");
@@ -480,7 +480,7 @@ sub archetype_AnalyzeCommand($$$$$) {
     Log3($SELF, 5, "$TYPE ($SELF) - call archetype_AnalyzeCommand");
   }
 
-  return unless($cmd);
+  return if !$cmd;
 
   # # Stellt Variablen fuer Zeit und Datum zur Verfuegung.
   # my ($sec, $min, $hour, $mday, $month, $year, $wday, $yday, $hms, $we) =
@@ -490,17 +490,17 @@ sub archetype_AnalyzeCommand($$$$$) {
   #     )
   #   );;
 
-  # Falls es sich nicht um einen durch {} gekennzeichneten Perl Befehlt
+  # Falls es sich nicht um einen durch {} gekennzeichneten Perl Befehl
   # handelt, werden alle Anfuehrungszeichen maskiert und der Befehl in
   # Anfuehrungszeichen gesetzt um eine korrekte Auswertung zu gewaehrleisten.
-  unless($cmd =~ m/^\{.*\}$/){
+  if ($cmd !~ m/^\{.*\}$/){
     $cmd =~ s/"/\\"/g;
     $cmd = "\"$cmd\""
   }
 
   $cmd = eval($cmd);
 
-  return($cmd);
+  return $cmd;
 }
 
 sub archetype_attrCheck($$$$;$) {
@@ -531,7 +531,7 @@ sub archetype_attrCheck($$$$;$) {
     $desired = (split(":", $desired, 2))[1];
   }
 
-  return unless($desired);
+  return if !$desired;
 
   if($actual ne $desired){
     if($check){
@@ -556,7 +556,7 @@ sub archetype_DEFcheck($$;$) {
   if($expected && $expected ne InternalVal($name, "DEF", " ")){
     CommandDefMod(undef, "$name $type $expected");
   }else{
-    CommandDefMod(undef, "$name $type") unless(IsDevice($name, $type));
+    CommandDefMod(undef, "$name $type") if !IsDevice($name, $type);
   }
 }
 
@@ -568,7 +568,7 @@ sub archetype_define_inheritors($;$$$) {
 
   my @relations = $relation ? $relation : archetype_devspec($SELF, "relations");
 
-  return unless(@relations);
+  return if !@relations;
 
   my @ret;
   my $TYPE = AttrVal($SELF, "actualTYPE", "dummy");
@@ -578,10 +578,10 @@ sub archetype_define_inheritors($;$$$) {
     $initialize = "\"$initialize\"";
   }
 
-  foreach my $relation (@relations){
+  for my $relation (@relations){
     my $room = AttrVal($relation, "room", "Unsorted");
 
-    foreach $room (
+    for $room (
       AttrVal($SELF, "splitRooms", 0) eq "1" ? split(",", $room) : $room
     ){
       my $name = archetype_AnalyzeCommand(
@@ -598,7 +598,7 @@ sub archetype_define_inheritors($;$$$) {
 
           next;
         }
-        unless($init){
+        if (!$init){
           archetype_DEFcheck($name, $TYPE, $DEF);
           addToDevAttrList($name, "defined_by");
           $attr{$name}{defined_by} = $SELF;
@@ -613,7 +613,7 @@ sub archetype_define_inheritors($;$$$) {
         && (!$defined || $init)
       );
 
-      archetype_inheritance($SELF, $name) unless($init);
+      archetype_inheritance($SELF, $name) if !$init;
     }
   }
 
@@ -636,7 +636,7 @@ sub archetype_derive_attributes($;$$$) {
     : sort(split(/[\s]+/, AttrVal($SELF, "attributes", "")))
   ;
 
-  foreach (@devspecs){
+  for (@devspecs){
     for my $attribute (@attributes){
       my $desired = AttrVal(
         $_, "actual_$attribute", AttrVal($SELF, "actual_$attribute", "")
@@ -701,7 +701,7 @@ sub archetype_devspec($;$) {
   }
 
   my @devspec;
-  push(@devspec, devspec2array($_)) foreach (split(/[\s]+/, $devspecs));
+  push(@devspec, devspec2array($_)) for (split(/[\s]+/, $devspecs));
   my %devspec = map{$_, 1}@devspec;
   delete $devspec{$SELF};
 
@@ -720,7 +720,7 @@ sub archetype_evalSpecials($$;$) {
 
   for my $part (split(/\[/, $pattern)){
     for my $special ($part =~ m/%(\S+)%/g){
-      foreach (split("\\|", $special)){
+      for (split("\\|", $special)){
         my $AttrVal = AttrVal($name, $_, undef);
         $AttrVal = archetype_AnalyzeCommand(
           $AttrVal, $name, AttrVal($name, "room", undef), undef, undef
@@ -749,7 +749,7 @@ sub archetype_inheritance($;$$) {
   my ($hash) = $defs{$SELF};
   my $TYPE = $hash->{TYPE};
   my @devices = shift;
-  @devices = archetype_devspec($SELF) unless($devices[0]);
+  @devices = archetype_devspec($SELF) if !$devices[0];
   my @attributes = shift;
 
   if($attributes[0]){
@@ -759,7 +759,7 @@ sub archetype_inheritance($;$$) {
     @attributes = split(/[\s]+/, AttrVal($SELF, "attributes", ""));
   }
 
-  foreach my $attribute (@attributes){
+  for my $attribute (@attributes){
     my $value =
       AttrVal($SELF, "actual_$attribute", AttrVal($SELF, $attribute, ""));
 
@@ -784,21 +784,21 @@ sub CommandClean($$) {
   my %pendingAttributes;
 
   if($arguments && $arguments eq "check"){
-    foreach my $SELF (@archetypes){
+    for my $SELF (@archetypes){
       my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "attributes");
 
       next if(
         $ret =~ /no attributes pending|Unknown argument pending|is disabled/
       );
 
-      foreach my $pending (split("\n", $ret)){
+      for my $pending (split("\n", $ret)){
         my ($sign, $name, $attribute, $value) = split(" ", $pending, 4);
         $sign =~ s/^\+//;
         $pendingAttributes{$pending} = "$name $attribute $sign $value";
       }
     }
 
-    foreach my $SELF (@archetypes){
+    for my $SELF (@archetypes){
       my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "inheritors");
 
       push(@pendingInheritors, $ret) if(
@@ -981,6 +981,8 @@ __END__
       </li>
       <br>
       <a id="archetype-get-pending"></a><li>
+      <ul>
+      <li>
         <code>pending attributes</code><br>
         Displays all outstanding attributes specified under the attributes
         attributes for all inheritors, which do not match the attributes of the
@@ -992,6 +994,7 @@ __END__
         Displays all outstanding inheritors, which should be defined on the
         basis of the relations
       </li>
+      </ul>
     </ul>
     <br>
     <a id="archetype-attr"></a>
@@ -1295,6 +1298,7 @@ attr SVG_link_archetype attributes group</pre>
       </li>
       <br>
       <a id="archetype-get-pending"></a><li>
+      <ul><li>
         <code>pending attributes</code><br>
         Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
         Attribute auf, die nicht mit den Attributen des archetype
@@ -1306,6 +1310,7 @@ attr SVG_link_archetype attributes group</pre>
         Listet alle Erben auf die aufgrund der Beziehungen noch definiert
         werden sollen.
       </li>
+      </ul>
     </ul>
     <br>
     <a id="archetype-attr"></a>
