@@ -1,11 +1,11 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-01-31 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-02-01 Beta-User $
 
 # copyright ###################################################################
 #
 # 98_archetype.pm
 #
-# Copyright by igami
+# Originally initiated by igami
 #
 # This file is part of FHEM.
 #
@@ -22,46 +22,15 @@
 # You should have received a copy of the GNU General Public License
 # along with FHEM.  If not, see <http://www.gnu.org/licenses/>.
 
-# verbose
-#   Set the verbosity level. Possible values:
-#     0 - server start/stop
-#     1 - error messages or unknown packets
-#     2 - major events/alarms.
-#     3 - commands sent out will be logged.
-#     4 - you'll see whats received by the different devices.
-#     5 - debugging.
 
 package main;
   use strict;
   use warnings;
 
-# forward declarations ########################################################
-sub archetype_Initialize($);
-
-sub archetype_Define($$);
-sub archetype_Undef($$);
-sub archetype_Set($@);
-sub archetype_Get($@);
-sub archetype_Attr(@);
-sub archetype_Notify($$);
-
-sub archetype_AnalyzeCommand($$$$$);
-sub archetype_attrCheck($$$$;$);
-sub archetype_DEFcheck($$;$) ;
-sub archetype_define_inheritors($;$$$);
-sub archetype_derive_attributes($;$$$);
-sub archetype_devspec($;$);
-sub archetype_evalSpecials($$;$);
-sub archetype_inheritance($;$$);
-
-sub CommandClean($$);
-
 # initialize ##################################################################
-sub archetype_Initialize($) {
-  my ($hash) = @_;
-  my $TYPE = "archetype";
-
-  Log(5, "$TYPE - call archetype_Initialize");
+sub archetype_Initialize {
+  my $hash = shift // return;
+  my $TYPE = 'archetype';
 
   $hash->{DefFn}      = "$TYPE\_Define";
   $hash->{UndefFn}    = "$TYPE\_Undef";
@@ -70,8 +39,8 @@ sub archetype_Initialize($) {
   $hash->{AttrFn}     = "$TYPE\_Attr";
   $hash->{NotifyFn}   = "$TYPE\_Notify";
 
-  $hash->{AttrList} = ""
-    . "actual_.+ "
+  $hash->{AttrList} = 
+      "actual_.+ "
     . "actualTYPE "
     . "attributes "
     . "autocreate:1,0 "
@@ -94,6 +63,7 @@ sub archetype_Initialize($) {
     Hlp => "[check]"
   );
   $cmds{clean} = \%hash;
+  return;
 }
 
 # regular Fn ##################################################################
@@ -144,7 +114,7 @@ sub archetype_Set($@) {
   return "\"set $TYPE\" needs at least one argument" if !@arguments;
 
   my $argument = shift @arguments;
-  my $value = join(" ", @arguments) if(@arguments);
+  my $value = @arguments ? join q{ }, @arguments : undef;
   my %archetype_sets;
 
   if($hash->{DEF} eq "derive attributes"){
@@ -211,7 +181,7 @@ sub archetype_Set($@) {
   else{
     my @readingList = split(/[\s]+/, AttrVal($SELF, "readingList", ""));
 
-    if(@readingList && grep(/\b$argument\b/, @readingList)){
+    if( @readingList && grep { m/\b$argument\b/ } @readingList ){
       Log3($SELF, 3, "$TYPE set $SELF $argument $value");
 
       readingsSingleUpdate($hash, $argument, $value, 1);
@@ -236,8 +206,8 @@ sub archetype_Get($@) {
   return "\"get $TYPE\" needs at least one argument" if !@arguments;
 
   my $argument = shift @arguments;
-  my $value = join(" ", @arguments) if(@arguments);
-  my $derive_attributes = $hash->{DEF} eq "derive attributes";
+  my $value = @arguments ? join q{ }, @arguments : undef;
+  my $derive_attributes = $hash->{DEF} eq 'derive attributes';
   my %archetype_gets;
 
   if($derive_attributes){
@@ -357,7 +327,7 @@ sub archetype_Attr(@) {
     }
   }
 
-  return if(IsDisabled($SELF));
+  return if IsDisabled($SELF);
 
   my @attributes = AttrVal($SELF, "attributes", "");
 
@@ -378,8 +348,8 @@ sub archetype_Attr(@) {
   elsif(
     $cmd eq "set"
     && (
-      grep(/\b$attribute\b/, @attributes)
-      || $attribute =~ /^actual_(.+)$/ && grep(/\b$1\b/, @attributes)
+      grep { m/\b$attribute\b/ } @attributes
+      || $attribute =~ /^actual_(.+)$/ && grep { m/\b$1\b/ } @attributes
     )
   ){
     $attribute = $1 if($1);
@@ -432,14 +402,14 @@ sub archetype_Notify($$) {
 
     return if !$name;
 
-    if($argument eq "DEFINED" && grep(/\b$name\b/, archetype_devspec($SELF))){
+    if( $argument eq 'DEFINED' && grep { m/\b$name\b/ } archetype_devspec($SELF)) {
       Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance $name");
 
       archetype_inheritance($SELF, $name);
     }
     elsif(
-      $argument eq "DEFINED"
-      && grep(/\b$name\b/, archetype_devspec($SELF, "relations"))
+      $argument eq 'DEFINED'
+      && grep { m/\b$name\b/ } archetype_devspec($SELF, "relations")
     ){
       Log3($SELF, 3, "$TYPE ($SELF) - starting define inheritors");
 
@@ -450,14 +420,14 @@ sub archetype_Notify($$) {
     elsif(
       $hash->{DEF} eq "derive attributes"
       && $argument eq "ATTR"
-      && grep(/\b$name\b/, archetype_devspec($SELF, "specials"))
+      && grep { m/\b$name\b/ } archetype_devspec($SELF, "specials")
     ){
-      for my $attribute (split(" ", AttrVal($SELF, "attributes", ""))){
+      for my $attribute ( split m{ }, AttrVal($SELF, 'attributes', '') ) {
         my @specials = archetype_evalSpecials(
           undef, AttrVal($SELF, "actual_$attribute", ""), "all"
         );
 
-        if(grep(/\b$attr\b/, @specials)){
+        if ( grep { m/\b$attr\b/ } @specials ){
           archetype_derive_attributes($SELF, undef, $name, $attribute);
 
           last;
@@ -617,9 +587,10 @@ sub archetype_define_inheritors($;$$$) {
     }
   }
 
-  if($check){
+  if ($check) {
     my %ret = map{$_, 1} @ret;
-    return sort(keys %ret);
+    my @slist = sort keys %ret;
+    return @slist; #Beta-User: use uniq instead?
   }
 
   return;
@@ -704,8 +675,9 @@ sub archetype_devspec($;$) {
   push(@devspec, devspec2array($_)) for (split(/[\s]+/, $devspecs));
   my %devspec = map{$_, 1}@devspec;
   delete $devspec{$SELF};
+  @devspec = sort keys %devspec;
 
-  return sort(keys %devspec);
+  return @devspec;
 }
 
 sub archetype_evalSpecials($$;$) {
