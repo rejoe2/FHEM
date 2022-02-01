@@ -980,20 +980,21 @@ __END__
       </li>
       <br>
       <a id="archetype-get-pending"></a><li>
-      <ul>
-      <li>
-        <code>pending attributes</code><br>
-        Displays all outstanding attributes specified under the attributes
-        attributes for all inheritors, which do not match the attributes of the
-        archetype.
+       <ul>
+          <li>
+            <code>pending attributes</code><br>
+            Displays all outstanding attributes specified under the attributes
+            attributes for all inheritors, which do not match the attributes of the
+            archetype.
+          </li>
+          <br>
+          <li>
+            <code>pending inheritors</code><br>
+            Displays all outstanding inheritors, which should be defined on the
+            basis of the relations
+          </li>
+       </ul>
       </li>
-      <br>
-      <li>
-        <code>pending inheritors</code><br>
-        Displays all outstanding inheritors, which should be defined on the
-        basis of the relations
-      </li>
-      </ul>
     </ul>
     <br>
     <a id="archetype-attr"></a>
