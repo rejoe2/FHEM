@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 25556 2022-01-31 +package Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-02-01 +package Beta-User $
 #
 # copyright ###################################################################
 #
@@ -134,8 +134,10 @@ sub firstInit {
   if ($cfg) {
     (my $ret, $content) = _readConfigFromFile($hash, $cfg);
     return $ret if $ret;
+    $hash->{DIALOG} = $content;
   } else {
     $content = InternalVal($name, 'DEF', '{}');
+    delete $hash->{DIALOG};
   }
   delete $hash->{TRIGGER};
 
@@ -145,7 +147,6 @@ sub firstInit {
     Log3($hash, 2, "msgDialog ($name) - DEF or configFile is not a valid JSON: $@");
     return("Usage: define <name> msgDialog {JSON}\n\n$@");
   }
-  $hash->{DIALOG} = $content;
 
   my @TRIGGER;
 
@@ -175,7 +176,8 @@ sub Set {
   my %sets = (
     reset         => 'reset:noArg',
     say           => 'say:textField',
-    updateAllowed => 'updateAllowed:noArg'
+    updateAllowed => 'updateAllowed:noArg',
+    update        => 'update:allowed,configFile'
   );
 
   Log3($SELF, 5, "$TYPE ($SELF) - entering msgDialog_Set");
@@ -185,10 +187,15 @@ sub Set {
    if !defined $sets{$argument};
 
   if ( $argument eq 'reset' ){
-    msgDialog_reset($hash);
+    return msgDialog_reset($hash);
   }
-  elsif( $argument eq 'updateAllowed'){
-    msgDialog_updateAllowed();
+  if( $argument eq 'update'){
+    return msgDialog_updateAllowed() if $values[0] eq 'allowed';
+    return firstInit($hash) if $values[0] eq 'configFile';
+  }
+
+  if( $argument eq 'updateAllowed'){
+    return msgDialog_updateAllowed();
   }
 
   return if IsDisabled($SELF);
@@ -360,7 +367,7 @@ sub msgDialog_progress {
     if !$force;
   push @oldHistory, split "\\|", $message;
   my (@history);
-  my $dialog = $hash->{DIALOG};
+  my $dialog = $hash->{DIALOG} // $hash->{DEF} // q{};
   $dialog = msgDialog_evalSpecials($hash, $dialog);
   $dialog =~ s{\$recipient}{$recipients}g;
   if ( !eval{ $dialog = JSON->new->decode($dialog); 1;} ){
@@ -536,7 +543,6 @@ __END__
 =pod
 =encoding utf8
 
-
 =item helper
 =item summary    dialogs for instant messaging
 =item summary_DE Dialoge f&uuml;r Sofortnachrichten
@@ -678,6 +684,14 @@ __END__
       <code>updateAllowed</code><br>
       Updates the selection for the allowed attribute.
     </li>
+    <a id="msgDialog-set-update"></a>
+    <li>
+      <code>update &lt;allowed or configFile&gt;</code><br>
+      <ul>
+        <li>allowed - updates the selection for the allowed attribute.</li>
+        <li>configFile - rereads configFile (e.g. after editing).</li>
+      </ul>
+    </li>
   </ul>
   <br>
 
@@ -733,6 +747,13 @@ __END__
       The default is
       <code>"msg push \@$recipients $message"</code>.<br>
       This attribute is available in the msgConfig device.
+    </li>
+    <li>
+      <a id="msgDialog-attr-configFile"></a><b>configFile</b><br>
+      <p>Path to a configuration file for the dialogue. This is an alternative way to using DEF.<br>
+      The file itself must contain a JSON-encoded dialogue structure - just as described in define.
+      <p>Example (placed in the same dir fhem.pl is located):</p>
+      <p><code>attr &lt;msgDialogDevice&gt; configFile ./metaDialogue.cfg</code></p>
     </li>
   </ul>
   <br>
@@ -1113,6 +1134,14 @@ plot=Waschkeller_washer_SVG
       <code>updateAllowed</code><br>
       Aktualisiert die Auswahl f&uuml;r das Attribut allowed.
     </li>
+    <a id="msgDialog-set-update"></a>
+    <li>
+      <code>update &lt;allowed or configFile&gt;</code><br>
+      <ul>
+        <li>allowed - aktualisiert die Auswahl für das Attribut allowed.</li>
+        <li>configFile - liest die configFile neu ein (z.B. nach Änderung).</li>
+      </ul>
+    </li>
   </ul>
   <br>
 
@@ -1173,6 +1202,13 @@ plot=Waschkeller_washer_SVG
       <code>"msg push \@$recipients $message"</code><br>
       Dieses Attribut ist als "msgDialog_msgCommand" im msgConfig Gerät
       vorhanden.
+    </li>
+    <li>
+      <a id="msgDialog-attr-configFile"></a><b>configFile</b><br>
+      <p>Alternativ zur Eingabe des Dialogs in der DEF kann eine Datei eingelesen werden, die die Konfigurationsinformationen zum Dialog enthält. Anzugeben ist der Pfad zu dieser Datei.<br>
+      Die Datei selbst muss den Dialog in einer JSON-Structur beinhalten (Kommentar-Zeilen beginnend mit # sind erlaubt) - ansonsten gilt dasselbe wie in define beschrieben.
+      <p>Beispiel (die Datei liegt im Modul-Verzeichnis):</p>
+      <p><code>attr &lt;msgDialogDevice&gt; configFile ./FHEM/metaDialogue.cfg</code></p>
     </li>
   </ul>
   <br>

@@ -1423,9 +1423,7 @@ attr SVG_link_archetype attributes group</pre>
         werden und beschreibt den Aufbau des Namen f&uuml;r die Erben.
       </li>
       <br>
-      <li>
-        <code><a href="#dummy-attr-readingList">readingList</a></code>
-      </li>
+      <li><a href="#dummy-attr-readingList">readingList</a></li>
       <br>
       <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
@@ -1436,9 +1434,7 @@ attr SVG_link_archetype attributes group</pre>
         f&uuml;r Details der &lt;devspec&gt;.
       </li>
       <br>
-      <li>
-        <a href="#dummy-attr-setList"><code>setList</code></a>
-      </li>
+      <li><a href="#dummy-attr-setList">setList</a></li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
