@@ -1196,6 +1196,7 @@ attr SVG_link_archetype attributes group</pre>
     <br>
     <a id="archetype-command"></a>
     <h4>Befehle</h4>
+    <ul>
     <a id="archetype-command-clean"></a>
       <code>clean [check]</code><br>
       Definiert für alle Beziehungen aller archetype die Erben, vererbt für
@@ -1296,19 +1297,20 @@ attr SVG_link_archetype attributes group</pre>
       </li>
       <br>
       <a id="archetype-get-pending"></a><li>
-      <ul><li>
-        <code>pending attributes</code><br>
-        Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
-        Attribute auf, die nicht mit den Attributen des archetype
-        &uuml;bereinstimmen.
+          <ul><li>
+            <code>pending attributes</code><br>
+            Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
+            Attribute auf, die nicht mit den Attributen des archetype
+            &uuml;bereinstimmen.
+          </li>
+          <br>
+          <li>
+            <code>pending inheritors</code><br>
+            Listet alle Erben auf die aufgrund der Beziehungen noch definiert
+            werden sollen.
+          </li>
+        </ul>
       </li>
-      <br>
-      <li>
-        <code>pending inheritors</code><br>
-        Listet alle Erben auf die aufgrund der Beziehungen noch definiert
-        werden sollen.
-      </li>
-      </ul>
     </ul>
     <br>
     <a id="archetype-attr"></a>
@@ -1316,7 +1318,7 @@ attr SVG_link_archetype attributes group</pre>
     <ul>
       Hinweise:
       <ul>
-        Alle Attribute die vererbt werden k&ouml;nnen, k&ouml;nnen vorab mit
+        Alle Attribute, die vererbt werden k&ouml;nnen, k&ouml;nnen vorab mit
         einem Modifikator versehen werden.
         <a id="archetype-attr-undef"></a><li>
           <code>attr archetype &lt;attribute&gt; undef:&lt;...&gt;</code><br>
@@ -1446,7 +1448,7 @@ attr SVG_link_archetype attributes group</pre>
     </ul>
     <br>
     <a id="archetype-examples"></a>
-    <b>Beispiele</b>
+    <h4>Beispiele</h4>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
         <u>

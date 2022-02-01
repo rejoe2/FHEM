@@ -1,4 +1,4 @@
-# $Id: 30_HUEBridge.pm 25591 2022-01-31 cref Beta-User $
+# $Id: 30_HUEBridge.pm 25600 2022-02-01 cref Beta-User $
 
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
@@ -1143,6 +1143,12 @@ HUEBridge_Set($@)
     readingsSingleUpdate($hash, 'state', 'inactive', 1 );
     return undef;
 
+  } elsif($cmd eq 'refreshv2resources' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+    HUEBridge_refreshv2resources($hash, 1);
+
+    return "done";
+
   } elsif($cmd eq 'v2json' ) {
     return "usage: $cmd <v2 light id> <json>" if( !@params );
 
@@ -1219,6 +1225,7 @@ HUEBridge_Set($@)
     return;
 
   } elsif($cmd eq 'v2scene' ) {
+    return "usage: $cmd <v2 scene id>" if( @args != 1 || $args[0] eq '?' );
     my $params = {
                 url => "https://$hash->{host}/clip/v2/resource/scene/$arg",
              method => 'PUT',
@@ -1284,7 +1291,7 @@ HUEBridge_Set($@)
     $list .= " createrule updaterule updateschedule enableschedule disableschedule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
 
     if( $hash->{has_v2_api} ) {
-      $list .= " v2scene";
+      $list .= " refreshv2resources v2json v2scene ";
     }
 
     return "Unknown argument $cmd, choose one of $list";
@@ -1300,13 +1307,26 @@ HUEBridge_V2IdOfV1Id($$$)
   return "undef" if( !$type );
   return "undef" if( !$hash->{has_v2_api} );
 
-  foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
-    next if( !$entry->{id_v1} );
-    next if( !$entry->{type} );
-    next if( $entry->{id_v1} ne $id );
-    next if( $entry->{type} ne $type );
+  foreach my $resource ( values %{$hash->{helper}{resource}{by_id}} ) {
+    next if( !$resource->{id_v1} );
+    next if( !$resource->{type} );
+    next if( $resource->{id_v1} ne $id );
+    next if( $resource->{type} ne $type );
 
-    return $entry->{id};
+    return $resource->{id};
+  }
+
+  return undef;
+}
+sub
+HUEBridge_GetResource($$)
+{
+  my ($hash, $id) = @_;
+  return undef if( !$hash->{has_v2_api} );
+  return undef if( !$id );
+
+  if( my $resource = $hash->{helper}{resource}{by_id}{$id} ) {
+    return $resource;
   }
 
   return undef;
@@ -1365,20 +1385,20 @@ HUEBridge_Get($@)
     $result->{0} = { name => 'Lightset 0', type => 'LightGroup', lights => ["ALL"] };
     $hash->{helper}{groups} = $result;
     my $ret = "";
-    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
-      my $code = $name ."-G". $key;
-      my $fhem_name = '';
+    foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
+      my $code = $name ."-G". $id;
+      my $fhem_name;
          $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
          $fhem_name = ' (ignored)' if( !$fhem_name && $hash->{helper}{ignored}{$code} );
-      $fhem_name = "" if( !$fhem_name );
-      $result->{$key}{type} = '' if( !defined($result->{$key}{type}) );     #deCONZ fix
-      $result->{$key}{class} = '' if( !defined($result->{$key}{class}) );   #deCONZ fix
-      $result->{$key}{lights} = [] if( !defined($result->{$key}{lights}) ); #deCONZ fix
-      $ret .= sprintf( "%2i: %-15s %-15s %-15s %-15s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type}, $result->{$key}{class} );
+         $fhem_name = '' if( !$fhem_name );
+      $result->{$id}{type} = '' if( !defined($result->{$id}{type}) );     #deCONZ fix
+      $result->{$id}{class} = '' if( !defined($result->{$id}{class}) );   #deCONZ fix
+      $result->{$id}{lights} = [] if( !defined($result->{$id}{lights}) ); #deCONZ fix
+      $ret .= sprintf( "%2i: %-15s %-15s %-15s %-15s", $id, $result->{$id}{name}, $fhem_name, $result->{$id}{type}, $result->{$id}{class} );
       if( !$arg && $hash->{helper}{lights} ) {
-        $ret .= sprintf( " %s\n", join( ",", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$result->{$key}{lights}} ) );
+        $ret .= sprintf( " %s\n", join( ",", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$result->{$id}{lights}} ) );
       } else {
-        $ret .= sprintf( " %s\n", join( ",", @{$result->{$key}{lights}} ) );
+        $ret .= sprintf( " %s\n", join( ",", @{$result->{$id}{lights}} ) );
       }
     }
     $ret = sprintf( "%2s  %-15s %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "CLASS", "LIGHTS" ) .$ret if( $ret );
@@ -1520,12 +1540,6 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'ignored' ) {
     return join( "\n", sort keys %{$hash->{helper}{ignored}} );
 
-  } elsif($cmd eq 'refreshv2resources' ) {
-    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
-    HUEBridge_refreshv2resources($hash, 1);
-
-    return "done";
-
   } elsif($cmd eq 'v2resourcetypes' ) {
     return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
     my %result;
@@ -1580,12 +1594,40 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'v2scenes' ) {
     return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
     my $ret;
-    foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+    foreach my $entry ( sort {$a->{group}{rid} cmp $b->{group}{rid}} values %{$hash->{helper}{resource}{by_id}} ) {
       next if( $entry->{type} ne 'scene' );
-      $ret .= sprintf( "%-36s %-25s %-10s", $entry->{id}, $entry->{metadata}{name}, HUEBridge_nameOfResource($hash,$entry->{group}{rid}) );
-      $ret .= "\n";
+      my $room = HUEBridge_GetResource($hash,$entry->{group}{rid});
+      my(undef, $t, $id) = split( '/', $room->{id_v1} );
+      my $code = $name ."-G". $id;
+      my $fhem_name;
+         $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+         $fhem_name = ' (ignored)' if( !$fhem_name && $hash->{helper}{ignored}{$code} );
+         $fhem_name = '' if( !$fhem_name );
+      $ret .= sprintf( "%-36s %-25s %s (%s", $entry->{id}, $entry->{metadata}{name}, HUEBridge_nameOfResource($hash,$entry->{group}{rid}), $fhem_name );
+      if( $arg && $entry->{actions}) {
+        $ret .= sprintf( ": %s\n", join( ",", map { my $l = HUEBridge_nameOfResource($hash,$_->{target}{rid}); $l?$l:$_;} @{$entry->{actions}} ) );
+      }
+      $ret .= ")\n";
     }
-    $ret = sprintf( "%-36s %-25s %-15s %s\t%s\n", "ID", "NAME", "ROOM", "", "" ) .$ret if( $ret );
+    $ret = sprintf( "%-36s %-21s %s\n", "ID", "NAME", "for GROUP" ) .$ret if( $ret );
+    return $ret;
+
+  } elsif($cmd eq 'v2effects' ) {
+    return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+    return "usage: $cmd [<v2 light id>]" if( $arg && $arg eq '?' );
+    my $ret;
+    foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+      next if( !$entry->{effects} );
+      next if( $arg && $arg ne $entry->{id} );
+      my(undef, $t, $id) = split( '/', $entry->{id_v1} );
+      my $code = $name ."-". $id;
+      my $fhem_name = '';
+         $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $ret .= sprintf( "%-36s %-2s %-15s %s:", $entry->{id}, $id, $fhem_name, $entry->{metadata}{name} ) if( $hash->{CL} );
+      $ret .= join( ',', @{$entry->{effects}{effect_values}} );
+      $ret .= "\n" if( $hash->{CL} );
+    }
+    $ret = sprintf( "%-36s %-2s %-15s %s\n", "ID", "V1", "FEHM", "NAME", ). $ret if( $ret && $hash->{CL} );
     return $ret;
 
   } else {
@@ -1595,7 +1637,7 @@ HUEBridge_Get($@)
     }
 
     if( $hash->{has_v2_api} ) {
-      $list .= " v2devices v2resource v2resourcetypes v2scenes";
+      $list .= " v2devices v2effects v2resource v2resourcetypes v2scenes";
     }
 
     return "Unknown argument $cmd, choose one of $list";
@@ -2417,6 +2459,22 @@ HUEBridge_dispatch($$$;$)
     Log3 $name, 4, "$name: found $count new resources";
     HUEBridge_Autocreate($hash) if( $count );
 
+    foreach my $resource ( values %{$hash->{helper}{resource}{by_id}} ) {
+      next if( !$resource->{type} );
+      next if( !$resource->{id_v1} );
+      if( $resource->{type} eq 'device' ) {
+        my(undef, $t, $id) = split( '/', $resource->{id_v1} );
+        my $code;
+           $code = $name ."-". $id if( $t eq 'lights' );
+           $code = $name ."-S". $id if( $t eq 'sensors' );
+           $code = $name ."-G". $id if( $t eq 'groups' );
+        next if( !$code );
+        if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+          $chash->{v2_id} = $resource->{id};
+        }
+      }
+    }
+
     return undef;
 
   } elsif( defined($type) && $type eq 'event' ) {
@@ -2994,14 +3052,14 @@ __END__
 =item tag cloudfree
 =item tag publicAPI
 =item tag protocol:zigbee
-=item summary    module for the phillips hue bridge
+=item summary    module for the philips hue bridge
 =item summary_DE Modul f&uuml;r die Philips HUE Bridge
 =begin html
 
 <a id="HUEBridge"></a>
 <h3>HUEBridge</h3>
 <ul>
-  Module to access the bridge of the phillips hue lighting system.<br><br>
+  Module to access the bridge of the philips hue lighting system.<br><br>
 
   The actual hue bulbs, living colors or living whites devices are defined as <a href="#HUEDevice">HUEDevice</a> devices.
 
@@ -3092,6 +3150,8 @@ __END__
       Modifys the given scene in the bridge.</li>
     <a id="HUEBridge-set-scene"></a><li>scene &lt;id&gt;|&lr;name&gt;<br>
       Recalls the scene with the given id.</li>
+    <a id="HUEBridge-set-deletescene"></a><li>deletescene &lt;id&gt;|&lr;name&gt;<br>
+      Deletes the scene with the given id.</li>
     <a id="HUEBridge-set-updateschedule"></a><li>updateschedule &lt;id&gt; &lt;attributes json&gt;<br>
       updates the given schedule in the bridge with &lt;attributes json&gt; </li>
     <a id="HUEBridge-set-enableschedule"></a><li>enableschedule &lt;id&gt;<br>
@@ -3102,6 +3162,8 @@ __END__
       Creates a new rule in the bridge.</li>
     <a id="HUEBridge-set-deleterule"></a><li>deleterule &lt;id&gt;<br>
       Deletes the given rule in the bridge.</li>
+    <a id="HUEBridge-set-updaterule"></a><li>updaterule &lt;id&gt; &lt;json&gt;<br>
+      Write specified rule's toplevel data.</li>
     <a id="HUEBridge-set-createsensor"></a><li>createsensor &lt;name&gt; &lt;type&gt; &lt;uniqueid&gt; &lt;swversion&gt; &lt;modelid&gt;<br>
       Creates a new CLIP (IP) sensor in the bridge.</li>
     <a id="HUEBridge-set-deletesensor"></a><li>deletesensor &lt;id&gt;<br>
@@ -3118,7 +3180,7 @@ __END__
       perform touchlink action</li>
     <a id="HUEBridge-set-checkforupdate"></a><li>checkforupdate<br>
       perform checkforupdate action</li>
-    <a id="HUEBridge-set-autocreate"></a><li>statusRequest<br>
+    <a id="HUEBridge-set-statusRequest"></a><li>statusRequest<br>
       Update bridge status.</li>
     <a id="HUEBridge-set-swupdate"></a><li>swupdate<br>
       Update bridge firmware. This command is only available if a new firmware is
@@ -3170,7 +3232,7 @@ __END__
       the bridge will request the real device state after a set command. default is 1.</li>
     <a id="HUEBridge-attr-noshutdown"></a><li>noshutdown<br>
       Some bridge devcies require a different type of connection handling. raspbee/deconz only works if the connection
-      is not immediately closed, the phillips hue bridge now shows the same behavior. so this is now the default.  </li>
+      is not immediately closed, the philips hue bridge now shows the same behavior. so this is now the default.  </li>
   </ul><br>
 </ul><br>
 
@@ -3179,7 +3241,7 @@ __END__
 =encoding utf8
 =for :application/json;q=META.json 30_HUEBridge.pm
 {
-  "abstract": "module for the phillips hue bridge",
+  "abstract": "module for the philips hue bridge",
   "x_lang": {
     "de": {
       "abstract": "Modul für die Philips HUE Bridge"

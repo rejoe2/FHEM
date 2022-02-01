@@ -92,7 +92,7 @@ dummy_Define($$)
 =item summary_DE dummy Ger&auml;t
 =begin html
 
-<a name="dummy"></a>
+<a id="dummy"></a>
 <h3>dummy</h3>
 <ul>
 
@@ -100,8 +100,8 @@ dummy_Define($$)
   Used for programming.
   <br><br>
 
-  <a name="dummydefine"></a>
-  <b>Define</b>
+  <a id="dummy-define"></a>
+  <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; dummy</code>
     <br><br>
@@ -114,38 +114,38 @@ dummy_Define($$)
   </ul>
   <br>
 
-  <a name="dummyset"></a>
-  <b>Set</b>
+  <a id="dummy-set"></a>
+  <h4>Set</h4>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt</code><br>
     Set any value.
   </ul>
   <br>
 
-  <a name="dummyget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <a id="dummy-get"></a>
+  <h4>Get</h4> <ul>N/A</ul><br>
 
-  <a name="dummyattr"></a>
-  <b>Attributes</b>
+  <a id="dummy-attr"></a>
+  <h4>Attributes</h4>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-    <li><a name="readingList">readingList</a><br>
+    <li><a id="dummy-attr-readingList">readingList</a><br>
       Space separated list of readings, which will be set, if the first
       argument of the set command matches one of them.</li>
 
-    <li><a name="setList">setList</a><br>
+    <li><a id="dummy-attr-setList">setList</a><br>
       Space separated list of commands, which will be returned upon "set name
       ?", so the FHEMWEB frontend can construct a dropdown and offer on/off
       switches. Example: attr dummyName setList on off </li>
 
-    <li><a name="useSetExtensions">useSetExtensions</a><br>
+    <li><a id="dummy-attr-useSetExtensions">useSetExtensions</a><br>
       If set, and setList contains on and off, then the
       <a href="#setExtensions">set extensions</a> are available.<br>
       Side-effect: if set, only the specified parameters are accepted, even if
       setList contains no on and off.</li>
 
-    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+    <li><a id="dummy-attr-setExtensionsEvent">setExtensionsEvent</a><br>
       If set, the event will contain the command implemented by SetExtensions
       (e.g. on-for-timer 10), else the executed command (e.g. on).</li>
 
