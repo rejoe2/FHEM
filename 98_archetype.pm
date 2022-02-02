@@ -59,12 +59,13 @@ sub archetype_Initialize {
   addToAttrList('attributesExclude','archetype');
 
   my %hash = (
-    Fn  => "CommandClean",
-    Hlp => "[check]"
+    Fn  => 'CommandClean',
+    Hlp => 'archetype [clean or check], set attributes according to settings in archetypes'
   );
-  $cmds{clean} = \%hash;
+  $cmds{archetype} = \%hash;
   return;
 }
+
 
 # regular Fn ##################################################################
 sub archetype_Define($$) {
@@ -796,6 +797,7 @@ sub CommandClean($$) {
         )
     );
   }
+  return 'command archetype needs either <clean> or <check> as arguments' if !$arguments || $arguments ne 'clean';
 
   fhem(
       "set TYPE=archetype:FILTER=DEF!=derive.attributes define inheritors;"
@@ -806,7 +808,7 @@ sub CommandClean($$) {
   return(
       "clean done"
     . "\n\n"
-    . CommandClean($client_hash, "check")
+    . CommandClean($client_hash, 'check')
   );
 }
 
@@ -1043,7 +1045,7 @@ __END__
       <br>
       <a id="archetype-attr-deleteAttributes"></a><li>
         <code>deleteAttributes 1</code><br>
-        If an attribute is deleted in the archetype, it is also deleted for all
+        If set to 1 and then an attribute is deleted in the archetype, it is also deleted for all
         inheritors.<br>
         The default value is 0.
       </li>
@@ -1143,9 +1145,9 @@ attr SVG_link_archetype attributes group</pre>
 <div>
   <ul>
     Mit einem archetype werden Attribute auf Erben (inheritors), andere
-    Ger&auml;te, &uuml;bertragen. Die Erben k&ouml;nnen, nach einem vorgegeben
-    Muster im archetype und f&uuml;r Beziehungen (relations), eine bestimmte
-    Gruppe von Ger&auml;ten, definiert werden.<br>
+    Geräte, übertragen. Die Erben können, nach einem vorgegeben
+    Muster im archetype und für Beziehungen (relations), eine bestimmte
+    Gruppe von Geräten, definiert werden.<br>
     <br>
     Hinweise:
     <ul>
@@ -1170,8 +1172,8 @@ attr SVG_link_archetype attributes group</pre>
     <a id="archetype-command"></a>
     <h4>Befehle</h4>
     <ul>
-    <a id="archetype-command-clean"></a>
-      <code>clean [check]</code><br>
+    <a id="archetype-command-archetype"></a>
+      <code>archetype &lt;clean or check&gt;</code><br>
       Definiert für alle Beziehungen aller archetype die Erben, vererbt für
       alle archetype die unter dem Attribut attributes angegeben Attribute auf
       alle Erben.<br>
@@ -1210,7 +1212,7 @@ attr SVG_link_archetype attributes group</pre>
         <code>addToAttrList &lt;attribute&gt;</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
         m&ouml;glich.<br>
-        F&uuml;gt global einen Eintrag unter userattr hizu, sodass er f&uuml;r
+        F&uuml;gt global einen Eintrag unter userattr hinzu, sodass er f&uuml;r
         alle Ge&auml;r&auml;te zur Verf&uuml;gung steht.<br>
         Dies kann sinnvoll sein um den alias nach einem Muster abzuleiten.
       </li>
@@ -1364,10 +1366,10 @@ attr SVG_link_archetype attributes group</pre>
       </li>
       <br>
       <a id="archetype-attr-deleteAttributes"></a><li>
-        <code>delteAttributes 1</code><br>
-        Wird ein Attribut im archetype gelöscht, wird es auch bei allen Erben
+        <code>deleteAttributes 1</code><br>
+        Wenn gesetzt, wird ein im archetype gelöschtes Attribut auch bei allen Erben
         gelöscht.<br>
-        Der Standardwert ist 0.
+        Der Standardwert ist 0 (deaktiviert).
       </li>
       <br>
       <a id="archetype-attr-disable"></a><li>
