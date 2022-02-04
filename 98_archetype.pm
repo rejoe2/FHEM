@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-02-01 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-02-04 Beta-User $
 
 # copyright ###################################################################
 #
@@ -86,6 +86,7 @@ sub archetype_Define($$) {
   }
 
   $hash->{DEF} = "defined_by=$SELF" if !$DEF;
+  $hash->{MODEL} = $hash->{DEF} =~ m{[\b]?defined_by=}x ? 'defined_by' : $hash->{DEF} =~ m{[\b]?derive.attributes}x ? 'metaType' : 'devspec';
   $hash->{NOTIFYDEV} = 'global';
   $hash->{STATE} = 'active'
     if !AttrVal($SELF, 'stateFormat', undef) || IsDisabled($SELF);
@@ -198,7 +199,7 @@ sub archetype_Set($@) {
 }
 
 sub archetype_Get($@) {
-	my ($hash, @arguments) = @_;
+  my ($hash, @arguments) = @_;
   my $SELF = shift @arguments;
   my $TYPE = $hash->{TYPE};
 
@@ -297,24 +298,26 @@ sub archetype_Attr(@) {
 
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Attr");
 
-  if($attribute eq "disable" && ($cmd eq "del" || $value eq "0")){
-    if(AttrVal($SELF, "stateFormat", undef)){
-      evalStateFormat($hash);
+  if( $attribute eq 'disable' ) {
+    if ($cmd eq 'del' || $value eq '0') {
+        if ( AttrVal($SELF, 'stateFormat', undef) ) {
+            evalStateFormat($hash);
+        } else {
+            $hash->{STATE} = 'active';
+        }
+        Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance inheritors");
+        return archetype_inheritance($SELF);
     }
-    else{
-      $hash->{STATE} = "active";
-    }
-
-    Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance inheritors");
-
-    archetype_inheritance($SELF);
+    $hash->{STATE} = 'disabled';
+    return;
   }
-  elsif($attribute =~ /^actual_/){
-    if($cmd eq "set"){
-      addToDevAttrList($SELF, $attribute)
-    }
-    else{
-      my %values =
+
+  return if !$init_done;
+
+  if($attribute =~ /^actual_/) {
+    return addToDevAttrList($SELF, $attribute) if $cmd eq 'set';
+    # delete case
+    my %values =
         map{$_, 0} split(" ", AttrVal($SELF, "userattr", ""));
       delete $values{$attribute};
       my $values = join(" ", sort(keys %values));
@@ -325,7 +328,6 @@ sub archetype_Attr(@) {
       else{
         $attr{$SELF}{userattr} = $values;
       }
-    }
   }
 
   return if IsDisabled($SELF);
@@ -367,16 +369,17 @@ sub archetype_Attr(@) {
       $value = "userattr $value";
       $_[3] = $value;
       $attr{$SELF}{$attribute} = $value;
+    } else {
+        my $posAttr = getAllAttr($SELF);
+        for my $elem ( split m{ }, $value ) {
+            addToDevAttrList($SELF, $elem) if $elem !~ m{\b$posAttr(?:[\b:\s]|\Z)}xms;
+        }
     }
 
     Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance inheritors");
 
     archetype_inheritance($SELF, undef, $value);
   }
-  elsif($attribute eq "disable" && $cmd eq "set" && $value eq "1"){
-    $hash->{STATE} = "disabled";
-  }
-
   return;
 }
 
@@ -545,16 +548,15 @@ sub archetype_define_inheritors($;$$$) {
   my $TYPE = AttrVal($SELF, "actualTYPE", "dummy");
   my $initialize = AttrVal($SELF, "initialize", undef);
   if($initialize && $initialize !~ /^\{.*\}$/s){
-  	$initialize =~ s/\"/\\"/g;
+    $initialize =~ s/\"/\\"/g;
     $initialize = "\"$initialize\"";
   }
 
   for my $relation (@relations){
-    my $room = AttrVal($relation, "room", "Unsorted");
-
-    for $room (
-      AttrVal($SELF, "splitRooms", 0) eq "1" ? split(",", $room) : $room
-    ){
+    my @rooms;
+    push @rooms, AttrVal($relation, 'room', 'Unsorted');
+    @rooms = split q{,}, $rooms[0] if AttrVal($SELF, 'splitRooms', 0);
+    for my $room ( @rooms ) {
       my $name = archetype_AnalyzeCommand(
         AttrVal($SELF, "metaNAME", ""), undef, $room, $relation, $SELF
       );
@@ -563,16 +565,16 @@ sub archetype_define_inheritors($;$$$) {
       );
       my $defined = IsDevice($name, $TYPE) ? 1 : 0;
 
-      unless($defined && InternalVal($name, "DEF", " ") eq $DEF){
+      if ( !$defined || InternalVal($name, 'DEF', '') eq $DEF) {
         if($check){
-          push(@ret, $name);
-
+          push @ret, $name;
           next;
         }
         if (!$init){
           archetype_DEFcheck($name, $TYPE, $DEF);
-          addToDevAttrList($name, "defined_by");
-          $attr{$name}{defined_by} = $SELF;
+          addToDevAttrList($name, 'defined_by', 'archetype');
+          #$attr{$name}{defined_by} = $SELF;
+          CommandAttr($hash, "$name -silent defined_by $SELF");
         }
       }
 
@@ -818,6 +820,9 @@ __END__
 
 # commandref ##################################################################
 =pod
+
+statistic: 04.2.2022: # installations: 13, # defines: 113
+
 =item helper
 =item summary    inheritance attributes and defines devices
 =item summary_DE vererbt Attribute und definiert Geräte
