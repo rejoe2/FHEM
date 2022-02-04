@@ -86,7 +86,7 @@ sub archetype_Define($$) {
   }
 
   $hash->{DEF} = "defined_by=$SELF" if !$DEF;
-  $hash->{MODEL} = $hash->{DEF} =~ m{[\b]?defined_by=}x ? 'defined_by' : $hash->{DEF} =~ m{[\b]?derive.attributes}x ? 'metaType' : 'devspec';
+  $hash->{MODEL} = $hash->{DEF} =~ m{[\b]?defined_by=}x ? 'defined_by' : $hash->{DEF} =~ m{[\b]?derive.attributes}x ? 'deriveAttr' : 'devspec';
   $hash->{NOTIFYDEV} = 'global';
   $hash->{STATE} = 'active'
     if !AttrVal($SELF, 'stateFormat', undef) || IsDisabled($SELF);
@@ -1118,8 +1118,9 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         </b>
         <ul>
 <pre>defmod SVG_archetype archetype TYPE=SVG
-attr SVG_archetype group verlaufsdiagramm
-attr SVG_archetype attributes group</pre>
+attr SVG_archetype attributes group
+attr SVG_archetype group history
+</pre>
         </ul>
       </li>
       <li>
@@ -1133,7 +1134,7 @@ attr SVG_link_archetype actualTYPE weblink
 attr SVG_link_archetype metaNAME $relation\_link
 attr SVG_link_archetype metaDEF link ?detail=$relation
 attr SVG_link_archetype initialize attr $name room $room;;
-attr SVG_link_archetype group verlaufsdiagramm
+attr SVG_link_archetype group history
 attr SVG_link_archetype attributes group</pre>
         </ul>
       </li>
@@ -1396,7 +1397,10 @@ attr SVG_link_archetype attributes group</pre>
         werden und beschreibt den Aufbau des Namen f&uuml;r die Erben.
       </li>
       <br>
-      <li><a href="#dummy-attr-readingList">readingList</a></li>
+      <a id="archetype-attr-readingList"></a><li>
+        <code>readingList &lt;values&gt;</code><br>
+        Ermöglicht zusammen mit <i>setList</i> das Vorbelegen von Reading-Werten, die z.B. bei einer "initialize"-Aktion ausgewertet und an die Erben weitergereicht werden können. Siehe auch <a href="#dummy-attr-readingList">readingList</a> in dummy.
+      </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
@@ -1407,7 +1411,10 @@ attr SVG_link_archetype attributes group</pre>
         f&uuml;r Details der &lt;devspec&gt;.
       </li>
       <br>
-      <li><a href="#dummy-attr-setList">setList</a></li>
+      <a id="archetype-attr-setList"></a><li>
+        <code>setList &lt;values&gt;</code><br>
+        Siehe <a href="#archetype-attr-setList">readingList</a>.
+      </li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
@@ -1434,8 +1441,8 @@ attr SVG_link_archetype attributes group</pre>
         </b>
         <br>
 <pre>defmod SVG_archetype archetype TYPE=SVG
-attr SVG_archetype group verlaufsdiagramm
-attr SVG_archetype attributes group</pre>
+attr SVG_archetype attributes group
+attr SVG_archetype group verlaufsdiagramm</pre>
       </li>
       <br>
       <li>
