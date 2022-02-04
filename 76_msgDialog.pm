@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 25556 2022-02-04 +package Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-02-04 +package+acc Beta-User $
 #
 # copyright ###################################################################
 #
@@ -464,6 +464,7 @@ sub msgDialog_progress {
         "%message"    => $message
         );
   $msgCommand  = EvalSpecials($msgCommand, %specials);
+  $msgCommand =~ s{\\[\@]}{@}x;
   AnalyzeCommandChain($hash, $msgCommand);
   #$msgCommand =~ s{\\[\@]}{@}x;
   #$msgCommand =~ s{(\$\w+)}{$1}eegx;
