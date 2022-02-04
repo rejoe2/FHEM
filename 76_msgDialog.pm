@@ -456,10 +456,18 @@ sub msgDialog_progress {
 
   $message = join "\n", @message; #we need the soft variant
   my $msgCommand = InternalVal($SELF, 'MSGCOMMAND', '');
-  $msgCommand =~ s{\\[\@]}{@}x;
-  $msgCommand =~ s{(\$\w+)}{$1}eegx;
-  AnalyzeCommand($hash, $msgCommand);
 
+  my %specials   = ( 
+        "%SELF"       => $SELF,
+        "%TYPE"       => $TYPE,
+        "%recipients" => $recipients,
+        "%message"    => $message
+        );
+  $msgCommand  = EvalSpecials($msgCommand, %specials);
+  AnalyzeCommandChain($hash, $msgCommand);
+  #$msgCommand =~ s{\\[\@]}{@}x;
+  #$msgCommand =~ s{(\$\w+)}{$1}eegx;
+  #AnalyzeCommand($hash, $msgCommand);
   return;
 }
 

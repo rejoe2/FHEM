@@ -1,4 +1,4 @@
-# $Id: 98_WeekdayTimer.pm 25110 2021-11-16 restructured Beta-User $
+# $Id: 98_WeekdayTimer.pm 25243 2022-02-04 decode_json eval Beta-User $
 #############################################################################
 #
 #     98_WeekdayTimer.pm
@@ -638,7 +638,11 @@ E:  while ( @{ $arr } > 0 ) {
         Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
         return;
       }
-      my $wp_profile_unpacked = decode_json($wp_profile_data);
+      my $wp_profile_unpacked;
+      if ( !eval { $wp_profile_unpacked = decode_json($wp_profile_data) ; 1 } ) {
+        Log3($hash, 1, "$name:JSON decoding error in weekprofile:  $@");
+        return;
+      }
       $hash->{weekprofiles}{$wp_name} = {'PROFILE'=>$wp_profile,'PROFILE_JSON'=>$wp_profile_data,'SunAsWE'=>$wp_sunaswe,'PROFILE_DATA'=>$wp_profile_unpacked };
       my %wp_shortDays = ("Mon"=>1,"Tue"=>2,"Wed"=>3,"Thu"=>4,"Fri"=>5,"Sat"=>6,"Sun"=>0);
       for my $wp_days (sort keys %{$hash->{weekprofiles}{$wp_name}{PROFILE_DATA}}) {
