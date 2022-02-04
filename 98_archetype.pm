@@ -686,7 +686,7 @@ sub archetype_evalSpecials($$;$) {
   my $value;
 
   if($get){
-    $pattern =~ s/\[[^]]*\]//g if($get eq "mandatory");
+    $pattern =~ s/\[[^]]*\]//g if $get eq 'mandatory';
 
     return(($pattern =~ m/%(\S+)%/g));
   }
@@ -1144,43 +1144,36 @@ attr SVG_link_archetype attributes group</pre>
 <h3>archetype</h3>
 <div>
   <ul>
-    Mit einem archetype werden Attribute auf Erben (inheritors), andere
+    <i>archetype</i> (lt. Duden Synonym u.a. für: Urbild, Urform, Urgestalt, Urtyp, Ideal, Inbegriff, Musterbild, Vorbild) kann:
+    <ul>
+      <li>Attribute vom <i>archetype</i> auf andere Geräte übertragen und/oder</li>
+      <li>neue Geräte nach einem bestimmten Muster anlegen und initialisieren</li>
+    </ul><br>
+    Die verwendeten Begriffe sind angelehnt an <a href="https://de.wikipedia.org/wiki/Vererbung_%28Programmierung%29">Vererbung</a> 
+    in der Programmierung. 
+    Mit einem <i>archetype</i> werden Attribute auf <i>Erben</i> (inheritors), andere
     Geräte, übertragen. Die Erben können, nach einem vorgegeben
-    Muster im archetype und für Beziehungen (relations), eine bestimmte
+    Muster im <i>archetype</i> und für <i>Beziehungen</i> (relations), eine bestimmte
     Gruppe von Geräten, definiert werden.<br>
     <br>
-    Hinweise:
+    Folgende Variablen können für Übertragungsvorgänge genutzt werden:
     <ul>
-      <li>
-        <code>$name</code><br>
-        Name des Erben
-      </li><br>
-      <li>
-        <code>$room</code><br>
-        Raum der Beziehung
-      </li><br>
-      <li>
-        <code>$relation</code><br>
-        Name der Beziehung
-      </li><br>
-      <li>
-        <code>$SELF</code><br>
-        Name des archetype
-      </li>
+      <li><code>$name</code> Name des Erben</li>
+      <li><code>$room</code> Raum der Beziehung</li>
+      <li><code>$relation</code> Name der Beziehung</li>
+      <li><code>$SELF</code> Name des archetype</li>
     </ul>
-    <br>
     <a id="archetype-command"></a>
     <h4>Befehle</h4>
     <ul>
     <a id="archetype-command-archetype"></a>
       <code>archetype &lt;clean or check&gt;</code><br>
       Definiert für alle Beziehungen aller archetype die Erben, vererbt für
-      alle archetype die unter dem Attribut attributes angegeben Attribute auf
+      alle <i>archetype</i> die unter dem Attribut attributes angegeben Attribute auf
       alle Erben.<br>
       Wird optinal der Parameter "check" angegeben werden alle ausstehenden
       Attribute und Erben angezeigt.
     </ul>
-    <br>
     <a id="archetype-define"></a>
     <h4>Define</h4>
     <ul>
