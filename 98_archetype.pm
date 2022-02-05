@@ -119,21 +119,21 @@ sub archetype_Set($@) {
   my $value = @arguments ? join q{ }, @arguments : undef;
   my %archetype_sets;
 
-  if($hash->{DEF} eq "derive attributes"){
+  if($hash->{DEF} eq 'derive attributes'){
     %archetype_sets = (
-        "addToAttrList" => "addToAttrList:textField"
-      , "derive" => "derive:attributes"
+        addToAttrList => 'addToAttrList:textField'
+      , derive => 'derive:attributes'
     );
   }
   else{
     %archetype_sets = (
-        "define" => "define:inheritors"
-      , "inheritance" => "inheritance:noArg"
-      , "initialize" => "initialize:inheritors"
-      , "raw" => "raw:textField"
+        define => 'define:inheritors'
+      , inheritance => 'inheritance:noArg'
+      , initialize => 'initialize:inheritors'
+      , raw => 'raw:textField'
     );
-    $archetype_sets{(split(":", $_))[0]} = $_
-      for ( split /[\s]+/, AttrVal($SELF, 'setList', '') );
+    $archetype_sets{(split m{:}, $_)[0]} = $_
+      for ( split m{[\s]+}, AttrVal($SELF, 'setList', '') );
   }
 
   return(
@@ -141,10 +141,10 @@ sub archetype_Set($@) {
     . join(" ", values %archetype_sets)
   ) if !exists $archetype_sets{$argument};
 
-  if($argument eq "addToAttrList"){
-    addToAttrList($value);
+  if($argument eq 'addToAttrList'){
+    return addToAttrList($value);
   }
-  elsif($argument eq "derive" && $value eq "attributes"){
+  if($argument eq "derive" && $value eq "attributes"){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     archetype_derive_attributes($SELF);
@@ -372,7 +372,7 @@ sub archetype_Attr(@) {
     } else {
         my $posAttr = getAllAttr($SELF);
         for my $elem ( split m{ }, $value ) {
-            addToDevAttrList($SELF, $elem) if $elem !~ m{\b$posAttr(?:[\b:\s]|\Z)}xms;
+            addToDevAttrList($SELF, $elem) if $posAttr !~ m{\b$elem(?:[\b:\s]|\z)}xms;
         }
     }
 
