@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-02-04 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-02-07 Beta-User $
 
 # copyright ###################################################################
 #
@@ -86,13 +86,23 @@ sub archetype_Define($$) {
   }
 
   $hash->{DEF} = "defined_by=$SELF" if !$DEF;
-  $hash->{MODEL} = $hash->{DEF} =~ m{[\b]?defined_by=}x ? 'defined_by' : $hash->{DEF} =~ m{[\b]?derive.attributes}x ? 'deriveAttr' : 'devspec';
   $hash->{NOTIFYDEV} = 'global';
   $hash->{STATE} = 'active'
     if !AttrVal($SELF, 'stateFormat', undef) || IsDisabled($SELF);
 
-  return;
+  return $init_done ? archetype_firstInit($hash) : InternalTimer(time+100, \&archetype_firstInit, $hash );
 }
+
+
+sub archetype_firstInit {
+    my $hash = shift // return;
+    my $name = $hash->{NAME};
+    for (devspec2array('defined_by=.+')) {
+        addToDevAttrList($_, 'defined_by','archetype');
+    }
+    return;
+}
+
 
 sub archetype_Undef($$) {
   my ($hash, $SELF) = @_;
@@ -364,7 +374,7 @@ sub archetype_Attr(@) {
 
     archetype_inheritance($SELF, undef, $attribute);
   }
-  elsif($attribute eq "attributes" && $cmd eq "set"){
+  elsif($attribute eq 'attributes' && $cmd eq 'set'){
     if($value =~ /actual_/ && $value !~ /userattr/){
       $value = "userattr $value";
       $_[3] = $value;
@@ -372,7 +382,7 @@ sub archetype_Attr(@) {
     } else {
         my $posAttr = getAllAttr($SELF);
         for my $elem ( split m{ }, $value ) {
-            addToDevAttrList($SELF, $elem) if $posAttr !~ m{\b$elem(?:[\b:\s]|\z)}xms;
+            addToDevAttrList($SELF, "actual_$elem") if $posAttr !~ m{\b$elem(?:[\b:\s]|\z)}xms;
         }
     }
 
@@ -1044,8 +1054,8 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
       <br>
       <a id="archetype-attr-defined_by"></a><li>
         <code>defined_by &lt;...&gt;</code><br>
-        Auxiliary attribute to recognize by which archetype the inheritor was
-        defined.
+        Auxiliary attribute to recognize by which <a href="#archetype">archetype</a>
+        the device has been defined as inheritor.
       </li>
       <br>
       <a id="archetype-attr-deleteAttributes"></a><li>
@@ -1080,8 +1090,11 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         describes the structure of the name for the inheritors.
       </li>
       <br>
-      <li>
-        <code><a href="#dummy-attr-readingList">readingList</a></code>
+      <a id="archetype-attr-readingList" data-pattern="(reading|set)List"></a><li>
+        <code>readingList &lt;values&gt;</code><br>
+        <code>setList &lt;values&gt;</code><br>
+        Both work as same attributes in <a href="#dummy">dummy</a>. They are intented
+        to set initial values for "initialize"-actions that may he handed over to heirs.
       </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
@@ -1093,9 +1106,6 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         for details of the &lt;devspec&gt;.
       </li>
       <br>
-      <li>
-        <code><a href="#dummy-attr-setList">setList</a></code>
-      </li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
@@ -1360,8 +1370,8 @@ attr SVG_link_archetype attributes group</pre>
       <br>
       <a id="archetype-attr-defined_by"></a><li>
         <code>defined_by &lt;...&gt;</code><br>
-        Hilfsattribut um zu erkennen, durch welchen archetype der Erbe
-        definiert wurde.
+        Hilfsattribut um zu erkennen, durch welchen <a href="#archetype">archetype</a> ein 
+        Device als Erbe definiert wurde.
       </li>
       <br>
       <a id="archetype-attr-deleteAttributes"></a><li>
@@ -1397,11 +1407,6 @@ attr SVG_link_archetype attributes group</pre>
         werden und beschreibt den Aufbau des Namen f&uuml;r die Erben.
       </li>
       <br>
-      <a id="archetype-attr-readingList"></a><li>
-        <code>readingList &lt;values&gt;</code><br>
-        Ermöglicht zusammen mit <i>setList</i> das Vorbelegen von Reading-Werten, die z.B. bei einer "initialize"-Aktion ausgewertet und an die Erben weitergereicht werden können. Siehe auch <a href="#dummy-attr-readingList">readingList</a> in dummy.
-      </li>
-      <br>
       <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
         In den &lt;relations&gt; werden alle Beziehungen beschrieben die es für
@@ -1411,9 +1416,10 @@ attr SVG_link_archetype attributes group</pre>
         f&uuml;r Details der &lt;devspec&gt;.
       </li>
       <br>
-      <a id="archetype-attr-setList"></a><li>
+      <a id="archetype-attr-readingList" data-pattern="(reading|set)List"></a><li>
+        <code>readingList &lt;values&gt;</code><br>
         <code>setList &lt;values&gt;</code><br>
-        Siehe <a href="#archetype-attr-setList">readingList</a>.
+        Ermöglichen zusammen das Vorbelegen von Reading-Werten, die z.B. bei einer "initialize"-Aktion ausgewertet und an die Erben weitergereicht werden können. Siehe auch die entsprechenden Attributbeschreibungen in <a href="#dummy">dummy</a>.
       </li>
       <br>
       <a id="archetype-attr-splitRooms"></a><li>
