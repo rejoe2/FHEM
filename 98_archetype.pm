@@ -137,18 +137,20 @@ sub archetype_Set($@) {
   }
   else{
     %archetype_sets = (
-        define => 'define:inheritors'
-      , inheritance => 'inheritance:noArg'
-      , initialize => 'initialize:inheritors'
-      , raw => 'raw:textField'
+       define => 'define:inheritors',
+       inheritance => 'inheritance:noArg',
+       initialize => 'initialize:inheritors',
+       raw => 'raw:textField'
     );
+    my $inheritors = join q{,}, archetype_devspec($SELF);
+    if ($inheritors) { $archetype_sets{import} = "import:select,$inheritors" };
     $archetype_sets{(split m{:}, $_)[0]} = $_
       for ( split m{[\s]+}, AttrVal($SELF, 'setList', '') );
   }
 
   return(
       "Unknown argument $argument, choose one of "
-    . join(" ", values %archetype_sets)
+    . join q{ }, values %archetype_sets
   ) if !exists $archetype_sets{$argument};
 
   if($argument eq 'addToAttrList'){
@@ -178,18 +180,49 @@ sub archetype_Set($@) {
 
     archetype_define_inheritors($SELF, $argument);
 
-    Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
+    return Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
   }
-  elsif($argument eq "raw" && $value){
-    (my $command, $value) = split(/[\s]+/, $value, 2);
+  if($argument eq "raw" && $value){
+    (my $command, $value) = split m{[\s]+}x, $value, 2;
 
-    return "\"set $TYPE\" $argument at least one command and argument"
+    return qq("set $TYPE $argument" needs at least one command and one argument)
       if !$value;
 
     Log3($SELF, 3, "$TYPE ($SELF) - $command <inheritors> $value");
 
-    fhem("$command " . join(",", archetype_devspec($SELF)) . " $value");
+    #fhem("$command " . join(",", archetype_devspec($SELF)) . " $value");
+    my $targets = join q{,}, archetype_devspec($SELF);
+    return if !$targets;
+    return AnalyzeCommandChain($hash, "$command $targets $value");
   }
+  
+  if($argument eq 'import' && $value){
+    $hash->{'.importing'} = 1;
+    return qq("set $TYPE $argument" requires an existing device as argument)
+      if !$value || !defined $defs{$value};
+
+    my @toImport = split m{[\s,]+}x, AttrVal($SELF, 'attributes', getAllAttr($value));
+    for (@toImport) {
+        $_ = (split m{:}x, $_, 2)[0];
+    }
+    my $ownlist = AttrVal($SELF, 'attributes', undef);
+    my @newlist;
+    
+    for my $import ( @toImport ) {
+        next if $import =~ m{\A[.]}x; # no hidden attributes!
+        my $cont = AttrVal($value, $import, undef);
+        next if !$cont;
+        push @newlist, $import;
+        CommandAttr(undef, "$SELF actual_$import $cont");
+    }
+    if (!$ownlist) {
+        my $ownlist = join q{ }, @newlist;
+        CommandAttr(undef, "$SELF attributes $ownlist");
+    }
+    delete $hash->{'.importing'};
+    return;
+  }
+  
   else{
     my @readingList = split(/[\s]+/, AttrVal($SELF, "readingList", ""));
 
@@ -237,7 +270,7 @@ sub archetype_Get($@) {
 
   return(
       "Unknown argument $argument, choose one of "
-    . join(" ", values %archetype_gets)
+    . join q{ }, values %archetype_gets
   ) if !exists $archetype_gets{$argument};
 
   return "$SELF is disabled" if IsDisabled($SELF);
@@ -325,14 +358,17 @@ sub archetype_Attr(@) {
   return if !$init_done;
 
   if($attribute =~ /^actual_/) {
-    return addToDevAttrList($SELF, $attribute) if $cmd eq 'set';
+    if ($cmd eq 'set') {
+        addToDevAttrList($SELF, $attribute, 'archetype');
+        return ;
+    }
     # delete case
     my %values =
         map{$_, 0} split(" ", AttrVal($SELF, "userattr", ""));
       delete $values{$attribute};
-      my $values = join(" ", sort(keys %values));
+      my $values = join q{ }, sort keys %values;
 
-      if($values eq ""){
+      if($values eq ''){
         CommandDeleteAttr(undef, "$SELF userattr");
       }
       else{
@@ -366,15 +402,17 @@ sub archetype_Attr(@) {
     )
   ){
     $attribute = $1 if($1);
+    return if $hash->{'.importing'};
     Log3(
       $SELF, 3
       , "$TYPE ($SELF) - "
       . "starting inheritance attribute \"$attribute\" to inheritors"
     );
 
-    archetype_inheritance($SELF, undef, $attribute);
+    return archetype_inheritance($SELF, undef, $attribute);
   }
-  elsif($attribute eq 'attributes' && $cmd eq 'set'){
+  
+  if($attribute eq 'attributes' && $cmd eq 'set'){
     if($value =~ /actual_/ && $value !~ /userattr/){
       $value = "userattr $value";
       $_[3] = $value;
@@ -386,8 +424,9 @@ sub archetype_Attr(@) {
         }
     }
 
-    Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance inheritors");
+    return if $hash->{'.importing'} && $cmd eq 'set';
 
+    Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance inheritors");
     archetype_inheritance($SELF, undef, $value);
   }
   return;
@@ -457,22 +496,14 @@ sub archetype_Notify($$) {
 sub archetype_AnalyzeCommand($$$$$) {
   # Wird ausgefuehrt um metaNAME und metaDEF auszuwerten.
   my ($cmd, $name, $room, $relation, $SELF) = @_;
+  my $hash; my $TYPE;
   if($SELF){
-    my ($hash) = $defs{$SELF};
-    my $TYPE = $hash->{TYPE};
-
+    $hash = $defs{$SELF};
+    $TYPE = $hash->{TYPE};
     Log3($SELF, 5, "$TYPE ($SELF) - call archetype_AnalyzeCommand");
   }
 
   return if !$cmd;
-
-  # # Stellt Variablen fuer Zeit und Datum zur Verfuegung.
-  # my ($sec, $min, $hour, $mday, $month, $year, $wday, $yday, $hms, $we) =
-  #   split(" ",
-  #     AnalyzePerlCommand(
-  #       undef, '"$sec $min $hour $mday $month $year $wday $yday $hms $we"'
-  #     )
-  #   );;
 
   # Falls es sich nicht um einen durch {} gekennzeichneten Perl Befehl
   # handelt, werden alle Anfuehrungszeichen maskiert und der Befehl in
@@ -482,53 +513,81 @@ sub archetype_AnalyzeCommand($$$$$) {
     $cmd = "\"$cmd\""
   }
 
-  $cmd = eval($cmd);
+  #$cmd = eval($cmd);
+  my %specials = (
+         '$SELF'     => $SELF,
+         '$name'     => $name,
+         '$room'     => $room,
+         '$relation' => $relation
+  );
+  $specials{'$SELF'} = $SELF if $SELF;
+  $specials{'$TYPE'} = $TYPE if $TYPE;
 
-  return $cmd;
+  $cmd  = EvalSpecials($cmd, %specials);
+
+  # CMD ausführen
+  return AnalyzeCommandChain( $hash, $cmd );
+  
+  #$cmd = eval($cmd);
+
+  #return $cmd;
 }
 
 sub archetype_attrCheck($$$$;$) {
   # Wird fuer jedes vererbende Attribut und fuer jeden Erben ausgefuehrt um zu
   # pruefen ob das Attribut den vorgaben entspricht.
   my ($SELF, $name, $attribute, $desired, $check) = @_;
-  my ($hash) = $defs{$SELF};
+  my $hash = $defs{$SELF};
   my $TYPE = $hash->{TYPE};
-  my $actual = AttrVal($name, $attribute, "");
+  my $actual = AttrVal($name, $attribute, '');
 
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_attrCheck");
 
-  return if(AttrVal($name, "attributesExclude", "") =~ /$attribute/);
+  return if AttrVal($name, 'attributesExclude', '') =~ m{$attribute};
 
-  if(AttrVal($SELF, "actual_$attribute", undef)){
-    $desired = eval($desired) if($desired =~ m/^\{.*\}$/);
-    $desired = archetype_evalSpecials($name, $desired) if($desired =~ m/%/);
+  if ( AttrVal($SELF, "actual_$attribute", undef ) ) {
+    my %specials = (
+         '$SELF'      => $SELF,
+         '$name'      => $name,
+         '$TYPE'      => $TYPE,
+         '$attribute' => $attribute
+    );
+
+    #$desired = eval($desired) if $desired =~ m{\A\{.*\}\z};
+    if ( $desired =~ m{\A\{.*\}\z} ) {
+        $desired  = EvalSpecials($desired, %specials);
+        # CMD ausführen
+        $desired = AnalyzePerlCommand( $hash, $desired );
+    }
+
+    $desired = archetype_evalSpecials($name, $desired) if $desired =~ m/%/;
   }
 
   if($desired =~ m/^least(\((.*)\))?:(.+)/){
     my $seperator = $2 ? $2 : " ";
     my %values =
-      map{$_, 0} (split(($seperator), $actual), split($seperator, $3));
-    $desired = join($seperator, sort(keys %values));
+      map{$_, 0} (split( $seperator, $actual), split $seperator, $3 );
+    $desired = join $seperator, sort keys %values;
   }
-  elsif($desired =~ m/^undef/){
-    return if(AttrVal($name, $attribute, undef));
-    $desired = (split(":", $desired, 2))[1];
+  elsif( $desired =~ m{\Aundef} ){
+    return if AttrVal($name, $attribute, undef);
+    $desired = ( split m{:}x, $desired, 2)[1];
   }
 
   return if !$desired;
 
-  if($actual ne $desired){
-    if($check){
+  return if $actual eq $desired;
+
+  if ( $check ) {
       my $ret;
-      $ret .= "-attr $name $attribute $actual\n" if($actual ne "");
+      $ret .= "-attr $name $attribute $actual\n" if $actual ne '';
       $ret .= "+attr $name $attribute $desired";
 
       return $ret;
-    }
-
-    fhem("attr $name $attribute $desired");
-    # CommandAttr(undef, "$name $attribute $desired");
   }
+
+    #fhem("attr $name $attribute $desired");
+    CommandAttr(undef, "$name $attribute $desired");
 
   return;
 }
@@ -588,13 +647,25 @@ sub archetype_define_inheritors($;$$$) {
         }
       }
 
-      next if($check);
+      next if $check;
 
-      fhem(eval($initialize)) if(
-        $initialize
+      #fhem(eval($initialize)) if( ##Beta-User: fhem/eval
+      if ( $initialize
         && IsDevice($name, $TYPE)
         && (!$defined || $init)
-      );
+        ) {
+            #fhem(eval($initialize))
+            my %specials = (
+                '$SELF'     => $SELF,
+                '$name'     => $name,
+                '$TYPE'     => $TYPE,
+                '$room'     => $room,
+                '$relation' => $relation
+                );
+            $initialize  = EvalSpecials($initialize, %specials);
+            # CMD ausführen
+            AnalyzeCommandChain( $hash, $initialize );
+        }
 
       archetype_inheritance($SELF, $name) if !$init;
     }
@@ -685,7 +756,7 @@ sub archetype_devspec($;$) {
   }
 
   my @devspec;
-  push(@devspec, devspec2array($_)) for (split(/[\s]+/, $devspecs));
+  push @devspec, devspec2array($_) for (split m{[\s]+}x, $devspecs);
   my %devspec = map{$_, 1}@devspec;
   delete $devspec{$SELF};
   @devspec = sort keys %devspec;
@@ -768,16 +839,16 @@ sub CommandClean($$) {
   my (@pendingAttributes, @pendingInheritors);
   my %pendingAttributes;
 
-  if($arguments && $arguments eq "check"){
+  return 'command archetype needs either <clean> or <check> as arguments' if !$arguments || $arguments ne 'clean' && $arguments ne 'check';
+
+  if( $arguments eq 'check' ){
     for my $SELF (@archetypes){
       my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "attributes");
 
-      next if(
-        $ret =~ /no attributes pending|Unknown argument pending|is disabled/
-      );
+      next if $ret =~ m{no attributes pending|Unknown argument pending|is disabled};
 
-      for my $pending (split("\n", $ret)){
-        my ($sign, $name, $attribute, $value) = split(" ", $pending, 4);
+      for my $pending ( split m{\n}x, $ret ){
+        my ($sign, $name, $attribute, $value) = split q{ }, $pending, 4;
         $sign =~ s/^\+//;
         $pendingAttributes{$pending} = "$name $attribute $sign $value";
       }
@@ -786,42 +857,38 @@ sub CommandClean($$) {
     for my $SELF (@archetypes){
       my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "inheritors");
 
-      push(@pendingInheritors, $ret) if(
-        $ret !~ /no inheritors pending|Unknown argument pending|is disabled/
-      );
+      push @pendingInheritors, $ret if $ret !~ m{no inheritors pending|Unknown argument pending|is disabled};
     }
 
     @pendingAttributes =
-      sort { lc($pendingAttributes{$a}) cmp lc($pendingAttributes{$b}) }
+      sort { lc $pendingAttributes{$a} cmp lc $pendingAttributes{$b} }
       keys %pendingAttributes
     ;
-    @pendingInheritors = sort(@pendingInheritors);
+    @pendingInheritors = sort @pendingInheritors;
 
     return(
         (@pendingAttributes ?
-           "pending attributes:\n" . join("\n", @pendingAttributes)
-         : "no attributes pending"
+           "pending attributes:\n" . join "\n", @pendingAttributes
+         : 'no attributes pending'
         )
       . "\n\n"
       . (@pendingInheritors ?
-           "pending inheritors:\n" . join("\n", @pendingInheritors)
-         : "no inheritors pending"
+           'pending inheritors:\n' . join "\n", @pendingInheritors
+         : 'no inheritors pending'
         )
     );
   }
-  return 'command archetype needs either <clean> or <check> as arguments' if !$arguments || $arguments ne 'clean';
 
-  fhem(
-      "set TYPE=archetype:FILTER=DEF!=derive.attributes define inheritors;"
-    . "set TYPE=archetype:FILTER=DEF!=derive.attributes inheritance;"
-    . "set TYPE=archetype:FILTER=DEF=derive.attributes derive attributes;"
+  #fhem(
+  AnalyzeCommandChain( undef,
+      'set TYPE=archetype:FILTER=DEF!=derive.attributes define inheritors;'
+    . 'set TYPE=archetype:FILTER=DEF!=derive.attributes inheritance;'
+    . 'set TYPE=archetype:FILTER=DEF=derive.attributes derive attributes;'
   );
 
-  return(
-      "clean done"
-    . "\n\n"
-    . CommandClean($client_hash, 'check')
-  );
+  return 'clean done'
+         . "\n\n"
+         . CommandClean($client_hash, 'check');
 }
 
 1;
@@ -940,7 +1007,18 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
       <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
         Inheritance all attributes specified under the attributes attribute for
-        all inheritors.
+        all inheritors. Attribute values will be taken - if available - from the respective <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>, otherwise the value will be taken from the archetype's attribute with the same name.
+      </li>
+      <br>
+      <a id="archetype-set-import"></a><li>
+        <code>import</code><br>
+        Helper funktion to create an <i>archetype</i>.
+        <ul>
+          <li>Imports all attributes from the given device as listed in <i>archetype's</i> <i>attributes</i> list.</li>
+          <li>If <i>attributes</i> was not set before, all attributes <u>from the given device</u> will be imported (as <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>) to the archetype; <i>attributes</i> will be filled with a list of the importierted attributes.</li>
+          <li>The values form the attributs will also be imported for futher usage in the archetype.</li>
+        </ul>
+        Note: While import is running, no values will be forwarded to the inheritors.
       </li>
       <br>
       <a id="archetype-set-initialize"></a><li>
@@ -1106,7 +1184,6 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         for details of the &lt;devspec&gt;.
       </li>
       <br>
-      <br>
       <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
         Returns every room seperatly for each relation in $room.
@@ -1163,7 +1240,7 @@ attr SVG_link_archetype attributes group</pre>
     <i>archetype</i> (lt. Duden Synonym u.a. für: Urbild, Urform, Urgestalt, Urtyp, Ideal, Inbegriff, Musterbild, Vorbild) kann:
     <ul>
       <li>Attribute vom <i>archetype</i> auf andere Geräte übertragen und/oder</li>
-      <li>neue Geräte nach einem bestimmten Muster anlegen und initialisieren</li>
+      <li>neue Geräte (auch z.B. solche, die von <a href="#autocreate">autocreate</a> erzeugt werden) nach einem bestimmten Muster anlegen, mit Standardattributen versorgen und initialisieren</li>
     </ul><br>
     Die verwendeten Begriffe sind angelehnt an <a href="https://de.wikipedia.org/wiki/Vererbung_%28Programmierung%29">Vererbung</a> 
     in der Programmierung. 
@@ -1200,17 +1277,16 @@ attr SVG_link_archetype attributes group</pre>
       archetype gibt. Es sollte darauf geachtet werden, dass jeder Erbe nur
       einem archetype zugeordnet ist.<br>
       Wird keine &lt;devspec&gt; angegeben wird diese mit "defined_by=$SELF"
-      gesetzt. Diese devspec wird auch immer &uuml;berpr&uuml;ft, selbst wenn
+      gesetzt. Diese devspec wird auch immer überprüft, selbst wenn
       sie nicht angegeben ist.<br>
-      Siehe den Abschnitt &uuml;ber
-      <a href="#devspec">Ger&auml;te-Spezifikation</a>
-      f&uuml;r Details der &lt;devspec&gt;.<br>
+      Siehe den Abschnitt über <a href="#devspec">Geräte-Spezifikation</a>
+      für Details zu &lt;devspec&gt;.<br>
       <br>
       <code>define &lt;name&gt; archetype derive attributes</code><br>
       Wird in der DEF "derive attributes" angegeben handelt es sich um ein
       besonderes archetype. Es leitet Attribute anhand eines Musters ab.<br>
       Das Muster wird mit den Attributen actual_.+ beschrieben.<br>
-      Als Erben werden alle Ger&auml;te aufgelistet welche alle Pflicht-
+      Als Erben werden alle Geräte aufgelistet welche alle Pflicht-
       Attribute eines Musters besitzen.
     </ul>
     <br>
@@ -1220,23 +1296,23 @@ attr SVG_link_archetype attributes group</pre>
       <a id="archetype-set-addToAttrList"></a><li>
         <code>addToAttrList &lt;attribute&gt;</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
-        m&ouml;glich.<br>
-        F&uuml;gt global einen Eintrag unter userattr hinzu, sodass er f&uuml;r
-        alle Ge&auml;r&auml;te zur Verf&uuml;gung steht.<br>
-        Dies kann sinnvoll sein um den alias nach einem Muster abzuleiten.
+        möglich.<br>
+        Fügt global einen Eintrag unter userattr hinzu, sodass er für
+        alle Geräte zur Verfügung steht.<br>
+        Dies kann sinnvoll sein, um (z.B.) den alias nach einem Muster abzuleiten.
       </li>
       <br>
       <a id="archetype-set-define"></a><li>
         <code>define inheritors</code><br>
-        Definiert f&uuml;r alle Beziehungen einen Erben nach dem Muster:<br>
+        Definiert für alle Beziehungen einen Erben nach dem Muster:<br>
         <ul>
           <code>
             define &lt;metaNAME&gt; &lt;actualTYPE&gt; [&lt;metaDEF&gt;]
           </code>
         </ul>
-        Wenn ein Erbe definiert wird, wird er, mit den unter dem Attribut
-        initialize angegebenen Befehlen, initialisiert und ihm wir das Attribut
-        defined_by mit dem Wert $SELF zugewiesen.<br>
+        Wenn ein Erbe definiert wird, wird er mit den unter dem Attribut
+        initialize angegebenen Befehlen initialisiert und ihm wird das Attribut
+        <i>defined_by<i> mit dem Wert $SELF zugewiesen.<br>
         Die Beziehungen, metaNAME, actualTYPE und metaDEF werden in Attributen
         beschrieben.
       </li>
@@ -1244,15 +1320,25 @@ attr SVG_link_archetype attributes group</pre>
       <a id="archetype-set-derive"></a><li>
         <code>derive attributes</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
-        m&ouml;glich.<br>
-        Leitet f&uuml;r alle Erben die unter dem Attribut attributes angegeben
+        möglich.<br>
+        Leitet für alle Erben die unter dem Attribut <i>attributes</i> angegeben
         Attribute ab.
       </li>
       <br>
       <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
         Vererbt die eigenen unter dem Attribut attributes angegeben Attribute
-        auf alle Erben.
+        auf alle Erben. Dabei werden - wenn vorhanden - die Vorgaben aus dem zugehörigen <a href="#archetype-attr-actual_attribute">actual_.+-Attribut</a> entnommen, hilfsweise aus dem gleichnamigen Attribut des archetype.
+      </li>
+      <a id="archetype-set-import"></a><li>
+        <code>import</code><br>
+        Hilfsfunktion zum Erstellen eines <i>archetype</i>.
+        <ul>
+          <li>Importiert alle Attribute vom ausgewählten Device, die im <i>archetype</i> unter <i>attributes</i> gelistet sind.</li>
+          <li>Ist <i>attributes</i> nicht gesetzt, werden alle <u>im genannten Device gesetzten</u> Attribute (als <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>) in das archetype importiert und <i>attributes</i> wird mit der Liste der importierten Attribute gefüllt</li>
+          <li>die Attribut-Werte werden ebenfalls importiert und können dann nachbearbeitet werden.</li>
+        </ul>
+        Hinweis: Beim Import werden die Attribute nicht direkt wieder weitervererbt.
       </li>
       <br>
       <a id="archetype-set-initialize"></a><li>
@@ -1411,9 +1497,8 @@ attr SVG_link_archetype attributes group</pre>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
         In den &lt;relations&gt; werden alle Beziehungen beschrieben die es für
         dieses archetype gibt.<br>
-        Siehe den Abschnitt &uuml;ber
-        <a href="#devspec">Ger&auml;te-Spezifikation</a>
-        f&uuml;r Details der &lt;devspec&gt;.
+        Siehe den Abschnitt über <a href="#devspec">Geräte-Spezifikation</a>
+        für Details zu &lt;devspec&gt;.
       </li>
       <br>
       <a id="archetype-attr-readingList" data-pattern="(reading|set)List"></a><li>
