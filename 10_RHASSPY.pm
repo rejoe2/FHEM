@@ -1517,7 +1517,7 @@ sub disable_msgDialog {
             $devsp = qq($hash->{helper}->{STT}->{config}->{AMADCommBridge});
     }
     if ($enable) { 
-        $devsp ? $devsp .= 'TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+        $devsp ? $devsp .= ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
     my @ntfdevs = devspec2array($devsp);
     if (@ntfdevs) {

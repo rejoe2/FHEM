@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 25556 2022-02-04 +package+acc Beta-User $
+# $Id: 76_msgDialog.pm 25556 2022-02-08 +package+acc Beta-User $
 #
 # copyright ###################################################################
 #
@@ -30,7 +30,6 @@ use warnings;
 use GPUtils qw(GP_Import);
 use JSON (); # qw(decode_json encode_json);
 use Encode;
-#use HttpUtils;
 use utf8;
 use Time::HiRes qw(gettimeofday);
 
@@ -97,16 +96,6 @@ sub Define {
   my $hash = shift // return;
   my $def  = shift // return;
   my ($SELF, $TYPE, $DEF) = split m{[\s]+}x, $def, 3;
-  if (!eval{
-    require JSON;
-    JSON->import();
-    1;
-  } ) { return (
-    "Error loading JSON. Maybe this module is not installed? ".
-    "\nUnder debian (based) system it can be installed using ".
-    "\"apt-get install libjson-perl\""
-    )
-  }
   return $init_done ? firstInit($hash) : InternalTimer(time+1, \&firstInit, $hash );
 }
 
@@ -997,18 +986,20 @@ plot=Waschkeller_washer_SVG
 <a id="msgDialog"></a>
 <h3>msgDialog</h3>
 <ul>
-  Mit msgDialog k&ouml;nnen Dialoge f&uuml;r Sofortnachrichten &uuml;ber
-  TelegramBot, Jabber und yowsup (WhatsApp) definiert werden.<br>
-  Die Kommunikation erfolgt &uuml;ber den msg Befehl. Daher muss ein Ger&auml;t
-  vom Typ <a href="#msgConfig">msgConfig</a> zuerst definiert werden.<br>
-  F&uuml;r jeden Dialog kann festgelegt werden welche Person dazu berechtigt
-  ist. Dazu sind Ger&auml;te vom Typ <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> mit definiertem
-  msgContactPush Attribut erforderlich. Es ist darauf zu achten, dass das
+  Mit msgDialog können Dialoge für Sofortnachrichten über vom Befehl <a href="#MSG">msg</a> 
+  unterstützte Messenger-Dienste wie <a href="#TelegramBot">TelegramBot</a>, 
+  <a href="#Jabber">Jabber</a> oder <a href="#yowsup">yowsup</a> (WhatsApp) 
+  definiert werden.<br>
+  Die Kommunikation erfolgt über den <i>msg</i> Befehl. Daher muss zuerst ein Gerät
+  vom Typ <a href="#msgConfig">msgConfig</a> definiert werden.<br>
+  Für jeden Dialog kann festgelegt werden welche Person dazu berechtigt
+  ist. Dazu sind Geräte vom Typ <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> 
+  mit definiertem msgContactPush Attribut erforderlich. Es ist darauf zu achten, dass das
   Reading fhemMsgRcvPush ein Event erzeugt.<br>
   <br>
   Vorraussetzungen:
   <ul>
-    Das Perl-Modul "JSON" wird ben&ouml;tigt.<br>
+    Das Perl-Modul "JSON" wird benötigt.<br>
     Unter Debian (basierten) System, kann dies mittels
     <code>"apt-get install libjson-perl"</code> installiert werden.
   </ul>
