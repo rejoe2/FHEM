@@ -550,9 +550,10 @@ __END__
 <a id="msgDialog"></a>
 <h3>msgDialog</h3>
 <ul>
-  With msgDialog you can define dialogs for instant messages via TelegramBot, Jabber and yowsup (WhatsApp).<br>
-  The communication uses the msg command. Therefore, a device of type <a href="#msgConfig">msgConfig</a> must be defined first.<br>
-  For each dialog you can define which person is authorized to do so. Devices of the type <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> with a defined msgContactPush attribute are required for this. Make sure that the reading fhemMsgRcvPush generates an event.<br>
+  With msgDialog you can define dialogues for instant messenger services like <a href="#TelegramBot">TelegramBot</a>, 
+  <a href="#Jabber">Jabber</a> or <a href="#yowsup">yowsup</a> (WhatsApp).<br>
+  The communication uses the <a href="#MSG">msg</a> command. Therefore, a device of type <a href="#msgConfig">msgConfig</a> must be defined first.<br>
+  For each dialogue you can specify which person is authorized to use it. Devices of the type <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> with a defined <i>msgContactPush</i> attribute are required for this. Also make sure the reading <i>fhemMsgRcvPush</i> is updated issueing events.<br>
   <br>
   Prerequisites:
   <ul>
@@ -995,7 +996,7 @@ plot=Waschkeller_washer_SVG
   Für jeden Dialog kann festgelegt werden welche Person dazu berechtigt
   ist. Dazu sind Geräte vom Typ <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> 
   mit definiertem msgContactPush Attribut erforderlich. Es ist darauf zu achten, dass das
-  Reading fhemMsgRcvPush ein Event erzeugt.<br>
+  Reading <i>fhemMsgRcvPush</i> ein Event erzeugt.<br>
   <br>
   Vorraussetzungen:
   <ul>
