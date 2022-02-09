@@ -78,6 +78,9 @@ sub archetype_Define {
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Define");
 
   if($hash->{DEF} eq 'derive attributes'){
+    #https://forum.fhem.de/index.php/topic,53402.msg452468.html#msg452468  - 'derive attributes' als spezielle DEF implementieren um den alias nach dem Muster <room>: <description> [<index>] [<suffix>] abzuleiten
+    #https://forum.fhem.de/index.php/topic,53402.msg453030.html#msg453030 - für ein archetype mit der DEF "derive attributes" die Befehle "set <archetype> derive attributes" und "get <archetype> pending attributes" implementieren
+    #- Muster für derive attributes im archetype konfigurierbar machen
     my $derive_attributes = $modules{$TYPE}{derive_attributes};
 
     return(
@@ -424,8 +427,8 @@ sub archetype_Attr {
     if($value =~ /actual_/ && $value !~ /userattr/){
       $value = "userattr $value";
       $_[3] = $value;
-      #$attr{$SELF}{$attribute} = $value;
-      CommandAttr($hash, "$SELF -silent $attribute $value");
+      $attr{$SELF}{$attribute} = $value;
+      #CommandAttr($hash, "$SELF -silent $attribute $value");
     } else {
         my $posAttr = getAllAttr($SELF);
         for my $elem ( split m{ }, $value ) {
@@ -628,7 +631,7 @@ sub archetype_DEFcheck {
 
 sub archetype_define_inheritors {
   #($;$$$) my ($SELF, $init, $check, $relation) = @_;
-  my $SELF     = shift // return; #Beta-User: only first argument seem to be mandatory
+  my $SELF     = shift // return; #Beta-User: only first argument seems to be mandatory
   my $init     = shift;
   my $check    = shift;
   my $relation = shift;
@@ -644,6 +647,8 @@ sub archetype_define_inheritors {
   my @ret;
   my $TYPE = AttrVal($SELF, 'actualTYPE', 'dummy');
   my $initialize = AttrVal($SELF, 'initialize', undef);
+  #Log3($SELF, 3, "$TYPE ($SELF) - call archetype_devspec");
+
   if ( $initialize && $initialize !~ /^\{.*\}$/s ) {
     $initialize =~ s/\"/\\"/g;
     $initialize = "\"$initialize\"";
