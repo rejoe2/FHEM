@@ -1558,10 +1558,10 @@ attr SVG_link_archetype attributes group</pre>
         <code>initialize &lt;initialize&gt;</code><br>
         &lt;initialize&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden.<br>
-        Der &lt;Text&gt; oder die R&uuml;ckgabe vom  {perl code} muss eine
+        Der &lt;Text&gt; oder die Rückgabe vom {perl code} muss eine
         durch Semikolon (;) getrennte Liste von FHEM-Befehlen sein. Mit diesen
         werden die Erben initialisiert, wenn sie definiert werden bzw. der 
-        Befehl <a href="#archetype-attr-initialize">initialize</a> angewandt wird.
+        Befehl <a href="#archetype-set-initialize">initialize</a> angewandt wird.
       </li>
       <br>
       <a id="archetype-attr-metaDEF"></a><li>
