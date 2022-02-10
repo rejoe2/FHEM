@@ -172,26 +172,33 @@ sub archetype_Set { #($@)
     archetype_derive_attributes($SELF);
 
     Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
+    return;
   }
-  elsif($argument eq "define" && $value eq "inheritors"){
+
+  if($argument eq "define" && $value eq "inheritors"){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     archetype_define_inheritors($SELF);
 
     Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
+    return;
   }
-  elsif($argument eq "inheritance"){
+
+  if($argument eq "inheritance"){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument inheritors");
 
     archetype_inheritance($SELF);
+    return;
   }
-  elsif($argument eq "initialize" && $value eq "inheritors"){
+
+  if($argument eq "initialize" && $value eq "inheritors"){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     archetype_define_inheritors($SELF, $argument);
 
     return Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
   }
+
   if($argument eq "raw" && $value){
     (my $command, $value) = split m{[\s]+}x, $value, 2;
 
@@ -224,6 +231,7 @@ sub archetype_Set { #($@)
         my $cont = AttrVal($value, $import, undef);
         next if !$cont;
         push @newlist, $import;
+        $cont = $cont =~ m{\A\{.*\}\z}xms ? "undef,Perl:$cont" : "undef:$cont";
         CommandAttr(undef, "$SELF actual_$import $cont");
     }
     if (!$ownlist) {
@@ -234,7 +242,7 @@ sub archetype_Set { #($@)
     return;
   }
   
-  else{
+  #else{
     my @readingList = split(/[\s]+/, AttrVal($SELF, "readingList", ""));
 
     if( @readingList && grep { m/\b$argument\b/ } @readingList ){
@@ -247,7 +255,7 @@ sub archetype_Set { #($@)
 
       readingsSingleUpdate($hash, "state", "$argument $value", 1);
     }
-  }
+  #}
 
   return;
 }
@@ -318,16 +326,16 @@ sub archetype_Get {
         @ret = archetype_derive_attributes($SELF, 1);
       }
       else{
-        for (archetype_devspec($SELF)){
+        for my $ds (archetype_devspec($SELF)){
           for my $attribute (@attributes){
-            my $desired =
-              AttrVal(
-                $SELF, "actual_$attribute", AttrVal($SELF, $attribute, "")
-              );
+            my $desired = archetype_get_desired($SELF, $attribute, $ds);
+              #AttrVal(
+              #  $SELF, "actual_$attribute", AttrVal($SELF, $attribute, "")
+              #);
 
-            next if($desired eq "");
+            next if !$desired || $desired eq '';
 
-            push(@ret, archetype_attrCheck($SELF, $_, $attribute, $desired, 1));
+            push @ret, archetype_attrCheck($SELF, $ds, $attribute, $desired, 1);
           }
         }
       }
@@ -338,10 +346,32 @@ sub archetype_Get {
 
     Log3($SELF, 3, "$TYPE ($SELF) - request $argument $value done");
 
-    return @ret ? join q{\n}, @ret : "no $value $argument";
+    return @ret ? join "\n", @ret : "no $value $argument"; #soft form required
   }
   return "Unknown argument $value, choose one of "
-         . join q{ }, (split m{,}x, (split m{:}x, $archetype_gets{$argument})[1]);
+         . join q{ }, split m{,}x, (split m{:}x, $archetype_gets{$argument})[1];
+}
+
+sub archetype_get_desired {
+    my $SELF      = shift // return; #Beta-User: only first argument seem to be mandatory
+    my $attribute = shift // return;
+    my $devspec   = shift;
+
+    my $desired = AttrVal($devspec, "actual_$attribute", undef); #compability layer
+    return $desired if $desired;
+
+    $desired = AttrVal( $SELF, "actual_$attribute", AttrVal($SELF, $attribute, ''));
+
+    my @filterattr = grep { $_ =~ m{\Aactual_${attribute}_}x } split m{\s+}x, getAllAttr($SELF);
+    return $desired if !@filterattr;
+    for my $tocheck (@filterattr) {
+        my ($filter, $desired2) = split m{\s+}, AttrVal($SELF,$tocheck,'');
+        Debug("FILTER: $filter");
+        next if !devspec2array("$devspec:FILTER=$filter");
+        Debug("FILTERed: $desired2");
+        return $desired2;
+    }
+    return $desired;
 }
 
 sub archetype_Attr {
@@ -566,7 +596,8 @@ sub archetype_attrCheck {
 
   return if AttrVal($name, 'attributesExclude', '') =~ m{$attribute};
 
-  if ( AttrVal($SELF, "actual_$attribute", undef ) ) {
+  #if ( AttrVal($SELF, "actual_$attribute", undef ) ) {
+  if ( getAllAttr($SELF) =~ m{\bactual_$attribute(?:_.+|[\b:\s]|\z)}xms ) {
     my %specials = (
          '$SELF'      => $SELF,
          '$name'      => $name,
@@ -592,6 +623,9 @@ sub archetype_attrCheck {
   }
   elsif( $desired =~ m{\Aundef} ){
     return if AttrVal($name, $attribute, undef);
+    $desired = ( split m{:}x, $desired, 2)[1];
+  }
+  elsif( $desired =~ m{\APerl:} ){
     $desired = ( split m{:}x, $desired, 2)[1];
   }
 
@@ -729,21 +763,22 @@ sub archetype_derive_attributes {
     : sort split m{[\s]+}xms, AttrVal($SELF, 'attributes', '')
   ;
 
-  for (@devspecs){
+  for my $ds (@devspecs){
     for my $attribute (@attributes){
-      my $desired = AttrVal(
-        $_, "actual_$attribute", AttrVal($SELF, "actual_$attribute", "")
-      );
+      my $desired = archetype_get_desired($SELF, $attribute, $ds);
+      #AttrVal(
+      #  $_, "actual_$attribute", AttrVal($SELF, "actual_$attribute", "")
+      #);
 
-      next if($desired eq "");
+      next if $desired eq '';
 
       if($check){
-        push(@ret, archetype_attrCheck($SELF, $_, $attribute, $desired, 1));
+        push(@ret, archetype_attrCheck($SELF, $ds, $attribute, $desired, 1));
 
         next;
       }
 
-      archetype_attrCheck($SELF, $_, $attribute, $desired);
+      archetype_attrCheck($SELF, $ds, $attribute, $desired);
     }
   }
 
@@ -798,6 +833,7 @@ sub archetype_devspec {
 
   my @devspec;
   push @devspec, devspec2array($_) for (split m{[\s]+}x, $devspecs);
+
   my %devspec = map{$_, 1}@devspec;
   delete $devspec{$SELF};
   @devspec = sort keys %devspec;
@@ -853,12 +889,14 @@ sub archetype_inheritance { #($;$$)
   my $TYPE = $hash->{TYPE};
 
   for my $attribute ( split m{[\s]+}xms, $attrlist ){
-    my $value =
-      AttrVal($SELF, "actual_$attribute", AttrVal($SELF, $attribute, ""));
+    for my $ds (@devices) {
+        my $value = archetype_get_desired($SELF, $attribute, $ds);
+        #AttrVal($SELF, "actual_$attribute", AttrVal($SELF, $attribute, ""));
 
-    next if($value eq "");
+        next if !$value || $value eq '';
 
-    archetype_attrCheck($SELF, $_, $attribute, $value) for (@devices);
+        archetype_attrCheck($SELF, $ds, $attribute, $value); #    for (@devices);
+    }
   }
 
   Log3($SELF, 3, "$TYPE ($SELF) - inheritance inheritors done")
