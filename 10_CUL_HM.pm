@@ -1,13 +1,13 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-01-21 Beta-User $
+# $Id: 10_CUL_HM.pm 25298 2022-02-10 frank $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
 # https://forum.fhem.de/index.php/topic,124090.msg1186368.html#msg1186368
 # https://forum.fhem.de/index.php/topic,121139.msg1182503.html#msg1182503
-
+# https://forum.fhem.de/index.php/topic,126118.msg1207202.html#msg1207202
 
 package main;
 
@@ -2185,6 +2185,7 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_DumpProtocol("RCV",$iohash,$mh{len},$mh{mNo},$mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p});
 
   #----------start valid messages parsing ---------
+  my $oldTry = ($mh{devH}->{helper}{prt}{try})? 1: 0;# frank: save old setting
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
   if(!defined $mh{md} or $mh{md} eq '' or $mh{md} eq "unknown"){
     $mh{devN} = '' if (!defined($mh{devN}));
@@ -2202,6 +2203,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
+    delete $mh{devH}->{helper}{prt}{try} if($oldTry && $mh{devH}->{helper}{prt}{try});# frank: delete if the try cmd is successful
     push @evtEt,[$mh{devH},1,""];
   }
   elsif($parse eq "NACK"){
@@ -8520,8 +8522,7 @@ sub CUL_HM_respPendTout($) {
     elsif ($pHash->{try}){         #send try failed - revert, wait for wakeup
       # device might still be busy with writing flash or similar
       # we have to wait for next wakeup
-      unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6))
-          if (substr($pHash->{rspWait}{cmd},8,2) ne "58"); #noansi: do not repeat TC duty cycle => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+      unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6));
       delete $pHash->{try};
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
       CUL_HM_protState($hash,"CMDs_pending");
