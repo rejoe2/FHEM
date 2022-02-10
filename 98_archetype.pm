@@ -1422,7 +1422,7 @@ attr SVG_link_archetype attributes group</pre>
         <ul>
           <li>Importiert alle Attribute vom ausgewählten Device, die im <i>archetype</i> unter <i>attributes</i> gelistet sind.</li>
           <li>Ist <i>attributes</i> nicht gesetzt, werden alle <u>im genannten Device gesetzten</u> Attribute (als <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>) in das archetype importiert und <i>attributes</i> wird mit der Liste der importierten Attribute gefüllt</li>
-          <li>die Attribut-Werte werden ebenfalls importiert und können dann nachbearbeitet werden.</li>
+          <li>die Attribut-Werte werden ebenfalls importiert und können dann nachbearbeitet werden. Sie werden dabei als nicht zwingende Attributwerte (mit "undef"-Präfix) übernommen.</li>
         </ul>
         Hinweis: Beim Import werden die Attribute nicht direkt wieder weitervererbt.
       </li>
@@ -1490,6 +1490,11 @@ attr SVG_link_archetype attributes group</pre>
           Wird kein Trennzeichen angegeben wird das Leerzeichen als
           Trennzeichen verwendet.
         </li>
+        <a id="archetype-attr-Perl"></a><li>
+          <code>attr archetype &lt;attribute&gt; Perl:&lt;...&gt;</code><br>
+          <code>attr archetype &lt;attribute&gt; undef,Perl:&lt;...&gt;</code><br>
+          Wird <code>Perl:</code> (mit) vorangestellt wird der folgende Perl-Code nicht zur Ermittlung des Attributwerts vorab ausgeführt, sondern direkt als Attributwert übernommen (z.B. für <i>devStateIcon</i> oder <i>stateFormat</i>).
+        </li><br>
       </ul>
       <br>
       <a id="archetype-attr-actual_attribute" data-pattern="actual_.*"></a><li>
