@@ -366,9 +366,9 @@ sub archetype_get_desired {
     return $desired if !@filterattr;
     for my $tocheck (@filterattr) {
         my ($filter, $desired2) = split m{\s+}, AttrVal($SELF,$tocheck,'');
-        Debug("FILTER: $filter");
+        #Debug("FILTER: $filter");
         next if !devspec2array("$devspec:FILTER=$filter");
-        Debug("FILTERed: $desired2");
+        #Debug("FILTERed: $desired2");
         return $desired2;
     }
     return $desired;
@@ -552,26 +552,38 @@ sub archetype_AnalyzeCommand {
     Log3($SELF, 5, "$TYPE ($SELF) - call archetype_AnalyzeCommand");
   }
 
+  my %specials = (
+         '%name'     => $name,
+         '%room'     => $room,
+         '%relation' => $relation
+  );
+  $specials{'%SELF'} = $SELF if $SELF;
+  $specials{'%TYPE'} = $TYPE if $TYPE;
+
   # Falls es sich nicht um einen durch {} gekennzeichneten Perl Befehl
   # handelt, werden alle Anfuehrungszeichen maskiert und der Befehl in
   # Anfuehrungszeichen gesetzt um eine korrekte Auswertung zu gewaehrleisten.
   if ($cmd !~ m/^\{.*\}$/){
     $cmd =~ s/"/\\"/g;
-    $cmd = "\"$cmd\""
+    $cmd = "\"$cmd\"";
+    #Debug("no Perl in aAC, starting with $cmd");
+    #$cmd  = EvalSpecials($cmd, %specials);
+    $cmd = eval($cmd); #seems we don't have much other opportunities for simple text replacements...?
+    #Debug("evaluated to $cmd");
+    return $cmd;
   }
 
+
+  #Debug("cmd in aAC oiginally was $cmd");
   #$cmd = eval($cmd);
-  my %specials = (
-         '$name'     => $name,
-         '$room'     => $room,
-         '$relation' => $relation
-  );
-  $specials{'$SELF'} = $SELF if $SELF;
-  $specials{'$TYPE'} = $TYPE if $TYPE;
-
+  $cmd = "$cmd";
+  #Debug("cmd in aAC was $cmd");
   $cmd  = EvalSpecials($cmd, %specials);
+  #Debug("cmd now is $cmd");
 
-  return AnalyzeCommandChain( $hash, $cmd );
+  $cmd = AnalyzeCommandChain( $hash, $cmd );
+  #Debug("cmd via ACC now is $cmd");
+  return $cmd;
   # CMD ausführen
   #$cmd = eval($cmd);
 
@@ -653,12 +665,11 @@ sub archetype_DEFcheck {
   my $type     = shift // return; 
   my $expected = shift;
 
-  my $hash = $defs{$name} // return;
-
   if($expected && $expected ne InternalVal($name, "DEF", " ")){
     CommandDefMod(undef, "$name $type $expected");
-  }else{
+  } else {
     CommandDefMod(undef, "$name $type") if !IsDevice($name, $type);
+    return 1;
   }
   return;
 }
@@ -674,9 +685,13 @@ sub archetype_define_inheritors {
 
   return if IsDisabled($SELF);
 
-  my @relations = $relation ? $relation : archetype_devspec($SELF, 'relations');
-
-  return if !@relations;
+  my @relations;
+  if ( $relation ) {
+      $relations[0] = $relation;
+  } else {
+      @relations = archetype_devspec($SELF, 'relations');
+      return if !@relations;
+  }
 
   my @ret;
   my $TYPE = AttrVal($SELF, 'actualTYPE', 'dummy');
@@ -688,30 +703,33 @@ sub archetype_define_inheritors {
     $initialize = "\"$initialize\"";
   }
 
-  for my $relation (@relations){
+  for my $relative (@relations){
     my @rooms;
-    push @rooms, AttrVal($relation, 'room', 'Unsorted');
+    push @rooms, AttrVal($relative, 'room', 'Unsorted');
     @rooms = split q{,}, $rooms[0] if AttrVal($SELF, 'splitRooms', 0);
     for my $room ( @rooms ) {
       my $name = archetype_AnalyzeCommand(
-        AttrVal($SELF, "metaNAME", ""), undef, $room, $relation, $SELF
+        AttrVal($SELF, 'metaNAME', ''), undef, $room, $relative, $SELF
       );
+      next if !$name;
       my $DEF = archetype_AnalyzeCommand(
-        AttrVal($SELF, "metaDEF", " "), $name, $room, $relation, $SELF
+        AttrVal($SELF, 'metaDEF', ' '), $name, $room, $relative, $SELF
       );
       my $defined = IsDevice($name, $TYPE) ? 1 : 0;
 
-      if ( !$defined || InternalVal($name, 'DEF', '') eq $DEF) {
+      if ( !$defined || InternalVal($name, 'DEF', '') ne $DEF) {
+      #unless($defined && InternalVal($name, "DEF", " ") eq $DEF){
         if($check){
           push @ret, $name;
           next;
         }
         if (!$init){
-          archetype_DEFcheck($name, $TYPE, $DEF);
+          archetype_DEFcheck($name, $TYPE, $DEF); #my $new = 
+          #archetype_inheritance($SELF, $name) if $new; #new!
           addToDevAttrList($name, 'defined_by', 'archetype');
-          #$attr{$name}{defined_by} = $SELF;
-          CommandAttr($hash, "$name -silent defined_by $SELF");
+          CommandAttr($hash, "$name defined_by $SELF");
         }
+
       }
 
       next if $check;
@@ -721,15 +739,19 @@ sub archetype_define_inheritors {
         && IsDevice($name, $TYPE)
         && (!$defined || $init)
         ) {
+            $initialize = eval($initialize); #for simple text replacement....
+            #Debug("init after eval replacement: $initialize");
             #fhem(eval($initialize))
             my %specials = (
-                '$SELF'     => $SELF,
-                '$name'     => $name,
-                '$TYPE'     => $TYPE,
-                '$room'     => $room,
-                '$relation' => $relation
+                '%SELF'     => $SELF,
+                '%name'     => $name,
+                '%TYPE'     => $TYPE,
+                '%room'     => $room,
+                '%relation' => $relative
                 );
             $initialize  = EvalSpecials($initialize, %specials);
+            #Debug("init now is: $initialize");
+      
             # CMD ausführen
             AnalyzeCommandChain( $hash, $initialize );
         }
@@ -860,7 +882,7 @@ sub archetype_evalSpecials {
         my $AttrVal = AttrVal($name, $_, undef);
         $AttrVal = archetype_AnalyzeCommand(
           $AttrVal, $name, AttrVal($name, "room", undef), undef, undef
-        ) if($AttrVal);
+        ) if $AttrVal;
 
         if($AttrVal){
           $part =~ s/\Q%$special%\E/$AttrVal/;
