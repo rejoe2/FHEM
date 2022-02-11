@@ -611,10 +611,10 @@ sub archetype_attrCheck {
   #if ( AttrVal($SELF, "actual_$attribute", undef ) ) {
   if ( getAllAttr($SELF) =~ m{\bactual_$attribute(?:_.+|[\b:\s]|\z)}xms ) {
     my %specials = (
-         '$SELF'      => $SELF,
-         '$name'      => $name,
-         '$TYPE'      => $TYPE,
-         '$attribute' => $attribute
+         '%SELF'      => $SELF,
+         '%name'      => $name,
+         '%TYPE'      => $TYPE,
+         '%attribute' => $attribute
     );
 
     #$desired = eval($desired) if $desired =~ m{\A\{.*\}\z};
