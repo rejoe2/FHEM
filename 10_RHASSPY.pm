@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-01-24 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-14 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -310,7 +310,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble|autoTraining)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -331,7 +331,7 @@ sub Define {
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
-    for my $key (qw( experimental handleHotword sessionTimeout Babble)) {
+    for my $key (qw( experimental handleHotword sessionTimeout Babble autoTraining)) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -353,7 +353,7 @@ sub firstInit {
     my $hash = shift // return;
 
     my $name = $hash->{NAME};
-    notifyRegexpChanged($hash,'',1);
+    notifyRegexpChanged($hash,'',1) if !$hash->{autoTraining};
 
     # IO
     AssignIoPort($hash);
@@ -418,8 +418,8 @@ sub initialize_Language {
     for my $key (keys %{$slots}) {
         updateSingleSlot($hash, $key, $slots->{$key});
     }
-
-    return;
+    return if !$hash->{autoTraining};
+    return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0);
 }
 
 sub initialize_prefix {
@@ -568,6 +568,7 @@ sub Set {
         if ($values[0] eq 'devicemap') {
             initialize_devicemap($hash);
             $hash->{'.needTraining'} = 1;
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             return updateSlots($hash);
         }
         if ($values[0] eq 'devicemap_only') {
@@ -575,6 +576,7 @@ sub Set {
         }
         if ($values[0] eq 'slots') {
             $hash->{'.needTraining'} = 1;
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             return updateSlots($hash);
         }
         if ($values[0] eq 'slots_no_training') {
@@ -587,6 +589,7 @@ sub Set {
         if ($values[0] eq 'all') {
             initialize_Language($hash, $hash->{LANGUAGE});
             initialize_devicemap($hash);
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             $hash->{'.needTraining'} = 1;
             updateSlots($hash);
             return fetchIntents($hash);
@@ -926,7 +929,7 @@ sub initialize_devicemap {
 
     # when called with just one keyword, devspec2array may return the keyword, even if the device doesn't exist...
     return if !@devices;
-    
+
     for (@devices) {
         _analyze_genDevType($hash, $_) if $hash->{useGenericAttrs};
         _analyze_rhassypAttr($hash, $_);
@@ -935,6 +938,13 @@ sub initialize_devicemap {
     return;
 }
 
+sub RHASSPY_autoTraining {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+
+    return updateSlots($hash, 1);
+}
 
 sub _analyze_rhassypAttr {
     my $hash   = shift // return;
@@ -1519,6 +1529,10 @@ sub disable_msgDialog {
     if ($enable) { 
         $devsp ? $devsp .= ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
+    if ($hash->{autoTraining}) {
+        $devsp ? $devsp .= ',global' : 'global';
+    }
+
     my @ntfdevs = devspec2array($devsp);
     if (@ntfdevs) {
         setNotifyDev($hash,$devsp);
@@ -1563,7 +1577,7 @@ sub RHASSPY_DialogTimeout {
     my $data     = shift // $hash->{helper}{'.delayed'}->{$identiy};
     my $siteId = $data->{siteId};
 
-    deleteSingleRegIntTimer($identiy, $hash, 1); 
+    deleteSingleRegIntTimer($identiy, $hash, 1);
 
     respond( $hash, $data, getResponse( $hash, 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identiy};
@@ -2475,6 +2489,72 @@ sub Notify {
 
     return notifySTT($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADCommBridge';
 
+    if ( $name eq 'global' ) {
+        return if !$hash->{autoTraining};
+
+        my $events = $dev_hash->{CHANGED};
+        return if !$events;
+        my @devs = devspec2array("$hash->{devspec}");
+        for my $evnt(@{$events}){
+            next if $evnt !~ m{\A(?:ATTR|DELETEATTR|DELETED|RENAMED)\s+(\w+)(?:\s+)(.*)};
+            my $dev = $1;
+            my $rest = $2;
+            next if !grep { $_ eq $dev } @devs;
+
+            return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0) if $evnt =~ m{\A(?:DELETED|RENAMED)\s+\w+};
+            return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0) if $rest =~ m{\A(alias|$hash->{prefix}|genericDeviceType|(alexa|siri|gassistant)Name|group)}xms;
+        }
+        return;
+    }
+
+
+=pod
+        if ($values[0] eq 'all') {
+            initialize_Language($hash, $hash->{LANGUAGE});
+            initialize_devicemap($hash);
+            $hash->{'.needTraining'} = 1;
+            updateSlots($hash);
+            return fetchIntents($hash);
+            
+                if ( $attribute eq 'rhasspyShortcuts' ) {
+        for ( keys %{ $hash->{helper}{shortcuts} } ) {
+            delete $hash->{helper}{shortcuts}{$_};
+        }
+        if ($command eq 'set') {
+            return init_shortcuts($hash, $value); 
+        }
+    }
+
+    if ( $attribute eq 'rhasspyIntents' ) {
+        for ( keys %{ $hash->{helper}{custom} } ) {
+            delete $hash->{helper}{custom}{$_};
+        }
+        if ($command eq 'set') {
+            return init_custom_intents($hash, $value); 
+        }
+    }
+
+    if ( $attribute eq 'rhasspyTweaks' ) {
+        for ( keys %{ $hash->{helper}{tweaks} } ) {
+            delete $hash->{helper}{tweaks}{$_};
+        }
+        if ($command eq 'set') {
+            return initialize_rhasspyTweaks($hash, $value) if $init_done;
+        } 
+    }
+
+
+    if ( $attribute eq 'languageFile' ) {
+        if ($command ne 'set') {
+            delete $hash->{CONFIGFILE};
+            delete $attr{$name}{languageFile};
+            delete $hash->{helper}{lng};
+            $value = undef;
+        }
+        return initialize_Language($hash, $hash->{LANGUAGE}, $value);
+    }
+=cut
+
     return if !ReadingsVal($name,'enableMsgDialog',1) || !defined $hash->{helper}->{msgDialog};
     my @events = @{deviceEvents($dev_hash, 1)};
 
@@ -3167,10 +3247,13 @@ sub msgDialog {
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub updateSlots {
-    my $hash = shift // return;
+    my $hash      = shift // return;
+    my $checkdiff = shift;
+
     my $language = $hash->{LANGUAGE};
     my $fhemId   = $hash->{fhemId};
     my $method   = q{POST};
+    my $changed;
 
     initialize_devicemap($hash);
     my $tweaks = $hash->{helper}{tweaks}->{updateSlots};
@@ -3211,10 +3294,15 @@ sub updateSlots {
         $deviceData = $deviceData . '"}';
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
         _sendToApi($hash, $url, $method, $deviceData);
+        $changed = 1 if ReadingsVal($hash->{NAME},'.Shortcuts.ini','') ne $deviceData;
+        readingsSingleUpdate($hash,'.Shortcuts.ini',$deviceData,0);
     }
 
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
-    return if !@devices && !@rooms && !@channels && !@types && !@groups;
+    if ( !@devices && !@rooms && !@channels && !@types && !@groups ) {
+        $hash->{'.needTraining'} = 1 if $checkdiff && $changed && $hash->{autoTraining};
+        return;
+    }
 
     my $json;
     $deviceData = {};
@@ -3285,6 +3373,9 @@ sub updateSlots {
 
     Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data ($language): $json");
 
+    $changed = 1 if ReadingsVal($hash->{NAME},'.slots','') ne $json;
+    readingsSingleUpdate($hash,'.slots',$json,0);
+    $hash->{'.needTraining'} = 1 if $checkdiff && $changed && $hash->{autoTraining};
     _sendToApi($hash, $url, $method, $json);
     return;
 }
@@ -3414,7 +3505,7 @@ sub RHASSPY_ParseHttpResponse {
 
     if ( defined $urls->{$url} ) {
         readingsBulkUpdate($hash, $urls->{$url}, $data);
-        if ( $urls->{$url} eq 'updateSlots' && $hash->{'.needTraining'} ) {
+        if ( ( $urls->{$url} eq 'updateSlots' || $urls->{$url} eq 'updateSentences' ) && $hash->{'.needTraining'} ) {
             trainRhasspy($hash);
             delete $hash->{'.needTraining'};
         }
