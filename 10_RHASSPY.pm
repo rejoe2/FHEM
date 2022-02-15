@@ -44,6 +44,7 @@ use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
 #use Data::Dumper;
 use FHEM::Core::Timer::Register qw(:ALL);
+#use FHEM::Meta;
 
 sub ::RHASSPY_Initialize { goto &Initialize }
 
@@ -260,6 +261,7 @@ BEGIN {
     makeReadingName
     FileRead
     getAllSets
+    evalStateFormat
     notifyRegexpChanged setNotifyDev
     deviceEvents
     trim
