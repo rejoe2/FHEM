@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-02-10 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-02-15 Beta-User $
 #
 # copyright ###################################################################
 #
@@ -48,12 +48,10 @@ sub archetype_Initialize {
     . "deleteAttributes:0,1 "
     . "disable:0,1 "
     . "initialize:textField-long "
-    . "metaDEF:textField-long "
-    . "metaNAME:textField-long "
-    . "readingList "
+    . "metaDEF:textField-long metaNAME:textField-long "
+    . "readingList setList:textField-long "
     . "relations "
-    . "setList:textField-long "
-    . "splitRooms:0,1 "
+    . "splitRooms:0,1 useEval:0,1"
     . $readingFnAttributes
   ;
 
@@ -568,8 +566,12 @@ sub archetype_AnalyzeCommand {
     $cmd = "\"$cmd\"";
     #Debug("no Perl in aAC, starting with $cmd");
     #$cmd  = EvalSpecials($cmd, %specials);
-    $cmd = eval($cmd); #seems we don't have much other opportunities for simple text replacements...?
+    $cmd = eval($cmd) if AttrVal($SELF,'useEval',0); #seems we don't have much other opportunities for simple text replacements...?
     #Debug("evaluated to $cmd");
+    for my $special ( sort { length $b <=> length $a } keys %specials) {
+        last if AttrVal($SELF,'useEval',0);
+        $cmd =~ s/\$$special/$specials{$special}/g;
+    }
     return $cmd;
   }
 
@@ -894,9 +896,11 @@ sub archetype_evalSpecials {
 
     ($part, my $optional) = ($part =~ m/([^\]]+)(\])?$/);
 
-    return unless($optional || $part !~ m/%\S+%/);
+    #return unless($optional || $part !~ m/%\S+%/);
+    return if !$optional && $part =~ m/%\S+%/;
 
-    $value .= $part unless($optional && $part =~ m/%\S+%/);
+    #$value .= $part unless($optional && $part =~ m/%\S+%/);
+    $value .= $part if !$optional || $part !~ m/%\S+%/;
   }
 
   return $value;

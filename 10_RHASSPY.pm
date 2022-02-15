@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-02-14 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-15 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -33,7 +33,8 @@ use strict;
 use warnings;
 use Carp qw(carp);
 use GPUtils qw(GP_Import);
-use JSON qw(decode_json);
+#use JSON qw(decode_json);
+use JSON (); # qw(decode_json encode_json);
 use Encode;
 use HttpUtils;
 use utf8;
@@ -318,7 +319,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.12';
+    $hash->{MODULE_VERSION} = '0.5.13';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -401,8 +402,9 @@ sub initialize_Language {
     return $ret if $ret;
 
     my $decoded;
-    if ( !eval { $decoded  = decode_json(encode($cp,$content)) ; 1 } ) {
-        Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg:  $@");
+    #if ( !eval { $decoded  = decode_json(encode($cp,$content)) ; 1 } ) {
+    if ( !eval { $decoded  = JSON->new->decode($content) ; 1 } ) {
+        Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg: $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
 
@@ -2406,7 +2408,8 @@ sub parseJSONPayload {
 
     # JSON Decode und Fehlerüberprüfung
     my $decoded;
-    if ( !eval { $decoded  = decode_json(encode($cp,$json)) ; 1 } ) {
+    #if ( !eval { $decoded  = decode_json(encode($cp,$json)) ; 1 } ) {
+    if ( !eval { $decoded  = JSON->new->decode($json) ; 1 } ) {
         return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
     }
 
@@ -3515,7 +3518,8 @@ sub RHASSPY_ParseHttpResponse {
     }
     elsif ( $url =~ m{api/profile}ix ) {
         my $ref; 
-        if ( !eval { $ref = decode_json($data) ; 1 } ) {
+        #if ( !eval { $ref = decode_json($data) ; 1 } ) {
+        if ( !eval { $ref = JSON->new->decode($data) ; 1 } ) {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
@@ -3523,9 +3527,9 @@ sub RHASSPY_ParseHttpResponse {
         for (keys %{$ref}) {
             next if !defined $ref->{$_}{satellite_site_ids};
             if ($siteIds) {
-                $siteIds .= ',' . encode($cp,$ref->{$_}{satellite_site_ids});
+                $siteIds .= ',' . $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             } else {
-                $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
+                $siteIds = $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             }
         }
         if ( $siteIds ) {
@@ -3535,11 +3539,12 @@ sub RHASSPY_ParseHttpResponse {
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 
-        if ( !eval { $refb = decode_json($data) ; 1 } ) {
+        #if ( !eval { $refb = decode_json($data) ; 1 } ) {
+        if ( !eval { $refb = JSON->new->decode($data) ; 1 } ) {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
-        my $intents = encode($cp,join q{,}, keys %{$refb});
+        my $intents = join q{,}, keys %{$refb}; #encode($cp,join q{,}, keys %{$refb});
         readingsBulkUpdate($hash, 'intents', $intents);
         configure_DialogManager($hash);
     }
