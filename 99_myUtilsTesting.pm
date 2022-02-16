@@ -174,6 +174,10 @@ sub genericDeviceType2appOption {
 	$str2 = AttrVal($device,'room','unknown');
 	$str2 = (split m{,}, $str2)[0];
     $str .= $str2;
+	my ($arr, $extras) = parseParams(AttrVal($device,'appOptions2',''));
+	for (keys %{$extras}) {
+		$str .= qq(", "$_": "$extras->{$_});
+	}
 	$str .= '" }';
 	return $str;
 }
