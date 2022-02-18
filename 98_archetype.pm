@@ -1587,7 +1587,7 @@ attr SVG_link_archetype attributes group</pre>
         &lt;value&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden.<br>
         Wird das Attribut &lt;attribute&gt; vererbt, ersetzt die Rückgabe
-        des actual_&lt;attribute&gt; Wert des Attributes.<br>
+        des actual_&lt;attribute&gt; den Wert des Attributes.<br>
         Bei dem archetype mit der DEF "derive attributes" können Muster
         definiert werden.<br>
         Beispiel:
@@ -1598,7 +1598,26 @@ attr SVG_link_archetype attributes group</pre>
         lässt sich durch | erreichen. Ist ein Ausdruck in [] eingeschlossen ist
         er optional.<br>
         Die Ausdrücke <i>captionRoom</i>, <i>description</i>, <i>index</i> und <i>suffix</i> sind hierbei
-        durch <i>addToAttrList</i> hinzugefügte (globale) Attribute.<br>
+        durch <i>addToAttrList</i> hinzugefügte (globale) Attribute.<br><br>
+        <b>Weitere Hinweise und Optionen</b>
+        <ul>
+          <li><i>keine Rückgabe</i></li>
+            Ist in einem Attribut (z.B. nach der Evaluierung einer Perl-Funktion) kein Inhalt definiert, 
+            wird der Wert des Attributs ohne "actual_"-Präfix verwendet, ist auch dieser leer bzw. nicht
+            vorhanden, wird keine Änderung vorgenommen.
+          <li><i>Filterungen</i></li>
+            Duch weitere Zusätze zum Attributnamen können zusätzliche Filterungen realisiert werden. 
+            Dies erfolgt in der Form <code>actual_&lt;attribute&gt;_&lt;index&gt; &lt;FILTER&gt;
+            &lt;value&gt;</code>. Dies kann genutzt werden, um z.B. Geräte mit mehreren Kanälen oder
+            ähnliche Modelle über ein gemeinsames archetype abzubilden. Falls der angegebene Filter paßt, wird ein eventuell vorhandenes gleichnamiges <i>actual_&lt;attribute&gt;</i> nicht ausgewertet, selbst, wenn ggf. die Evaluierung von Perl-Code keinen Rückgabewert ergibt.<br>
+            Beispiel:<br>
+            <code>define archHM_CC archetype TYPE=CUL_HM:FILTER=model=(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)<br>
+            attr archHM_CC attributes devStateIcon icon<br>
+            attr archHM_CC actual_devStateIcon_RT model=HM-CC-RT-DN:FILTER=chanNo=04 Perl:{devStateIcon_Clima($name)}<br>
+            attr archHM_CC actual_devStateIcon_WT model=HM-TC-IT-WM-W-EU:FILTER=chanNo=02 Perl:{devStateIcon_Clima($name)}<br>
+            attr archHM_CC actual_icon hm-cc-rt-dn<br>
+            attr archHM_CC actual_icon_2 model=HM-TC-IT-WM-W-EU hm-tc-it-wm-w-eu</code>
+        </ul>
       </li>
       <br>
       <a id="archetype-attr-actualTYPE"></a><li>

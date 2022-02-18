@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 25683 2022-02-15 07:12:15Z Beta-User $
+# $Id: mqtt2.template 25692 2022-02-16 18:18:37Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -135,9 +135,8 @@ attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
   BASE_TOPIC/([A-Za-z0-9._]+)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
-  devicelist:noArg log $\DEVICETOPIC/bridge/config/devices/get\
-  networkmap_raw:noArg raw $\DEVICETOPIC/bridge/networkmap raw\
-  networkmap_graphviz:noArg graphviz $\DEVICETOPIC/bridge/networkmap graphviz
+  networkmap_raw:noArg raw $\DEVICETOPIC/bridge/request/networkmap raw\
+  networkmap_graphviz:noArg graphviz $\DEVICETOPIC/bridge/request/networkmap graphviz
 attr DEVICE readingList\
   $\DEVICETOPIC/bridge/state:.* state\
   $\DEVICETOPIC/bridge/config/devices:.* {}\
@@ -148,9 +147,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/log:.*\"type\".\"devices\".\"message\".* devices\
   $\DEVICETOPIC/bridge/log:.* log\
   $\DEVICETOPIC/bridge/logging:.* { json2nameValue($EVENT,'log_') }\
-  $\DEVICETOPIC/bridge/networkmap:.* {}\
-  $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
-  $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
+  $\DEVICETOPIC/bridge/response/networkmap:.* { my $type = $EVENT =~ m/.*,"type":"(raw|graphviz)",.*/ ? $1 : 'networkmap'; $EVENT =~ m/{"data":\{.*"value":"?(.*[^"])"?\},"status":"ok"\}/ ? { $type=>$1 } : {} }\
   $\DEVICETOPIC/bridge/devices:.* devices\
   $\DEVICETOPIC/bridge/info:.* info\
   $\DEVICETOPIC/bridge/groups:.* groups\
@@ -181,7 +178,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20220114
+setreading DEVICE attrTemplateVersion 20220218
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -1620,7 +1617,7 @@ attr DEVICE readingList \
    STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
    STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}\
    STATTOPIC/SHUTTER1:.* state
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','Offline') eq 'Offline' ? 'rot' : 'gruen'; $onl = FW_makeImage("10px-kreis-$onl"); my $ip = ReadingsVal($name,'IPAddress','none'); my $pct = maxNum(int((109 - ReadingsNum($name,'pct',0))/10)*10, 1); my $open = ReadingsVal($name,'state',''); my $lvicon = $open eq 'opening' ? 'fts_shutter_up@red' : $open eq 'closing' ? 'fts_shutter_down@red' : "fts_shutter_$pct"; $lvicon = FW_makeImage($lvicon); my $lvcmd = ($open eq 'opening' || $open eq 'closing') ? 'stop' : $pct > 50 ? 'close' : 'open'; my $slt = ReadingsNum($name,'tiltSlat',90); my $slticon = 'fts_blade_arc_close_'; $slticon .= $slt > 0 ? '00' : $slt > -45 ? '50' : '100'; $slticon = FW_makeImage($slticon); my $sltcmd = $slt > 0 ? 'closeSlat' : $slt > -45 ? 'openSlat' : 'halfSlat'; qq(<a href="http://$ip" target="_blank">$onl</a> <div><a href="/fhem?cmd.dummy=set $name $lvcmd&XHR=1">$lvicon</a></div> <div><a href="/fhem?cmd.dummy=set $name $sltcmd&XHR=1">$slticon $slt</a>) }
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','Offline') eq 'Offline' ? 'rot' : 'gruen'; $onl = FW_makeImage("10px-kreis-$onl"); my $ip = ReadingsVal($name,'IPAddress','none'); my $pct = maxNum(int((109 - ReadingsNum($name,'pct',0))/10)*10, 1); my $open = ReadingsVal($name,'state',''); my $lvicon = $open eq 'opening' ? 'fts_shutter_up@red' : $open eq 'closing' ? 'fts_shutter_down@red' : "fts_shutter_$pct"; $lvicon = FW_makeImage($lvicon); my $lvcmd = ($open eq 'opening' || $open eq 'closing') ? 'stop' : $pct > 50 ? 'close' : 'open'; my $slt = ReadingsNum($name,'tiltSlat',90); my $slticon = 'fts_blade_arc_close_'; $slticon .= $slt == 0 ? '100' : $slt < 90 ? '50' : '00'; $slticon = FW_makeImage($slticon); my $sltcmd = $slt == 90 ? 'closeSlat' : $slt > 40 ? 'openSlat' : 'halfSlat'; qq(<a href="http://$ip" target="_blank">$onl</a> <div><a href="/fhem?cmd.dummy=set $name $lvcmd&XHR=1">$lvicon</a></div> <div><a href="/fhem?cmd.dummy=set $name $sltcmd&XHR=1">$slticon $slt</a>) }
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd pct:tiltSlat
 #attr DEVICE eventMap open:opens close:closes
@@ -1636,7 +1633,7 @@ This is for a tilt range from -90 to 90 degrees, if you have different tilt opti
 For calibration, tilt range settings, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20220216
+setreading DEVICE attrTemplateVersion 20220218
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 

@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-02-15 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-18 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -261,7 +261,6 @@ BEGIN {
     makeReadingName
     FileRead
     getAllSets
-    evalStateFormat
     notifyRegexpChanged setNotifyDev
     deviceEvents
     trim
@@ -5355,11 +5354,10 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <a id="RHASSPY-genericDeviceType"></a>
   <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <code>genericDeviceType</code> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. <code>useGenericAttrs=0</code> will deactivate this. (do not set this unless you know what you are doing!). Note: <code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
-  <li><b>Babble</b>: Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a> for details.</li>
-
-  <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a> for details.</li>
+  <li><b>encoding</b>: <b>most likely deprecated!</b>May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <li><b>autoTraining</b>: <b>experimental!</b> activated by setting a timeout (in seconds). RHASSPY then will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. If something ist changed at runtime, training will be initiated if timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
-
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
 <ul>
@@ -5407,7 +5405,7 @@ After changing something relevant within FHEM for either the data structure in</
     <p>Various options to update settings and data structures used by RHASSPY and/or Rhasspy. Choose between one of the following:</p>
     <ul>
       <li><b>devicemap</b><br>
-      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
+      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory (unless the "autoTraining" feature is enabled), to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
       </li>
       <li><b>devicemap_only</b><br>
       This may be helpfull to make an intermediate check, whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.
@@ -5687,8 +5685,13 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <br>
       </ul>
   </li>
+  <p><b>Remarks on rhasspySTT, rhasspyTTS and Babble:</b><br><a id="RHASSPY-experimental"></a>
+    Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
+    may be needed and functionality may be subject to changes!
+  </p>
   <li>
     <a id="RHASSPY-attr-rhasspySTT"></a><b>rhasspySTT</b>
+    <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
     <p>Optionally, you may want not to use the internal Rhasspy speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature, and most likely you also want to set values to <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a> as well. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
     Keys that may be set in this attribute:
      <ul>
@@ -5704,6 +5707,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   </li>
   <li>
   <a id="RHASSPY-attr-rhasspyTTS"></a><b>rhasspyTTS</b>
+    <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
     <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId. If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
       Example:<br>
     <p><code>AMADDev_A=siteId=android_livingroom ttsCommand={fhem("set $DEVICE ttsMsg $message")}</code><br>Notes: 
