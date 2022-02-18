@@ -4323,14 +4323,16 @@ attr DEVICE readingList\
   BASE_ID/home_presence/.* {}\
   homeassistant/.+?/config:.* { }
 attr DEVICE setList\
-  restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
+  restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}\
+  update { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq(BASE_ID/DEVNAME/commands/firmware_update $payload) }
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
 </a>Version: version
 attr DEVICE icon ICON
+attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20211207
+setreading DEVICE attrTemplateVersion 20220218
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
@@ -4346,6 +4348,7 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+)/[^:]+:.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+)/([^:]+),; { "${1}_$2"=>$EVENT }}\
   BASE_ID/home_presence/DEVNAME:.* { return unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_"); {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
+  BT_config { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq(BASE_ID/DEVNAME/commands/MQTTtoBT/config $payload) }\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
   BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
@@ -4353,9 +4356,10 @@ attr DEVICE setList\
   BT_minrssi:slider,-110,1,0 BASE_ID/DEVNAME/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith|attrTemplateVersion).* 86400"}
 attr DEVICE periodicCmd deleteReadings:1440
+attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20220218
 
 name:OpenMQTTGateway_BT_gtag
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
