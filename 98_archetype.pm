@@ -1408,7 +1408,7 @@ attr SVG_link_archetype attributes group</pre>
         <li>nach einem bestimmten Muster anlegen</li>
         <li>mit Standardattributen versorgen</li>
         <li>mit Standardattributen und/oder Reading-Werte initialisieren</li>
-      </ul>
+      </ul></li>
       <li>vorhandene Abweichungen zu gewünschten Standard-Attribut-Inhalten aufzeigen und beheben</li>
     </ul><br>
     Die verwendeten Begriffe sind angelehnt an <a href="https://de.wikipedia.org/wiki/Vererbung_%28Programmierung%29">Vererbung</a> 
