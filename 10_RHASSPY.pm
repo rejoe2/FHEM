@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-02-21 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-23 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2601,7 +2601,7 @@ sub notifySTT {
 
         my $tocheck = $hash->{helper}->{STT}->{config}->{filterFromBabble};
         if ( $tocheck ) {
-            return Babble_DoIt($hash->{Babble},$msgtext) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}i;
+            return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}i;
             $msgtext =~ s{\A[\b]*$tocheck}{}i;
         }
         return msgDialog_open($hash, $client, $msgtext);
@@ -3025,14 +3025,6 @@ sub analyzeMQTTmessage {
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
         push @updatedList, $hash->{NAME};
-        if ( $active ) {
-            my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
-            $device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
-            if ($device) {
-                analyzeAndRunCmd($hash, $device, "set $device activateVoiceInput");
-                push @updatedList, $device;
-            }
-        }
         return \@updatedList;
     }
 
@@ -3048,8 +3040,17 @@ sub analyzeMQTTmessage {
     }
 
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
-        return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $hotword = $1;
+        my $siteId = $data->{siteId};
+        if ( $siteId ) {
+            my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
+            $device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
+            if ($device) {
+                analyzeAndRunCmd($hash, $device, "set $device activateVoiceInput");
+                push @updatedList, $device;
+            }
+        }
+        return \@updatedList if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $ret = handleHotwordDetection($hash, $hotword, $data);
         push @updatedList, $ret if $ret && $defs{$ret};
         push @updatedList, $hash->{NAME};
@@ -4853,13 +4854,13 @@ sub handleIntentSetTimer {
         $addtrigger .= " $label" if defined $label;
 
         if ( !defined $soundoption ) {
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$siteId\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
         } else {
             $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
             my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return respond( $hash, $data, getResponse( $hash, 'DefaultError' ) );
             my $repeats = $+{repeats} // 5;
             my $duration = $+{duration} // 15;
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$siteId\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
         }
 
         #readingsSingleUpdate($hash, $roomReading, 1, 1);
