@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-02-23 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-24 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.13';
+    $hash->{MODULE_VERSION} = '0.5.14';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -4854,13 +4854,13 @@ sub handleIntentSetTimer {
         $addtrigger .= " $label" if defined $label;
 
         if ( !defined $soundoption ) {
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$siteId\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
         } else {
             $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
             my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return respond( $hash, $data, getResponse( $hash, 'DefaultError' ) );
             my $repeats = $+{repeats} // 5;
             my $duration = $+{duration} // 15;
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$siteId\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
+            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
         }
 
         #readingsSingleUpdate($hash, $roomReading, 1, 1);
@@ -5927,7 +5927,7 @@ yellow=rgb FFFF00</code></p>
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
   <li>siteId2ttsDevice_&lt;siteId&gt;</li>
-  If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value); naming scheme is the same as for site2room.
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value); naming scheme is the same as for site2room.
 </ul>
 =end html
 =cut
