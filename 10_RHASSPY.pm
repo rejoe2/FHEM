@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25369 2022-02-24 Beta-User $
+# $Id: 10_RHASSPY.pm 25369 2022-02-26 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1530,10 +1530,10 @@ sub disable_msgDialog {
             $devsp = qq($hash->{helper}->{STT}->{config}->{AMADCommBridge});
     }
     if ($enable) { 
-        $devsp ? $devsp .= ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+        $devsp .= $devsp ? ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
     if ($hash->{autoTraining}) {
-        $devsp ? $devsp .= ',global' : 'global';
+        $devsp .= $devsp ? ',global' : 'global';
     }
 
     my @ntfdevs = devspec2array($devsp);
@@ -5927,7 +5927,7 @@ yellow=rgb FFFF00</code></p>
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
   <li>siteId2ttsDevice_&lt;siteId&gt;</li>
-  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value); naming scheme is the same as for site2room.
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
 </ul>
 =end html
 =cut
