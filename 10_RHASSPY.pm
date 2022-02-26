@@ -1858,7 +1858,7 @@ sub getRoomName {
 
     #Beta-User: This might be the right place to check, if there's additional logic implemented...
 
-    my $siteId = $data->{siteId};
+    my $siteId = $data->{siteId} // return $hash->{defaultRoom};
 
     my $rreading = makeReadingName("siteId2room_$siteId");
     $siteId =~ s{\A([^.]+).*}{$1}xms;
