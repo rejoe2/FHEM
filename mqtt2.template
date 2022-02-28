@@ -1044,8 +1044,6 @@ option:{ JSONMAPTYPE == 3 }
 attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Channel_5:0 Color:rgb Channel_4:white 
 option:{ JSONMAPTYPE == 4 }
 attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 Channel_5:0 HSBColor:0 Color:0
-
-
 option:global
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 attr DEVICE setList \

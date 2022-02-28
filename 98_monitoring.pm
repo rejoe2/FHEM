@@ -888,14 +888,14 @@ __END__
         <br>
 <pre>defmod Fenster_monitoring monitoring .*:(open|tilted) .*:closed
 attr Fenster_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Das Fenster \"$errors[0]\" ist schon l&auml;nger ge&ouml;ffnet.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Fenster sind schon l&auml;nger ge&ouml;ffnet:", @errors))\
 }
 attr Fenster_monitoring errorWait {AttrVal($name, "winOpenTimer", 60*10)}
 attr Fenster_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
  return("Das Fenster \"$warnings[0]\" ist seit kurzem ge&ouml;ffnet.") if(int(@warnings) == 1);;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Fenster sind seit kurzem ge&ouml;ffnet:", @warnings))\
@@ -913,14 +913,14 @@ attr Fenster_monitoring warningReturn {return if !@warnings;;\
         <b>Battery monitoring</b><br>
 <pre>defmod Batterie_monitoring monitoring .*:battery:.low .*:battery:.ok
 attr Batterie_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Bei dem Ger&auml;t \"$errors[0]\" muss die Batterie gewechselt werden.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Ger&auml;ten muss die Batterie gewechselt werden:", @errors))\
 }
 attr Batterie_monitoring errorWait 60*60*24*14
 attr Batterie_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
  return("Bei dem Ger&auml;t \"$warnings[0]\" muss die Batterie demn&auml;chst gewechselt werden.") if(int(@warnings) == 1);;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Ger&auml;ten muss die Batterie demn&auml;chst gewechselt werden:", @warnings))\
@@ -937,14 +937,14 @@ attr Batterie_monitoring warningReturn {return if !@warnings;;\
         <b>Activity Monitor</b><br>
 <pre>defmod Activity_monitoring monitoring .*:.*
 attr Activity_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Das Ger&auml;t \"$errors[0]\" hat sich seit mehr als 24 Stunden nicht mehr gemeldet.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Ger&auml;ten haben sich seit mehr als 24 Stunden nicht mehr gemeldet:", @errors))\
 }
 attr Activity_monitoring errorWait 60*60*24
 attr Activity_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
  return("Das Ger&auml;t \"$warnings[0]\" hat sich seit mehr als 12 Stunden nicht mehr gemeldet.") if(int(@warnings) == 1);;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Ger&auml;ten haben sich seit mehr als 12 Stunden nicht mehr gemeldet:", @warnings))\
@@ -1400,14 +1400,14 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         <br>
 <pre>defmod Fenster_monitoring monitoring .*:(open|tilted) .*:closed
 attr Fenster_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Das Fenster \"$errors[0]\" ist schon l&auml;nger ge&ouml;ffnet.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Fenster sind schon l&auml;nger ge&ouml;ffnet:", @errors))\
 }
-attr Fenster_monitoring errorWait {AttrVal($name, "winOpenTimer", 60*10)}
+attr Fenster_monitoring errorWait {AttrVal($name, 'winOpenTimer', 60*10)}
 attr Fenster_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
  return("Das Fenster \"$warnings[0]\" ist seit kurzem ge&ouml;ffnet.") if(int(@warnings) == 1);;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Fenster sind seit kurzem ge&ouml;ffnet:", @warnings))\
@@ -1427,15 +1427,15 @@ attr Fenster_monitoring warningReturn {return if !@warnings;;\
         <b>Batterie&uuml;berwachung</b><br>
 <pre>defmod Batterie_monitoring monitoring .*:battery:.low .*:battery:.ok
 attr Batterie_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Bei dem Ger&auml;t \"$errors[0]\" muss die Batterie gewechselt werden.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Ger&auml;ten muss die Batterie gewechselt werden:", @errors))\
 }
 attr Batterie_monitoring errorWait 60*60*24*14
 attr Batterie_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
- return("Bei dem Ger&auml;t \"$warnings[0]\" muss die Batterie demn&auml;chst gewechselt werden.") if(int(@warnings) == 1);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
+ return("Bei dem Ger&auml;t \"$warnings[0]\" muss die Batterie demn&auml;chst gewechselt werden.") if int @warnings == 1;;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Ger&auml;ten muss die Batterie demn&auml;chst gewechselt werden:", @warnings))\
 }</pre>
@@ -1453,14 +1453,14 @@ attr Batterie_monitoring warningReturn {return if !@warnings;;\
         <b>Activity Monitor</b><br>
 <pre>defmod Activity_monitoring monitoring .*:.*
 attr Activity_monitoring errorReturn {return if !@errors;;\
- $_ = AttrVal($_, "alias", $_) for(@errors);;\
+ $_ = AttrVal($_, 'alias', $_) for @errors;;\
  return("Das Ger&auml;t \"$errors[0]\" hat sich seit mehr als 24 Stunden nicht mehr gemeldet.") if(int(@errors) == 1);;\
  @errors = sort {lc($a) cmp lc($b)} @errors;;\
  return(join("\n - ", "Die folgenden ".@errors." Ger&auml;ten haben sich seit mehr als 24 Stunden nicht mehr gemeldet:", @errors))\
 }
 attr Activity_monitoring errorWait 60*60*24
 attr Activity_monitoring warningReturn {return if !@warnings;;\
- $_ = AttrVal($_, "alias", $_) for(@warnings);;\
+ $_ = AttrVal($_, 'alias', $_) for @warnings;;\
  return("Das Ger&auml;t \"$warnings[0]\" hat sich seit mehr als 12 Stunden nicht mehr gemeldet.") if(int(@warnings) == 1);;\
  @warnings = sort {lc($a) cmp lc($b)} @warnings;;\
  return(join("\n - ", "Die folgenden ".@warnings." Ger&auml;ten haben sich seit mehr als 12 Stunden nicht mehr gemeldet:", @warnings))\
