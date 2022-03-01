@@ -71,7 +71,7 @@ sub monitoring_Define {
   return("Usage: define <name> $TYPE <add-event> [<remove-event>]")
     if( !@re || @re > 2);
 
-  monitoring_NOTIFYDEV($hash);
+  monitoring_NOTIFYDEV($hash) if !$init_done;
   monitoring_setActive($hash) if $init_done;
 
   return;
@@ -130,19 +130,19 @@ sub monitoring_Set {
       readingsBulkUpdate($hash, 'warningCount', 0, 0);
 
       for my $r (keys %{$hash->{READINGS}}){
-        if($r =~ m/(warning)Add_(.+)/){
+        if($r =~ m{(warning)Add_(.+)}xms){
           RemoveInternalTimer("$SELF|$1|add|$2");
 
           delete $hash->{READINGS}{$r};
         }
       }
     }
-    if ( $value =~ m{\A(error|all)\z} ) {
+    if ( $value =~ m{\A(error|all)\z}xms ) {
       readingsBulkUpdate($hash, 'error', '', 0);
       readingsBulkUpdate($hash, 'errorCount', 0, 0);
 
-      for my $r (keys %{$hash->{READINGS}}){
-        if($r =~ m{(error)Add_(.+)}){
+      for my $r ( keys %{$hash->{READINGS}} ) {
+        if ( $r =~ m{(error)Add_(.+)}xms ) {
           RemoveInternalTimer("$SELF|$1|add|$2");
 
           delete $hash->{READINGS}{$r};
@@ -186,18 +186,15 @@ sub monitoring_Get {
     "Unknown argument $argument, choose one of ".
     join ' ', sort values %monitoring_gets if !exists $monitoring_gets{$argument};
 
-  if($argument eq "all" || ($argument eq "default" && $default eq "all")){
-    push(@ret, monitoring_return($hash, "error"));
-    push(@ret, monitoring_return($hash, "warning"));
+  if ( $argument eq 'all' || $argument eq 'default' && $default eq 'all' ) {
+    push @ret, monitoring_return($hash, 'error');
+    push @ret, monitoring_return($hash, 'warning');
   }
-  elsif($argument eq "default"){
-    push(@ret, monitoring_return($hash, $default));
+  elsif ( $argument eq 'default' ) {
+    push @ret, monitoring_return($hash, $default);
   }
-  elsif($argument eq "error"){
-    push(@ret, monitoring_return($hash, "error"));
-  }
-  elsif($argument eq "warning"){
-    push(@ret, monitoring_return($hash, "warning"));
+  elsif($argument eq 'error' || $argument eq 'warning') {
+    push @ret, monitoring_return($hash, $argument);
   }
 
   return join("\n\n", @ret)."\n" if @ret;
@@ -211,7 +208,7 @@ sub monitoring_Attr {
   if($attribute =~  "blacklist" && $value){
     my @blacklist;
 
-    push @blacklist, devspec2array($_) for (split m{[\s]+}, $value);
+    push @blacklist, devspec2array($_) for (split m{[\s]+}x, $value);
 
     my %blacklist = map{ $_ => 1 } @blacklist;
 
@@ -226,7 +223,7 @@ sub monitoring_Attr {
     return if !$value;
     my @whitelist;
 
-    push(@whitelist, devspec2array($_)) for (split m{[\s]+}, $value);
+    push @whitelist, devspec2array($_) for (split m{[\s]+}x, $value);
 
     for my $list ( qw(warning error) ){
         for my $name ( split m{,}x, ReadingsVal($SELF, $list, '') ) {
@@ -240,7 +237,7 @@ sub monitoring_Attr {
       return monitoring_setActive($hash);
     }
     monitoring_setInactive($hash);
-    readingsSingleUpdate($hash, "state", "disabled", 0);
+    readingsSingleUpdate($hash, 'state', 'disabled', 0);
     Log3($SELF, 3, "$hash->{TYPE} ($SELF) attr $SELF disabled");
   }
 
@@ -265,40 +262,46 @@ sub monitoring_Notify {
 
   return if !$events;
 
-  if($name eq 'global' && 'INITIALIZED' =~ m/\Q@{$events}\E/){
+  if($name eq 'global' && 'INITIALIZED|REREADCFG' =~ m/\Q@{$events}\E/){
     monitoring_setActive($hash);
 
     return;
   }
 
-  my ($addRegex, $removeRegex) = split(/[\s]+/, InternalVal($SELF, "DEF", ""));
+  my ($addRegex, $removeRegex) = split m{[\s]+}x, InternalVal($SELF, 'DEF', '');
 
+=pod this seems to be useless?
   return unless(
     $addRegex =~ m/^$name:/ ||
-    $removeRegex && $removeRegex =~ m/^$name:/
+    $removeRegex && $removeRegex =~ m/^$name:/ ||
+    $events
   );
+=cut
 
   my @blacklist;
 
   push @blacklist, devspec2array($_)
-    for (split m{[\s]+}, AttrVal($SELF, 'blacklist', ''));
+    for (split m{[\s]+}x, AttrVal($SELF, 'blacklist', ''));
 
   return if @blacklist && grep {/$name/} @blacklist;
 
   my @whitelist;
 
   push @whitelist, devspec2array($_)
-    for (split m{[\s]+}, AttrVal($SELF, 'whitelist', ''));
+    for (split m{[\s]+}x, AttrVal($SELF, 'whitelist', ''));
 
   return if @whitelist && !grep {/$name/} @whitelist;
 
   for my $event (@{$events}){
     next if !$event;
 
-    my $addMatch = "$name:$event" =~ m/^$addRegex$/;
-    my $removeMatch = $removeRegex ? "$name:$event" =~ m/^$removeRegex$/ : 0;
+    my $addMatch = "$name:$event" =~ m{\A$addRegex\z}xms;
+    my $removeMatch = $removeRegex ? "$name:$event" =~ m{\A$removeRegex\z}xms : 0;
+    #Log3($hash, 3, "monitoring_notify called with add $addMatch and remove $removeMatch");
 
-    next unless(defined($event) && ($addMatch || $removeMatch));
+    #next unless(defined($event) && ($addMatch || $removeMatch));
+    next if !$addMatch && !$removeMatch;
+    #Log3($hash, 3, "monitoring_notify unless 1 replacement passed w. $addMatch and remove $removeMatch");
 
     Log3($SELF, 4 , "$TYPE ($SELF) triggered by \"$name $event\"");
 
@@ -308,18 +311,18 @@ sub monitoring_Notify {
       my $listWait = eval(AttrVal($SELF, $list.'Wait', 0));
       $listWait = 0 if !looks_like_number($listWait);
 
-      if($listFuncAdd eq 'preset' && $listFuncRemove eq 'preset'){
+      if ( $listFuncAdd eq 'preset' && $listFuncRemove eq 'preset' ) {
         Log3(
           $SELF, 5, "$TYPE ($SELF) ".
           $list."FuncAdd and $list"."FuncRemove are preset"
         );
-        if(!$removeRegex){
-          if($listWait == 0){
+        if ( !$removeRegex ) {
+          if ( $listWait == 0 ) {
             Log3(
               $SELF, 2, "$TYPE ($SELF) ".
               "set \"$list"."Wait\" while \"$list".
               "FuncAdd\" and \"$list"."FuncRemove\" are same"
-            ) if($list eq "error");
+            ) if $list eq 'error';
 
             next;
           }
@@ -332,15 +335,16 @@ sub monitoring_Notify {
           next;
         }
         else{
-          next unless($list eq 'error' || AttrVal($SELF, 'errorWait', undef));
+          #next unless($list eq 'error' || AttrVal($SELF, 'errorWait', undef));
+          next if $list ne 'error' && !AttrVal($SELF, 'errorWait', undef);
 
           Log3(
             $SELF, 5, "$TYPE ($SELF) ".
             "addRegex ($addRegex) and removeRegex ($removeRegex) are defined"
           );
 
-          monitoring_modify("$SELF|$list|remove|$name") if($removeMatch);
-          monitoring_modify("$SELF|$list|add|$name|$listWait") if($addMatch);
+          monitoring_modify("$SELF|$list|remove|$name") if $removeMatch;
+          monitoring_modify("$SELF|$list|add|$name|$listWait") if $addMatch;
 
           next;
         }
@@ -392,8 +396,9 @@ sub monitoring_Notify {
 
 # module Fn ###################################################################
 sub monitoring_modify {
-  my ($SELF, $list, $operation, $value, $wait) = split m{[|]}, shift;
+  my ($SELF, $list, $operation, $value, $wait) = split m{[|]}x, shift;
   my $hash = $defs{$SELF} // return;
+  Log3($hash, 3, "monitoring_modify called with $operation and $list");
 
   return if IsDisabled($SELF);
 
@@ -401,7 +406,7 @@ sub monitoring_modify {
   $at = eval($wait + gettimeofday()) if $wait && $wait ne 'quiet';
   my $TYPE = $hash->{TYPE};
   my (@change, %readings);
-  %readings = map{ $_ => 1 } split m{,}, ReadingsVal($SELF, $list, '');
+  %readings = map{ $_ => 1 } split m{,}xms, ReadingsVal($SELF, $list, '');
   my $arg = "$SELF|$list|$operation|$value";
   my $reading = $list."Add_".$value;
 
@@ -440,7 +445,8 @@ sub monitoring_modify {
 
   RemoveInternalTimer("$SELF|$list|add|$value");
 
-  return unless(@change || $operation eq 'add');
+  #return unless(@change || $operation eq 'add');
+  return if !@change && $operation ne 'add';
 
   my $allCount =
     int(keys %readings) +
@@ -467,13 +473,14 @@ sub monitoring_modify {
 sub monitoring_NOTIFYDEV {
   my $hash = shift // return;
   my $SELF = $hash->{NAME} // return;
-  my $NOTIFYDEV =
-    AttrVal($SELF, 'whitelist', undef) ||
-    join ",", (InternalVal($SELF, 'DEF', undef) =~ m/(?:^|\s)([^:\s]+):/g)
-  ;
-  $NOTIFYDEV =~ s/\s/,/g;
+  my $NOTIFYDEV = $init_done ? AttrVal($SELF, 'whitelist', undef) : 'global'; #|| join(",", (InternalVal($SELF, "DEF", undef) =~ m/(?:^|\s)([^:\s]+):/g))
 
-  return notifyRegexpChanged($hash, $NOTIFYDEV);
+  if ($NOTIFYDEV) {
+    $NOTIFYDEV =~ s{[\s]+}{,}gx;
+    return notifyRegexpChanged($hash, "$NOTIFYDEV,global");
+  }
+  $NOTIFYDEV = join q{|}, split m{[\s]+}x, InternalVal($SELF, 'DEF', undef);
+  return notifyRegexpChanged($hash, "$NOTIFYDEV|global");
 }
 
 sub monitoring_RemoveInternalTimer {
@@ -482,7 +489,7 @@ sub monitoring_RemoveInternalTimer {
 
   for my $reading (sort keys %{$hash->{READINGS}}){
     RemoveInternalTimer("$SELF|$1|add|$2")
-      if $reading =~ m/(error|warning)Add_(.+)/;
+      if $reading =~ m{(error|warning)Add_(.+)}xms;
   }
 
   return;
@@ -493,8 +500,8 @@ sub monitoring_return {
   my $list = shift // return;
 
   my $SELF = $hash->{NAME} // return;
-  my @errors = split m{,}, ReadingsVal($SELF, 'error', '');
-  my @warnings = split m{,}, ReadingsVal($SELF, 'warning', '');
+  my @errors = split m{,}xms, ReadingsVal($SELF, 'error', '');
+  my @warnings = split m{,}xms, ReadingsVal($SELF, 'warning', '');
   my $value = ReadingsVal($SELF, $list, undef);
   my $ret = AttrVal($SELF, $list.'Return', undef);
   $ret = '"$list: $value"' if !$ret && $value;
@@ -508,11 +515,12 @@ sub monitoring_setActive {
   my $SELF = $hash->{NAME} // return;
   my $TYPE = $hash->{TYPE};
 
+  monitoring_NOTIFYDEV($hash);
   readingsSingleUpdate($hash, 'state', 'active', 0);
   Log3($SELF, 3, "$TYPE ($SELF) set $SELF active");
 
   for my $reading (reverse sort keys %{$hash->{READINGS}}){
-    if($reading =~ m/(error|warning)Add_(.+)/){
+    if ( $reading =~ m{(error|warning)Add_(.+)}xms ) {
       my $wait = time_str2num(ReadingsVal($SELF, $reading, ''));
 
       next if !looks_like_number($wait);
@@ -540,6 +548,7 @@ sub monitoring_setInactive {
   my $SELF = $hash->{NAME} // return;
   my $TYPE = $hash->{TYPE};
 
+  notifyRegexpChanged($hash,'',1);
   AnalyzeCommandChain(undef, AttrVal($SELF, 'setInactiveFunc', 'preset'));
 
   return;
@@ -723,7 +732,7 @@ __END__
         </a>
       </li>
       <a id="monitoring-attr-blacklist"></a><li>
-        <code>blacklist</code><br>
+        <code>blacklist &lt;devspec list&gt;</code><br>
         Space-separated list of devspecs which will be ignored.<br>
         If the attribute is set all devices which are specified by the devspecs
         are removed from both lists.
@@ -860,7 +869,7 @@ __END__
         Like errorReturn, just for the warning list.
       </li>
       <a id="monitoring-attr-whitelist"></a><li>
-        <code>whitelist {&lt;devspec list&gt;}</code><br>
+        <code>whitelist &lt;devspec list&gt;</code><br>
         Space-separated list of devspecs which are allowed.<br>
         If the attribute is set all devices which are not specified by the
         devspecs are removed from both lists.
@@ -1228,10 +1237,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         </a>
       </li>
       <a id="monitoring-attr-blacklist"></a><li>
-        <code>blacklist</code><br>
-        Durch Leerzeichen getrennte Liste von devspecs die ignoriert werden.<br>
-        Wenn das Attribut gesetzt wird werden alle Geräte die durch die
-        devspecs definiert sind von beiden Listen gelöscht.
+        <code>blacklist &lt;devspec list&gt;</code><br>
+        Durch Leerzeichen getrennte Liste von devspecs, die ignoriert werden.<br>
+        Wenn das Attribut gesetzt wird, werden alle Geräte von beiden Listen gelöscht, 
+        die durch die devspecs definiert sind .
       </li>
       <a id="monitoring-attr-disable"></a><li>
         <code>disable (1|0)</code><br>
@@ -1368,11 +1377,10 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         Wie errorReturn, nur f&uuml;r die warning-Liste.
       </li>
       <a id="monitoring-attr-whitelist"></a><li>
-        <code>whitelist {&lt;perl code&gt;}</code><br>
-        Durch Leerzeichen getrennte Liste von devspecs die erlaubt sind
-        werden.<br>
-        Wenn das Attribut gesetzt wird werden alle Geräte die nicht durch die
-        devspecs definiert sind von beiden Listen gelöscht.
+        <code>whitelist &lt;devspec list&gt;</code><br>
+        Durch Leerzeichen getrennte Liste von devspecs die erlaubt sind.<br>
+        Wenn das Attribut gesetzt wird, werden alle Geräte von beiden Listen 
+        gelöscht, die nicht durch die devspecs definiert sind .
       </li>
       <li>
         <a href="#readingFnAttributes">
