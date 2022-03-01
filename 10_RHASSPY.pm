@@ -2745,6 +2745,7 @@ sub ttsDialog_close {
     Log3($hash, 5, "ttsDialog_close called with $device");
 
     deleteSingleRegIntTimer($device, $hash);
+    readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
 
     delete $hash->{helper}{ttsDialog}->{$device};
     return;
