@@ -2765,7 +2765,8 @@ sub ttsDialog_open {
         customData   => $device
     };
 
-    setTtsDialogTimeout($hash, $sendData, $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout});
+    my $tout = $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+    setTtsDialogTimeout($hash, $sendData, $tout);
     return ttsDialog_progress($hash, $device, $msgtext, $sendData);
 }
 
@@ -2800,29 +2801,31 @@ sub ttsDialog_progress {
 
 sub ttsDialog_respond {
     my $hash       = shift // return;
-    my $DEVICE     = shift // return;
+    my $device     = shift // return;
     my $message    = shift // return;
     my $keepopen   = shift // 1;
 
-    Log3($hash, 5, "ttsDialog_respond called with $DEVICE and text $message");
+    Log3($hash, 5, "ttsDialog_respond called with $device and text $message");
     trim($message);
     return if !$message; # empty?
 
-    my $msgCommand = $hash->{helper}->{TTS}->{config}->{$DEVICE}->{ttsCommand} // return;
+    my $msgCommand = $hash->{helper}->{TTS}->{config}->{$device}->{ttsCommand} // return;
     my %specials = (
-         '$DEVICE'  => $DEVICE,
+         '$DEVICE'  => $device,
          '$message' => $message,
          '$NAME'  => $hash->{NAME}
         );
     $msgCommand  = EvalSpecials($msgCommand, %specials);
     AnalyzeCommandChain($hash, $msgCommand);
     if ( $keepopen ) {
-        my $tout = $hash->{helper}->{TTS}->{config}->{$DEVICE}->{sessionTimeout} // $hash->{sessionTimeout};
-        resetRegIntTimer( $DEVICE, time + $tout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+        my $tout = $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+        resetRegIntTimer( $device, time + $tout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+        readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
     } else {
-        deleteSingleRegIntTimer($DEVICE, $hash);
+        deleteSingleRegIntTimer($device, $hash);
+        readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
     }
-    return $DEVICE;
+    return $device;
 }
 
 # Update the readings lastIntentPayload and lastIntentTopic
@@ -3066,8 +3069,8 @@ sub respond {
       && defined $hash->{helper}->{msgDialog}->{$identity} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
         return msgDialog_respond($hash, $identity, $response);
-    } elsif (defined $hash->{helper}->{STT} 
-        && defined $hash->{helper}->{STT}->{config}->{$identity} ) {
+    } elsif (defined $hash->{helper}->{TTS} 
+        && defined $hash->{helper}->{TTS}->{config}->{$identity} ) {
         return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
     }
 
