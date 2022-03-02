@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25757 2022-03-01 Beta-User $
+# $Id: 10_RHASSPY.pm 25757 2022-03-02 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.17';
+    $hash->{MODULE_VERSION} = '0.5.18';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2523,7 +2523,7 @@ sub notifySTT {
             return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}i;
             $msgtext =~ s{\A[\b]*$tocheck}{}i;
         }
-        return msgDialog_open($hash, $client, $msgtext);
+        return ttsDialog_open($hash, $client, $msgtext);
     }
 
     return;
@@ -2646,7 +2646,7 @@ sub msgDialog_progress {
     #This is the place to add additional logics and decission making...
     #my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
     Log3($hash, 5, "msgDialog_progress called with $device and text $msgtext");
-    Log3($hash, 5, 'msgDialog_progress called without DATA') if !defined $data;
+    #Log3($hash, 5, 'msgDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
 
@@ -2708,7 +2708,7 @@ sub handleTtsMsgDialog {
         && defined $hash->{helper}->{msgDialog}->{$recipient} ) {
         msgDialog_respond($hash,$recipient,$message);
         sayFinished($hash, $data->{id}, $hash->{siteId});
-    } elsif (defined $hash->{helper}->{STT} 
+    } elsif ( defined $hash->{helper}->{STT} 
         && defined $hash->{helper}->{STT}->{config}->{$recipient} ) {
         ttsDialog_respond($hash,$recipient,$message,0);
         sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
@@ -2824,6 +2824,7 @@ sub ttsDialog_respond {
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
     } else {
         deleteSingleRegIntTimer($device, $hash);
+        delete $hash->{helper}->{ttsDialog}->{$device};
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
     }
     return $device;
@@ -3065,13 +3066,21 @@ sub respond {
     Log3($hash->{NAME}, 5, "Response is: $response");
 
     #check for msgDialog or ttsDialog sessions
-    my $identity = (split m{_$hash->{siteId}_}, $data->{sessionId},3)[0];
+    my $identity = (split m{_$hash->{siteId}_}xms, $data->{sessionId},3)[0];
     if ( defined $hash->{helper}->{msgDialog} 
       && defined $hash->{helper}->{msgDialog}->{$identity} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
         return msgDialog_respond($hash, $identity, $response);
     } elsif (defined $hash->{helper}->{TTS} 
         && defined $hash->{helper}->{TTS}->{config}->{$identity} ) {
+        Log3($hash, 5, "respond deviated to ttsDialog_respond for $identity.");
+        $hash->{helper}->{ttsDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
+        return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
+    } elsif (defined $hash->{helper}->{TTS} 
+        && defined $hash->{helper}->{TTS}->{$identity} ) {
+        $identity = $hash->{helper}->{TTS}->{$identity};
+        Log3($hash, 5, "respond deviated to ttsDialog_respond for $identity by siteId.");
+        $hash->{helper}->{ttsDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
         return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
     }
 
@@ -3080,13 +3089,12 @@ sub respond {
     #setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
     #no audio output in msgDialog session
-    return if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
-    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",0);
+    #return if defined $hash->{helper}->{msgDialog} 
+    #    && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
+    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return;
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
-            text   => $response} )
-                if $secondAudio;
+            text   => $response} );
     return;
 }
 
@@ -5646,7 +5654,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   <li>
   <a id="RHASSPY-attr-rhasspyTTS"></a><b>rhasspyTTS</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId. If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
+    <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId (development remark: this is missleading atm!). If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
       Example:<br>
     <p><code>AMADDev_A=siteId=android_livingroom ttsCommand={fhem("set $DEVICE ttsMsg $message")}</code><br>Notes: 
     <ul>
