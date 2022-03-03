@@ -3436,7 +3436,7 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   request2shelly/rpc:.* json2nameValue($EVENT, 'req_', $JSONMAP, 'in_mode') }
 attr DEVICE getList in_mode:noArg in_mode $\DEVICETOPIC/rpc {"id": 1,"src":"request2shelly", "method": "Switch.GetConfig", "params": {"id": 0}}
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); my $reb = ReadingsVal($name,'sys_restart_required','false') eq 'true'?'<a href="/fhem?cmd.dummy=set '.$name.' x_reboot&XHR=1"> ... Notwendigen Reboot durchführen</a>':''; qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>$reb<div>Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 result_in_mode:in_mode
+attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 req_result_in_mode:in_mode
 attr DEVICE setStateList on off toggle on-for-timer off-for-timer
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
