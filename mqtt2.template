@@ -3421,6 +3421,7 @@ attr DEVICE setList\
   on:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":true}}\
   on-for-timer $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":true,"toggle_after":$EVTPART1}}\
   off-for-timer $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":false,"toggle_after":$EVTPART1}}\
+  in_mode:flip,detached $DEVICETOPIC/rpc {"id":1,"src":"fhem2shelly","method":"Switch.SetConfig","params": {"id":0, "config": {"in_mode": "$EVTPART1"}}}\
   x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Update","params": {"stage":"stable"}}\
   x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}\
   x_eco:true,false $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Sys.SetConfig","params": {"config": {"device": {"eco_mode": $EVTPART1}}}}
@@ -3431,9 +3432,11 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   $\DEVICETOPIC/status/cloud:.* {}\
   $\DEVICETOPIC/rpc:.* {}\
-  fhem2shelly/rpc:.* {}
+  fhem2shelly/rpc:.* {}\
+  request2shelly/rpc:.* json2nameValue($EVENT, 'req_', $JSONMAP, 'in_mode') }
+attr DEVICE getList in_mode:noArg in_mode $\DEVICETOPIC/rpc {"id": 1,"src":"request2shelly", "method": "Switch.GetConfig", "params": {"id": 0}}
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); my $reb = ReadingsVal($name,'sys_restart_required','false') eq 'true'?'<a href="/fhem?cmd.dummy=set '.$name.' x_reboot&XHR=1"> ... Notwendigen Reboot durchführen</a>':''; qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>$reb<div>Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0
+attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 result_in_mode:in_mode
 attr DEVICE setStateList on off toggle on-for-timer off-for-timer
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
@@ -3450,7 +3453,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,3); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); my $reb = ReadingsVal($name,'sys_restart_required','false') eq 'true'?'<a href="/fhem?cmd.dummy=set '.$name.' x_reboot&XHR=1"> ... Notwendigen Reboot durchführen</a>':''; qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>$reb<div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0
+attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 result_in_mode:in_mode
 attr DEVICE model shellyPlus_1pm
 setreading DEVICE attrTemplateVersion 20220303
 option:{ CALLSPEECHRECOGN }
