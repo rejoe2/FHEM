@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25763 2022-03-03 17:33:38Z Beta-User $
+# $Id: 10_RHASSPY.pm 25778 2022-03-07 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.19';
+    $hash->{MODULE_VERSION} = '0.5.19a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -3104,7 +3104,7 @@ sub respond {
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
             text   => $response} );
-    return;
+    return $hash->{NAME};
 }
 
 
