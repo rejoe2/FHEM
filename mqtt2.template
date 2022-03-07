@@ -4307,9 +4307,9 @@ name:OpenMQTTGateway_MCU
 filter:TYPE=MQTT2_DEVICE
 desc:Use this with an OpenMQTTGateway. This template is meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Early user version, not yet fully tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt it to your needs!
 order:X_02
-par:BASE_ID;BASE_ID typically is home;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*/.*:, ? $1 : undef }
-par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)/.*:, ? $2 : undef }
-par:DEV_TPC;base and device name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<([^:]+/O[^/]*M[^/]*G[^/]*)/LWT> ? $1 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<([^:]+)/O[^/]*M[^/]*G[^/]*> ? $1 : undef }
+par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<[^:]+/(O[^/]*M[^/]*G[^/]*)> ? $1 : undef }
+par:DEV_TPC;base and device name in the topic;{ my $dt =  AttrVal('DEVICE','devicetopic',undef); defined $dt ? $dt : AttrVal('DEVICE','readingList','') =~ m<([^:]+/O[^/]*M[^/]*G[^/]*)/LWT> ? $1 : undef }
 par:RADIO_HASBT;MCU uses a BT interface;{ undef }
 par:RADIO_NOBT;MCU does not use any BT interface;{ undef }
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal('DEVICE','icon','mqtt') }
@@ -4326,7 +4326,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
   $\DEVICETOPIC/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),; json2nameValue($EVENT,"${1}_") }\
   $\DEVICETOPIC/BTtoMQTT/([0-9A-Z]+)/[^:]+:.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+)/([^:]+),; { "${1}_$2"=>$EVENT }}\
-  BASE_ID/home_presence/DEVNAME:.* { return if $EVENT !~ m,(..):(..):(..):(..):(..):(..),; {last => uc($1.$2.$3.$4.$5.$6)}}
+  BASE_ID/home_presence/DEVNAME:.* { return if $EVENT !~ m,(..):(..):(..):(..):(..):(..),; {last => uc($1.$2.$3.$4.$5.$6)}}\
   homeassistant/.+?/config:.* {}
 attr DEVICE setList\
   restart:noArg $\DEVICETOPIC/commands/MQTTtoSYS/config {"cmd":"restart"}\
