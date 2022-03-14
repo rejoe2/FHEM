@@ -1,11 +1,11 @@
 # Id ##########################################################################
-# $Id: 98_monitoring.pm 25646 2022-02-28 Beta-User $
+# $Id: 98_monitoring.pm 25646 2022-03-14 Beta-User $
 
 # copyright ###################################################################
 #
 # 98_monitoring.pm
 #
-# Copyright by igami
+# Originally initiated by igami
 #
 # This file is part of FHEM.
 #
@@ -398,7 +398,6 @@ sub monitoring_Notify {
 sub monitoring_modify {
   my ($SELF, $list, $operation, $value, $wait) = split m{[|]}x, shift;
   my $hash = $defs{$SELF} // return;
-  Log3($hash, 3, "monitoring_modify called with $operation and $list");
 
   return if IsDisabled($SELF);
 
