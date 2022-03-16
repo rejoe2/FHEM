@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_monitoring.pm 25646 2022-03-14 Beta-User $
+# $Id: 98_monitoring.pm 25646 2022-03-16 Beta-User $
 
 # copyright ###################################################################
 #
@@ -438,8 +438,8 @@ sub monitoring_modify {
       delete $hash->{READINGS}{$reading};
   }
   elsif ( $operation eq 'remove' ) {
-    push(@change, 1) if(delete $readings{$value});
-    delete $hash->{READINGS}{"$reading"};
+    push(@change, 1) if delete $readings{$value};
+    delete $hash->{READINGS}{$reading};
   }
 
   RemoveInternalTimer("$SELF|$list|add|$value");

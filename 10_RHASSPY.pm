@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25778 2022-03-07 Beta-User $
+# $Id: 10_RHASSPY.pm 25803 2022-03-16 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.19a';
+    $hash->{MODULE_VERSION} = '0.5.20';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -3100,7 +3100,7 @@ sub respond {
     #no audio output in msgDialog session
     #return if defined $hash->{helper}->{msgDialog} 
     #    && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
-    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return;
+    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return $hash->{NAME};
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
             text   => $response} );
@@ -3459,7 +3459,7 @@ sub RHASSPY_ParseHttpResponse {
         }
         my $siteIds;
         for (keys %{$ref}) {
-            next if !defined $ref->{$_}{satellite_site_ids};
+            next if ref $ref->{$_} ne 'HASH' || !defined $ref->{$_}{satellite_site_ids};
             if ($siteIds) {
                 $siteIds .= ',' . $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             } else {
@@ -4562,7 +4562,7 @@ sub _runSetColorCmd {
             return respond( $hash, $data, $error ) if $error;
             return getResponse($hash, 'DefaultConfirmation');
         } elsif ( defined $data->{$kw} && defined $mapping->{$_} ) {
-            my $value = _round( ( $mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal} ) * $data->{$kw} / $kw eq 'Hue' ? 360 : 100 ) ;
+            my $value = _round( ( $mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal} ) * $data->{$kw} / ( $kw eq 'Hue' ? 360 : 100 ) ) ;
             $value = min(max($mapping->{$_}->{minVal}, $value), $mapping->{$_}->{maxVal});
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
@@ -5655,16 +5655,17 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         By default, all incoming messages from AMADDevice/AMADCommBridge will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
         <li><i>&lt;allowed AMAD-device&gt;</i> A list of key=value pairs to tweak default behaviours:
         <ul>
-         <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
+        <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
          "activateVoiceInput" command towards this AMADDevice</li>
-         <li><i>sessionTimeout</i> timeout (in seconds) used if a request (e.g. for confirmation) is open for this AMADDevice (if not set, global default value is used)</li>
-         <li> Remark: This may contain additional keys in the future, e.g., to restrict wakeword effect to a specific siteId.</li>
+        <li><i>sessionTimeout</i> timeout (in seconds) used if a request (e.g. for confirmation) is open for this AMADDevice (if not set, global default value is used)</li>
+        <li> Remark: This may contain additional keys in the future, e.g., to restrict wakeword effect to a specific siteId.</li>
         </ul>
+        </li>
       </ul>
       Example:<br>
         <p><code>allowed=AMADDev_A <br>
                  filterFromBabble=tell rhasspy <br>
-                 &lt;AMAD-device&gt;=wakeword=alexa sessionTimeout=20</code></p>
+                 AMADDev_A=wakeword=alexa sessionTimeout=20</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
@@ -5874,7 +5875,7 @@ yellow=rgb FFFF00</code></p>
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
   <li>siteId2ttsDevice_&lt;siteId&gt;</li>
-  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
 </ul>
 =end html
 =cut

@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-02-15 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-03-16 Beta-User $
 #
 # copyright ###################################################################
 #
@@ -1074,39 +1074,43 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
 <h3>archetype</h3>
 <div>
   <ul>
-    With an archetype, attributes are transferred to inheritors, other devices.
+    With an archetype, attributes are transferred to other devices, so called inheritors.
     The inheritors can be defined according to a given pattern in the archetype
     and for relations, a certain group of devices.<br>
     <br>
-    Notes:
+    As this is rather an abstract description that only may be self-explaining for those 
+    beeing familiar with concepts of <a href="https://en.wikipedia.org/wiki/Inheritance_(object-oriented_programming)">inheritence in programming</a>, 
+    here's some examples how <i>archetype</i> can be used:
     <ul>
-      <li>
-        <code>$name</code><br>
-        name of the inheritor
-      </li><br>
-      <li>
-        <code>$room</code><br>
-        room of the inheritor
-      </li><br>
-      <li>
-        <code>$relation</code><br>
-        name of the relation
-      </li><br>
-      <li>
-        <code>$SELF</code><br>
-        name of the archetype
-      </li>
+      <li>transfer attributes (and their values) from an <i>archetype</i> to arbitrary other devices and/or</li>
+      <li>new devices (as well within the <a href="#autocreate">autocreate</a> process) can be 
+      <ul>
+        <li>supplied with define and attr commands derived according to patterns</li>
+        <li>supplied with default attribute values</li>
+        <li>initialized with default attribute values and/or Reading-values</li>
+      </ul></li>
+      <li>indicate and/or correct differences between actual and desired attribute values</li>
+    </ul><br>
+    
+    <br>
+    These variables may be used within inheritence instructions:
+    <ul>
+      <li><code>$name</code> name of the inheritor</li>
+      <li><code>$room</code> room of the inheritor</li>
+      <li><code>$relation</code><br> name of the relation</li>
+      <li><code>$SELF</code> name of the archetype</li>
     </ul>
     <br>
+    Note: FHEM commands <a href="#setdefaultattr">setdefaultattr</a> and <a href="#template">template</a>
+    provide partly similar functionality.
     <a id="archetype-command"></a>
     <h4>Commands</h4>
     <ul>
-    <a id="archetype-command-clean"></a>
-      <code>clean [check]</code><br>
-      Defines all inheritors for all relations und inheritance all inheritors
-      with the attributes specified under the attribute attribute.<br>
-      If the "check" parameter is specified, all outstanding attributes and
-      inheritors are displayed.
+    <a id="archetype-command-archetype"></a>
+      <code>archetype &lt;clean or check&gt;</code><br>
+      "clean" will define all inheritors for all relations and process all inheritances to 
+      all inheritors with the attributes specified under the attribute attribute.<br>
+      If the "check" parameter is specified, all outstanding actions are displayed.
     </ul>
     <br>
     <a id="archetype-define"></a>
@@ -1115,13 +1119,13 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
       <code>
         define &lt;name&gt; archetype [&lt;devspec&gt;] [&lt;devspec&gt;] [...]
       </code><br>
-      In the &lt;devspec&gt; are described all the inheritors for this
-      archetype. Care should be taken to ensure that each inheritor is
-      associated with only one archetype.<br>
-      If no &lt;devspec&gt; is specified, this is set with "defined_by=$SELF".
-      This devspec is also always checked, even if it is not specified.<br>
-      See the section on
-      <a href="#devspec">device specification</a>
+      The &lt;devspec&gt; arguments point to all inheritors for this archetype. Make shure 
+      there are no conflicting actions described when using more than one archetype pointing 
+      to an inheritor. Basically it's recommended to associate each inheritor with just one 
+      archetype.<br>
+      If no &lt;devspec&gt; is specified, it is set to "defined_by=$SELF".
+      This devspec is also always checked, even if it is not specified explicitly.<br>
+      See the section on <a href="#devspec">device specification</a>
       for details of the &lt;devspec&gt;.<br>
       <br>
       <code>define &lt;name&gt; archetype derive attributes</code><br>
@@ -1139,7 +1143,7 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         <code>addToAttrList &lt;attribute&gt;</code><br>
         The command is only possible for an archetype with DEF
         "derive attributes".<br>
-        Add an entry to the userattr of the global device so that it is
+        Add an entry to the userattr of the <i>global</i> device so that it is
         available to all of the devices.<br>
         This can be useful to derive the alias according to a pattern.
       </li>
@@ -1152,24 +1156,25 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
             define &lt;metaNAME&gt; &lt;actualTYPE&gt; [&lt;metaDEF&gt;]
           </code>
         </ul>
-        When an inheritor Is defined, it is initialized with the commands
-        specified under the initialize attribute, and the archetype assign the
-        defined_by attribute to the value $ SELF.<br>
-        The relations, metaNAME, actualTYPE, and metaDEF are described in
-        the attributes.
+        When an inheritor is defined, it is initialized with the commands
+        specified under the <a href="#archetype-attr-initialize">initialize</a> attribute, 
+        and the archetype assign thedefined_by attribute to the value $ SELF.<br>
+        The relations (<a href="#archetype-attr-metaDEF">metaNAME</a>, <a href="#archetype-attr-metaTYPE">
+        metaTYPE</a> and <a href="#archetype-attr-metaDEF">metaDEF</a>) are described in
+        the respective attributes.
       </li>
       <br>
       <a id="archetype-set-derive"></a><li>
         <code>derive attributes</code><br>
-        This command is only possible for an archetype with DEF
+        This command is only availabe for an archetype with DEF
         "derive attributes".<br>
-        Derives all attributes specified under the attributes attribute for all
-        inheritors.
+        Derives all attributes specified under the <a href="#archetype-attr-attributes">
+        attributes</a> attribute for all inheritors.
       </li>
       <br>
       <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
-        Inheritance all attributes specified under the attributes attribute for
+        Inheritance all attributes specified under the <a href="#archetype-attr-attributes">attributes</a> attribute for
         all inheritors. Attribute values will be taken - if available - from the respective <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>, otherwise the value will be taken from the archetype's attribute with the same name.
       </li>
       <br>
@@ -1177,16 +1182,16 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         <code>import</code><br>
         Helper funktion to create an <i>archetype</i>.
         <ul>
-          <li>Imports all attributes from the given device as listed in <i>archetype's</i> <i>attributes</i> list.</li>
+          <li>Imports all attributes from the given device as listed in <i>archetype's</i> <a href="#archetype-attr-attributes">attributes</a> list.</li>
           <li>If <i>attributes</i> was not set before, all attributes <u>from the given device</u> will be imported (as <a href="#archetype-attr-actual_attribute">actual_.+-attribute</a>) to the archetype; <i>attributes</i> will be filled with a list of the importierted attributes.</li>
-          <li>The values form the attributs will also be imported for futher usage in the archetype.</li>
+          <li>The values form the attributs will also be imported for further usage in the archetype (marked as optional with the "undef"-prefix).</li>
         </ul>
         Note: While import is running, no values will be forwarded to the inheritors.
       </li>
       <br>
       <a id="archetype-set-initialize"></a><li>
         <code>initialize inheritors</code><br>
-        Executes all commands specified under the attributes initialize for all
+        Executes all commands specified under the attributes <a href="#archetype-attr-initialize">initialize</a> for all
         inheritors.
       </li>
       <br>
@@ -1213,15 +1218,15 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
        <ul>
           <li>
             <code>pending attributes</code><br>
-            Displays all outstanding attributes specified under the attributes
-            attributes for all inheritors, which do not match the attributes of the
-            archetype.
+            Displays all outstanding attributes specified under the <a href="#archetype-attr-attributes">attributes</a>
+            attribute for all inheritors, which do not match the (not optional) 
+            attributes of the archetype.
           </li>
           <br>
           <li>
             <code>pending inheritors</code><br>
-            Displays all outstanding inheritors, which should be defined on the
-            basis of the relations
+            Displays all outstanding inheritors, which shall be defined 
+            based on the described relations.
           </li>
        </ul>
       </li>
@@ -1235,8 +1240,8 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
       <ul>
         <a id="archetype-attr-undef"></a><li>
           <code>attr archetype &lt;attribute&gt; undef:&lt;...&gt;</code><br>
-          If <code>undef:</code>  preceded, the attribute is inherited only if
-          the inheritors does not already have this attribute.
+          If <code>undef:</code>  preceded, the attribute is not inherited 
+          if the inheritors does not already have this attribute (no matter which value it is set to).
         </li><br>
         <a id="archetype-attr-least"></a><li>
           <code>
@@ -1248,6 +1253,14 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
           <code>least[(&lt;seperator&gt;)]:</code>.<br>
           If no separator is specified, the space is used as separator.
         </li>
+        <a id="archetype-attr-Perl"></a><li>
+          <code>attr archetype &lt;attribute&gt; Perl:&lt;...&gt;</code><br>
+          <code>attr archetype &lt;attribute&gt; undef,Perl:&lt;...&gt;</code><br>
+          Default behaviour for Perl code in any attribute is: Code will be evaluated and the result 
+          will be the value to be set in the inheritor's attribute.
+          (Additional) modifier <code>Perl:</code> will change that so the (unevaluated) Perl code 
+          will be used directly as attribute value (e.g. usefull for <i>devStateIcon</i> or <i>stateFormat</i>).
+        </li><br>
       </ul>
       <br>
       <a id="archetype-attr-actual_attribute" data-pattern="actual_.*"></a><li>
@@ -1264,18 +1277,52 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         </code><br>
         All terms enclosed in% are attributes. An order can be achieved by |.
         If an expression is included in [] it is optional.<br>
-        The captionRoom, description, index, and suffix expressions are added
-        by addToAttrList.<br>
+        The captionRoom, description, index, and suffix expressions are added (e.g.)
+        by <a href="#archetype-set-addToAttrList">addToAttrList</a>.<br>
+        <b>Remarks and options:</b>
+        <ul>
+          <li><i>no return value</i></li>
+            If an <i>actual_&lt;attribute&gt;</i> is set, it will be used instead of the 
+            identically named &lt;attribute&gt;. If it contains Perl code to be evaluated
+            and evaluation returns no value, no changes will be derived.
+          <li><i>Filtering</i></li>
+            Extending the attribute names indicates filtering is desired. Syntax is:
+            <code>actual_&lt;attribute&gt;_&lt;index&gt; &lt;FILTER&gt; &lt;value&gt;</code>. 
+            This may be helpful to configure devices with more than one channels or different models
+            by a common archetype. If the given filter matches, this will prevent useage of 
+            content of <i>actual_&lt;attribute&gt;</i> (and <i>&lt;attribute&gt;</i> as well), 
+            even if the evaluation of Perl code will return nothing.<br>
+            Example:<br>
+            <code>define archHM_CC archetype TYPE=CUL_HM:FILTER=model=(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)<br>
+            attr archHM_CC attributes devStateIcon icon<br>
+            attr archHM_CC actual_devStateIcon_RT model=HM-CC-RT-DN:FILTER=chanNo=04 Perl:{devStateIcon_Clima($name)}<br>
+            attr archHM_CC actual_devStateIcon_WT model=HM-TC-IT-WM-W-EU:FILTER=chanNo=02 Perl:{devStateIcon_Clima($name)}<br>
+            attr archHM_CC actual_icon hm-cc-rt-dn<br>
+            attr archHM_CC actual_icon_2 model=HM-TC-IT-WM-W-EU hm-tc-it-wm-w-eu</code>
+          <li><i>Frontend availability</i></li>
+            <i>actual_&lt;attribute&gt;</i> is a "wildcard" attribute, intended to be set (initially) 
+            using FHEM command field. Wrt. to useage of <i>filterung</i>, this is the only way to set 
+            this type of attribute, all items from the <a href="#archetype-attr-attributes">attributes</a> list 
+            will added as <i>actual_&lt;attribute&gt;</i> as well and then can be accessed
+            directly by the regular drop-down menu in FHEMWEB.
+        </ul>
       </li>
       <br>
       <a id="archetype-attr-actualTYPE"></a><li>
         <code>actualTYPE &lt;TYPE&gt;</code><br>
-        Sets the TYPE of the inheritor. The default value is dummy.
+        Sets the TYPE of the inheritor. The default value is <i>dummy</i>.
       </li>
       <br>
       <a id="archetype-attr-attributes"></a><li>
         <code>attributes &lt;attribute&gt; [&lt;attribute&gt;] [...]</code><br>
-        Space-separated list of attributes to be inherited.
+        Space-separated list of attributes to be inherited. Values of the attributes 
+        in the inheritence process will be taken from the attributes with either (lower 
+        to higher priority) from
+         <ul>
+          <li>attribute with exactly the same name</li>
+          <li>attribute following the name sheme <a href="#archetype-attr-actual_attribute">actual_&lt;attribute&gt;</a></li>
+          <li>attribute following the name sheme <a href="#archetype-attr-actual_attribute">actual_&lt;attribute&gt;_&lt;index&gt;</a> in combination with matching filter</li>
+        </ul>
       </li>
       <br>
       <a id="archetype-attr-attributesExclude"></a><li>
@@ -1288,7 +1335,7 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
       <br>
       <a id="archetype-attr-autocreate"></a><li>
         <code>autocreate 0</code><br>
-        The archetype does not automatically inherit attributes to new devices,
+        If set to 0, the archetype does not automatically inherit attributes to new devices,
         and inheritors are not created automatically for new relations.<br>
         The default value is 1.
       </li>
@@ -1316,7 +1363,8 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         &lt;initialize&gt; can be specified as &lt;text&gt; or {perl code}.<br>
         The &lt;text&gt; or the return of {perl code} must be a list of FHEM
         commands separated by a semicolon (;). These are used to initialize the
-        inheritors when they are defined.
+        inheritors when they are defined.<br>
+        Note: This functionality is limited to "<a href="#archetype-attr-relations">relations</a>"!
       </li>
       <br>
       <a id="archetype-attr-metaDEF"></a><li>
@@ -1446,7 +1494,9 @@ attr SVG_link_archetype attributes group</pre>
       </code><br>
       In den &lt;devspec&gt; werden alle Erben beschrieben die es für dieses
       archetype gibt. Es sollte darauf geachtet werden, dass jeder Erbe nur
-      einem archetype zugeordnet ist.<br>
+      einem archetype zugeordnet ist und keine widerstreitenden Angaben für 
+      diesselben Attribute aus unterschiedlichen archetype abgeleitet werden sollen.
+      .<br>
       Wird keine &lt;devspec&gt; angegeben wird diese mit "defined_by=$SELF"
       gesetzt. Diese devspec wird auch immer überprüft, selbst wenn
       sie nicht angegeben ist.<br>
@@ -1454,7 +1504,7 @@ attr SVG_link_archetype attributes group</pre>
       für Details zu &lt;devspec&gt;.<br>
       <br>
       <code>define &lt;name&gt; archetype derive attributes</code><br>
-      Wird in der DEF "derive attributes" angegeben handelt es sich um ein
+      Wird in der DEF "derive attributes" angegeben, handelt es sich um ein
       besonderes archetype. Es leitet Attribute anhand eines Musters ab.<br>
       Das Muster wird mit den Attributen actual_.+ beschrieben.<br>
       Als Erben werden alle Geräte aufgelistet welche alle Pflicht-
@@ -1483,22 +1533,25 @@ attr SVG_link_archetype attributes group</pre>
         Wenn ein Erbe definiert wird, wird er mit den unter dem Attribut
         initialize angegebenen Befehlen initialisiert und ihm wird das Attribut
         <i>defined_by</i> mit dem Wert $SELF zugewiesen.<br>
-        Die Beziehungen, metaNAME, actualTYPE und metaDEF werden in Attributen
-        beschrieben.
+        Die Beziehungen (<a href="#archetype-attr-metaDEF">metaNAME</a>, <a href="#archetype-attr-metaTYPE">
+        metaTYPE</a> und <a href="#archetype-attr-metaDEF">metaDEF</a>) werden 
+        in den gleichnamigen Attributen beschrieben.
       </li>
       <br>
       <a id="archetype-set-derive"></a><li>
         <code>derive attributes</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
         möglich.<br>
-        Leitet für alle Erben die unter dem Attribut <i>attributes</i> angegeben
-        Attribute ab.
+        Leitet für alle Erben die unter dem Attribut <a href="#archetype-attr-attributes">attributes</a>
+        angegeben Attribute ab.
       </li>
       <br>
       <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
-        Vererbt die eigenen unter dem Attribut <i>attributes</i> angegeben Attribute
-        auf alle Erben. Dabei werden - wenn vorhanden - die Vorgaben aus dem zugehörigen <a href="#archetype-attr-actual_attribute">actual_.+-Attribut</a> entnommen, hilfsweise aus dem gleichnamigen Attribut des archetype.
+        Vererbt die eigenen unter dem Attribut <a href="#archetype-attr-attributes">attributes</a>
+        angegeben Attribute auf alle Erben. Dabei werden - wenn vorhanden - die Vorgaben aus dem
+        zugehörigen <a href="#archetype-attr-actual_attribute">actual_.+-Attribut</a> entnommen,
+        hilfsweise aus dem gleichnamigen Attribut des archetype.
       </li>
       <br>
       <a id="archetype-set-import"></a><li>
@@ -1514,7 +1567,7 @@ attr SVG_link_archetype attributes group</pre>
       <br>
       <a id="archetype-set-initialize"></a><li>
         <code>initialize inheritors</code><br>
-        Führt für alle Erben die unter dem Attribut <i>initialize</i> angegebenen Befehle aus.
+        Führt für alle Erben die unter dem Attribut <a href="#archetype-attr-initialize">initialize</a> angegebenen Befehle aus.
       </li>
       <br>
       <a id="archetype-set-raw"></a><li>
@@ -1538,9 +1591,9 @@ attr SVG_link_archetype attributes group</pre>
       <a id="archetype-get-pending"></a><li>
           <ul><li>
             <code>pending attributes</code><br>
-            Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
-            Attribute auf, die nicht mit den Attributen des archetype
-            &uuml;bereinstimmen.
+            Listet für jeden Erben die unter dem Attribut <a href="#archetype-attr-attributes">attributes</a> angegeben
+            Attribute auf, die nicht mit den (zwingenden) Attribut-Vorgaben des archetype
+            übereinstimmen.
           </li>
           <br>
           <li>
@@ -1556,12 +1609,12 @@ attr SVG_link_archetype attributes group</pre>
     <ul>
       Hinweise:
       <ul>
-        Alle Attribute, die vererbt werden k&ouml;nnen, k&ouml;nnen vorab mit
+        Alle Attribute, die vererbt werden können, können vorab mit
         einem Modifikator versehen werden.
         <a id="archetype-attr-undef"></a><li>
           <code>attr archetype &lt;attribute&gt; undef:&lt;...&gt;</code><br>
           Wird <code>undef:</code> vorangestellt wird das Attribut nur vererbt,
-          sofern der Erbe dieses Attribut noch nicht besitzt.
+          sofern dieses Attribut an dem Erbe noch gar nicht vorhanden ist.
         </li><br>
         <a id="archetype-attr-least"></a><li>
           <code>
@@ -1587,7 +1640,7 @@ attr SVG_link_archetype attributes group</pre>
         &lt;value&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden.<br>
         Wird das Attribut &lt;attribute&gt; vererbt, ersetzt die Rückgabe
-        des actual_&lt;attribute&gt; den Wert des Attributes.<br>
+        des actual_&lt;attribute&gt; den Wert des gleichnamigen Attributes.<br>
         Bei dem archetype mit der DEF "derive attributes" können Muster
         definiert werden.<br>
         Beispiel:
@@ -1598,13 +1651,12 @@ attr SVG_link_archetype attributes group</pre>
         lässt sich durch | erreichen. Ist ein Ausdruck in [] eingeschlossen ist
         er optional.<br>
         Die Ausdrücke <i>captionRoom</i>, <i>description</i>, <i>index</i> und <i>suffix</i> sind hierbei
-        durch <i>addToAttrList</i> hinzugefügte (globale) Attribute.<br><br>
+        z.B. durch <a href="#archetype-set-addToAttrList">addToAttrList</a> hinzugefügte (globale) Attribute.<br><br>
         <b>Weitere Hinweise und Optionen</b>
         <ul>
           <li><i>keine Rückgabe</i></li>
             Ist in einem Attribut (z.B. nach der Evaluierung einer Perl-Funktion) kein Inhalt definiert, 
-            wird der Wert des Attributs ohne "actual_"-Präfix verwendet, ist auch dieser leer bzw. nicht
-            vorhanden, wird keine Änderung vorgenommen.
+            wird keine Änderung vorgenommen.
           <li><i>Filterungen</i></li>
             Duch weitere Zusätze zum Attributnamen können zusätzliche Filterungen realisiert werden. 
             Dies erfolgt in der Form <code>actual_&lt;attribute&gt;_&lt;index&gt; &lt;FILTER&gt;
@@ -1617,17 +1669,31 @@ attr SVG_link_archetype attributes group</pre>
             attr archHM_CC actual_devStateIcon_WT model=HM-TC-IT-WM-W-EU:FILTER=chanNo=02 Perl:{devStateIcon_Clima($name)}<br>
             attr archHM_CC actual_icon hm-cc-rt-dn<br>
             attr archHM_CC actual_icon_2 model=HM-TC-IT-WM-W-EU hm-tc-it-wm-w-eu</code>
+          <li><i>Verfügbarkeit im FHEMWEB-Frontend</i></li>
+            Es handelt sich um "wildcard"-Attribute, die (initial) über das FHEM-Kommandofeld gesetzt
+            werden können bzw. (im Fall der <i>Filterung</i>) müssen. Ein Attribut, das in 
+            <a href="#archetype-attr-attributes">attributes</a> gelistet ist, erhält automatisch 
+            einen passenden actual_&lt;attribute&gt;-Eintrag und kann dann auch direkt das drop-down 
+            Menü der Attribut-Liste in FHEMWEB gesetzt werden.
         </ul>
       </li>
       <br>
       <a id="archetype-attr-actualTYPE"></a><li>
         <code>actualTYPE &lt;TYPE&gt;</code><br>
-        Legt den TYPE des Erben fest. Der Standardwert ist dummy.
+        Legt den TYPE des Erben fest. Der Standardwert ist <i>dummy</i>.
       </li>
       <br>
       <a id="archetype-attr-attributes"></a><li>
         <code>attributes &lt;attribute&gt; [&lt;attribute&gt;] [...]</code><br>
-        Leerzeichen-getrennte Liste der zu vererbenden Attribute.
+        Leerzeichen-getrennte Liste der zu vererbenden Attribute. Die Werte der
+        Attribute werden (mit steigender Priorität) im Vererbungsprozess entnommen aus 
+        dem Attribut mit:
+         <ul>
+          <li>genau demselben Namen</li>
+          <li>dem Namens-Schema: <a href="#archetype-attr-actual_attribute">actual_&lt;attribute&gt;</a></li>
+          <li>dem Namens-Schema <a href="#archetype-attr-actual_attribute">actual_&lt;attribute&gt;_&lt;index&gt;</a>,
+          sofern der dort angegebene Filter paßt.</li>
+        </ul>
       </li>
       <br>
       <a id="archetype-attr-attributesExclude"></a><li>
@@ -1670,24 +1736,25 @@ attr SVG_link_archetype attributes group</pre>
         Der &lt;Text&gt; oder die Rückgabe vom {perl code} muss eine
         durch Semikolon (;) getrennte Liste von FHEM-Befehlen sein. Mit diesen
         werden die Erben initialisiert, wenn sie definiert werden bzw. der 
-        Befehl <a href="#archetype-set-initialize">initialize</a> angewandt wird.
+        Befehl <a href="#archetype-set-initialize">initialize</a> angewandt wird.<br>
+        Hinweis: Die Funktion ist beschränkt auf "<a href="#archetype-attr-relations">relations</a>"!
       </li>
       <br>
       <a id="archetype-attr-metaDEF"></a><li>
         <code>metaDEF &lt;metaDEF&gt;</code><br>
         &lt;metaDEF&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
-        werden und beschreibt den Aufbau der DEF f&uuml;r die Erben.
+        werden und beschreibt den Aufbau der DEF für die Erben.
       </li>
       <br>
       <a id="archetype-attr-metaNAME"></a><li>
         <code>metaNAME &lt;metaNAME&gt;</code><br>
         &lt;metaNAME&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
-        werden und beschreibt den Aufbau des Namen f&uuml;r die Erben.
+        werden und beschreibt den Aufbau des Namen für die Erben.
       </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
-        In den &lt;relations&gt; werden alle Beziehungen beschrieben die es für
+        In den &lt;relations&gt; werden alle Beziehungen beschrieben, die es für
         dieses archetype gibt.<br>
         Siehe den Abschnitt über <a href="#devspec">Geräte-Spezifikation</a>
         für Details zu &lt;devspec&gt;.
@@ -1709,7 +1776,7 @@ attr SVG_link_archetype attributes group</pre>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
         <u>
-          Die folgenden beispiel Codes k&ouml;nnen per "Raw defnition"
+          Die folgenden beispiel Codes können per "Raw defnition"
           importiert werden.
         </u>
       </a>
