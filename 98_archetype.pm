@@ -1097,7 +1097,7 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
     <ul>
       <li><code>$name</code> name of the inheritor</li>
       <li><code>$room</code> room of the inheritor</li>
-      <li><code>$relation</code><br> name of the relation</li>
+      <li><code>$relation</code> name of the relation</li>
       <li><code>$SELF</code> name of the archetype</li>
     </ul>
     <br>
@@ -1283,7 +1283,7 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         <ul>
           <li><i>no return value</i></li>
             If an <i>actual_&lt;attribute&gt;</i> is set, it will be used instead of the 
-            identically named &lt;attribute&gt;. If it contains Perl code to be evaluated
+            identically named <i>&lt;attribute&gt;</i>. If it contains Perl code to be evaluated
             and evaluation returns no value, no changes will be derived.
           <li><i>Filtering</i></li>
             Extending the attribute names indicates filtering is desired. Syntax is:
@@ -1301,7 +1301,7 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
             attr archHM_CC actual_icon_2 model=HM-TC-IT-WM-W-EU hm-tc-it-wm-w-eu</code>
           <li><i>Frontend availability</i></li>
             <i>actual_&lt;attribute&gt;</i> is a "wildcard" attribute, intended to be set (initially) 
-            using FHEM command field. Wrt. to useage of <i>filterung</i>, this is the only way to set 
+            using FHEM command field. Wrt. to useage of <i>filtering</i>, this is the only way to set 
             this type of attribute, all items from the <a href="#archetype-attr-attributes">attributes</a> list 
             will added as <i>actual_&lt;attribute&gt;</i> as well and then can be accessed
             directly by the regular drop-down menu in FHEMWEB.
@@ -1749,7 +1749,7 @@ attr SVG_link_archetype attributes group</pre>
       <a id="archetype-attr-metaNAME"></a><li>
         <code>metaNAME &lt;metaNAME&gt;</code><br>
         &lt;metaNAME&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
-        werden und beschreibt den Aufbau des Namen für die Erben.
+        werden und beschreibt den Aufbau des Namens für die Erben.
       </li>
       <br>
       <a id="archetype-attr-relations"></a><li>
