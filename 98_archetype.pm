@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_archetype.pm 20798 2022-03-16 Beta-User $
+# $Id: 98_archetype.pm 20798 2022-03-17 Beta-User $
 #
 # copyright ###################################################################
 #
@@ -615,6 +615,7 @@ sub archetype_AnalyzeCommand {
     #Debug("no Perl in aAC, starting with $cmd");
     #$cmd  = EvalSpecials($cmd, %specials);
     $cmd = eval($cmd);# if AttrVal($SELF,'useEval',0); #seems we don't have much other opportunities for simple text replacements...?
+    
     #Debug("evaluated to $cmd");
 =pod
     for my $special ( sort { length $b <=> length $a } keys %specials) {
@@ -942,7 +943,7 @@ sub archetype_evalSpecials {
       for (split("\\|", $special)){
         my $AttrVal = AttrVal($name, $_, undef);
         $AttrVal = archetype_AnalyzeCommand(
-          $AttrVal, $name, AttrVal($name, "room", undef), undef, undef
+          $AttrVal, $name, AttrVal($name, 'room', undef), undef, undef
         ) if $AttrVal;
 
         if($AttrVal){

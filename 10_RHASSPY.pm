@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25803 2022-03-16 Beta-User $
+# $Id: 10_RHASSPY.pm 25803 2022-03-17 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -64,7 +64,8 @@ my %sets = (
     update              => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
     volume              => [],
     msgDialog           => [qw( enable disable )],
-    activateVoiceInput  => []
+    activateVoiceInput  => [],
+    test                => []
     #text2intent  => []
 );
 
@@ -259,7 +260,7 @@ BEGIN {
     HttpUtils_NonblockingGet
     FmtDateTime
     makeReadingName
-    FileRead
+    FileRead FileWrite
     getAllSets
     notifyRegexpChanged setNotifyDev
     deviceEvents
@@ -320,7 +321,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.20';
+    $hash->{MODULE_VERSION} = '0.5.21';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -591,6 +592,14 @@ sub Set {
         $data->{id}     = $h->{id}     // shift @values // return;
         my $siteId = $h->{siteId} // shift @values;
         return sayFinished($hash,$data,$siteId);
+    }
+    
+    if ($command eq 'test') {
+        return 'provide a filename' if !@values;
+        return testmode_start($hash, $values[0]) if $values[0] ne 'stop' || defined $hash->{testline};
+        delete $hash->{testline};
+        delete $hash->{helper}->{test};
+        return 'Test mode stopped (might have been running already)';
     }
 
     return;
@@ -2584,6 +2593,64 @@ sub sayFinished {
     return IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
 }
 
+#reference: https://forum.fhem.de/index.php/topic,124952.msg1213902.html#msg1213902
+sub testmode_start {
+    my $hash    = shift // return;
+    my $file    = shift // return;
+
+    my ($ret, @content) = FileRead( { FileName => $file, ForceType => 'file' } );
+    return $ret if $ret;
+    return 'file contains no content!' if !@content;
+    $hash->{testline} = 0;
+    $hash->{helper}->{test}->{content} = \@content;
+    $hash->{helper}->{test}->{filename} = $file;
+    return testmode_next($hash);
+}
+
+sub testmode_next {
+    my $hash = shift // return;
+
+    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    if ( !$line || $line =~ m{\A\s*[#]}x || $line =~ m{\A\s*\z}x) {
+        $line //= '';
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] = "$line (skipped empty or comment line)";
+        $hash->{testline}++;
+        return testmode_next($hash) if $hash->{testline} <= @{$hash->{helper}->{test}->{content}};
+    }
+
+    if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
+        my @ca_strings = split m{,}, ReadingsVal($hash->{NAME},'intents','');
+        my $sendData =  { 
+            input        => $line,
+            sessionId    => "$hash->{siteId}_$hash->{testline}_testmode",
+            id           => "$hash->{siteId}_$hash->{testline}",
+            siteId       => $hash->{siteId},
+            intentFilter => [@ca_strings]
+        };
+
+        my $json = _toCleanJSON($sendData);
+        return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
+    }
+
+    my $filename = "$hash->{helper}->{test}->{filename}.result";
+    FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
+    delete $hash->{testline};
+    delete $hash->{helper}->{test};
+    return;
+}
+
+sub testmode_parse {
+    my $hash       = shift // return;
+    my $intentName = shift // return;
+    my $data       = shift // return;
+    
+    my $json = toJSON($data);
+
+    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    $hash->{helper}->{test}->{result}->[$hash->{testline}] = "$line => $intentName $json";
+    $hash->{testline}++;
+    return testmode_next($hash);
+}
 
 sub RHASSPY_msgDialogTimeout {
     my $fnHash = shift // return;
@@ -2673,7 +2740,6 @@ sub msgDialog_progress {
 
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
-    return;
 }
 
 sub msgDialog_respond {
@@ -2954,6 +3020,7 @@ sub analyzeMQTTmessage {
     }
 
     if ($topic =~ m{\Ahermes/intent/.*[:_]SetMute}x && defined $siteId) {
+        return testmode_parse($hash, 'SetMute', $data) if defined $hash->{testline};
         $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         $data->{requestType} = $type;
 
@@ -3001,9 +3068,12 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
+        return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline};
         handleIntentNotRecognized($hash, $data) if $hash->{experimental};
         return;
     }
+
+    return testmode_parse($hash, $data->{intent}, $data) if defined $hash->{testline};
 
     my $command = $data->{input};
     $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
@@ -5229,10 +5299,6 @@ __END__
   Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
   Gibt auch Lampen, die können nur ct (Beta-User: unklare Frage: der fragliche Zweig wird nur bei "falschem ct" angesteuert, ansonsten wird schon vorher "nativ" ct verwendet)
 
-# Custom Intents
- - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
-   also gar nicht ausgegeben und: (Beta-User: klingt nach "silent cancelation", grade keine Idee).
-
    PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868. (Beta-User: nicht mehr zuordenbar)
 
 # Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
@@ -5445,8 +5511,13 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
   <li>
     <a id="RHASSPY-set-activateVoiceInput"></a><b>activateVoiceInput</b>
-    <p>Activate a satellite for voice input. <i>siteId</i>, <i>hotword</i> and <i>modelId</i> may be provided (either in order of appearance or as named arguments), otherwise some defaults will be used.
+    <p>Activate a satellite for voice input. <i>siteId</i>, <i>hotword</i> and <i>modelId</i> may be provided (either in order of appearance or as named arguments), otherwise some defaults will be used.</p>
   </li>
+  <li>
+    <a id="RHASSPY-set-test"></a><b>test</b>
+    <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to a file with the same name and extension '.result'. "stop" as filename will stop running test.</p>
+  </li>
+
 </ul>
 
 <a id="RHASSPY-attr"></a>
