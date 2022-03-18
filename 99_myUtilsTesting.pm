@@ -96,9 +96,13 @@ sub updateCountdown($;$$) {
   my $name = shift //return;
   my $remaining = shift;
   my $interval = shift // 30;
+  
+  if ($name =~ m{:} ) {
+     ($name, $interval) = split m{:}x, $name;
+  }
 
   my $hash = $name;               
-  $hash = $defs{$name} if( ref($hash) ne 'HASH' );
+  $hash = $defs{$name} if ref $hash ne 'HASH';
   $name = $hash->{NAME};         
 
   if( !$hash ) {                 
@@ -120,7 +124,7 @@ sub updateCountdown($;$$) {
     }
   }
                                  
-  Log3( $name, 4, "updateCountdown: remaining $remaining");
+  Log3( $name, 4, "updateCountdown: remaining $remaining" );
   if ( $remaining ne '<unknown>' ) {
     if( $remaining <= 0 ) {
       stopCountdown($name);
@@ -128,7 +132,7 @@ sub updateCountdown($;$$) {
     }
 
     readingsSingleUpdate($hash, 'timerRemaining', int($remaining), 1);
-    InternalTimer( gettimeofday() + $interval, 'updateCountdown', $hash);
+    InternalTimer( gettimeofday() + $interval, 'updateCountdown', "${name}:$interval" );
   }
 }
 
