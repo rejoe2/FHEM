@@ -40,6 +40,121 @@ sub myUptime {
   return "Da ist was schief gegangen";
 }
 
+#https://forum.fhem.de/index.php/topic,84016.0/topicseen.html
+sub startCountdown($;$$) {
+  my $name = shift // return
+  my $duration = shift;
+  my $interval = shift // 30;
+                                 
+  my $hash = $name;               
+  $hash = $defs{$name} if ref $hash ne 'HASH';
+  $name = $hash->{NAME};         
+
+  if( !$hash ) {                 
+    Log3( $name, 2, "startCountdown error: no such device: $name" );
+    return;                       
+  }                               
+
+  Log3( $name, 4, "startCountdown for: $name" );
+
+  my $remaining;                 
+  if( !defined $duration ) {     
+    my $state = ReadingsVal($name, 'state', undef);
+    if( $state eq 'off' ) {       
+      stopCountdown($name);       
+      return;                     
+    } 
+	if( defined ReadingsVal($name, 'timerDuration', undef) ) {
+      return;                     
+    };                           
+
+    $duration = '<unknown>';     
+    if( my $TIMED_OnOff = $hash->{TIMED_OnOff} ) {
+      $duration = $TIMED_OnOff->{DURATION};
+      $remaining = $TIMED_OnOff->{START} + $TIMED_OnOff->{DURATION} - time();
+    } elsif( $state =~ m/set_o[nf]+-for-timer (\d+)/ ) {
+      $duration = $1;
+      $remaining = $1;
+    }                             
+  }                               
+
+  if( $duration ne '<unknown>' ) {
+    if( $duration <= 0 ) {
+      stopCountdown($hash);
+      return;
+    }
+
+    readingsSingleUpdate($hash, 'timerDuration', $duration, 1);
+    updateCountdown($hash, $remaining, $interval);
+  } else {
+    readingsSingleUpdate($hash, 'timerDuration', $duration, 1);
+  }                               
+  return;                         
+}                                 
+                                 
+sub updateCountdown($;$$) {           
+  my $name = shift //return;
+  my $remaining = shift;
+  my $interval = shift // 30;
+
+  my $hash = $name;               
+  $hash = $defs{$name} if( ref($hash) ne 'HASH' );
+  $name = $hash->{NAME};         
+
+  if( !$hash ) {                 
+    Log3 $name, 2, "updateCountdown error: no such device: $name";
+    return;                       
+  }                               
+
+  if( !defined($remaining) ) {
+    $remaining = '<unknown>';
+
+    if( my $TIMED_OnOff = $hash->{TIMED_OnOff} ) {
+      $remaining = $TIMED_OnOff->{START} + $TIMED_OnOff->{DURATION} - time();
+    } else {
+      $remaining = ReadingsVal($name, 'timerDuration', undef);
+      if( $remaining ne '<unknown>' ) {
+        my $age = ReadingsAge($name, 'timerDuration', undef);
+        $remaining = $remaining - $age;
+      }
+    }
+  }
+                                 
+  Log3( $name, 4, "updateCountdown: remaining $remaining");
+  if ( $remaining ne '<unknown>' ) {
+    if( $remaining <= 0 ) {
+      stopCountdown($name);
+      return;
+    }
+
+    readingsSingleUpdate($hash, 'timerRemaining', int($remaining), 1);
+    InternalTimer( gettimeofday() + $interval, 'updateCountdown', $hash);
+  }
+}
+
+sub stopCountdown($) {               
+  my $name = shift // return;                 
+     
+  my $hash = $name;
+  $hash = $defs{$name} if ref $hash ne 'HASH';
+  $name = $hash->{NAME};
+         
+  if( !$hash ) {
+    Log3( $name, 2, "stopCountdown error: no such device: $name" );
+    return;
+  }
+
+  Log3( $name, 4, "stopCountdown for: $name" );
+
+  readingsSingleUpdate($hash, 'timerRemaining', 0, 1);
+
+  RemoveInternalTimer( $hash, 'updateCountdown' );
+  CommandDeleteReading( undef, "$name timerDuration" );
+  CommandDeleteReading( undef, "$name timerRemaining" );
+
+  return;                         
+}
+
 sub
 notifyRegexpChanged2a
 {
