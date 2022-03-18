@@ -5384,41 +5384,18 @@ __END__
 
 =begin ToDo
 
-# Farben:
-  Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
-  Gibt auch Lampen, die können nur ct (Beta-User: unklare Frage: der fragliche Zweig wird nur bei "falschem ct" angesteuert, ansonsten wird schon vorher "nativ" ct verwendet)
-
-   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868. (Beta-User: nicht mehr zuordenbar)
-
-# Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
-- kein "match in room" bei GetNumeric
-- "kind" und wie man es füllen könnte (mehr Dialoge)
-- Bestätigungsdialoge - weitere Anwendungsfelder
-- gDT: mehr und bessere mappings?
-- Farbe und Farbtemperatur (fast fertig?)
-- Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
-  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen (erl. mit extrarooms?)
-
-# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
-
-# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)? (erl. (?))
-
-=end ToDo
-
-=begin ToClarify
-
-#defaultRoom (JensS):
-- überhaupt erforderlich?
-- Schreibweise: RHASSPY ist raus, Rhasspy scheint der überkommene Raumname für die devspec zu sein => ist erst mal weiter beides drin
+# Continous mode? (Wackelig, mehr oder weniger ungetestet...)
 
 # GetTimer implementieren?
 https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
-# Wetterdurchsage
-Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
-https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754 (evtl. ersetzt durch STATE-Abfrage/gDT info?)
+# Rückmeldung zu den AMAD.*-Schnittstellen 
+- v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
-=end ToClarify
+# auto-training
+Tests/Rückmeldungen fehlen bisher
+
+=end ToDo
 
 =encoding utf8
 =item device
