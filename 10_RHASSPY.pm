@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-20 11:08:58Z Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-21 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -146,9 +146,11 @@ my $languagevars = {
       'update' => 'initiated update for $deviceName'
     },
     'getRHASSPYOptions' => {
-      'control' => 'the following devices can be controlled $deviceNames',
-      'info'    => '$deviceNames may provide ',
-      'scenes'  => '$deviceNames may be able to be set to these $sceneNames'
+      'generic' => 'actions to devices may be initiated or information known by your automation can be requested',
+      'control' => 'in $room amongst others the following devices can be controlled $deviceNames',
+      'info'    => 'especially $deviceNames may serve as information source in $room',
+      'rooms'   => 'amongst others i know $roomNames as rooms',
+      'scenes'  => '$deviceNames in $room may be able to be set to $sceneNames'
     }
   },
   'stateResponses' => {
@@ -326,7 +328,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.23';
+    $hash->{MODULE_VERSION} = '0.5.24';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -4485,14 +4487,55 @@ sub handleIntentGetState {
     my $data = shift // return;
     my $device = $data->{Device} // q{RHASSPY};
 
-    if ($device eq 'RHASSPY') {
-        return respond( $hash, $data, getResponse($hash, 'NoValidData'));
-    }
-
     my $response;
     Log3($hash->{NAME}, 5, 'handleIntentGetState called');
 
     my $room = getRoomName($hash, $data);
+
+    if ($device eq 'RHASSPY') {
+        $data->{Type} //= 'generic';
+        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $data->{Type} !~ m{\Ageneric|control|info|scenes|rooms\z};
+        $response = getResponse( $hash, 'getRHASSPYOptions', $data->{Type} );
+        my $roomNames = '';
+        if ( $data->{Type} eq 'rooms' ) {
+            my @rooms = getAllRhasspyMainRooms($hash);
+            $roomNames = _array2andString( $hash, \@rooms);
+        }
+
+        my @names; my @scenes;
+        my @intents = qw(SetNumeric SetOnOff GetNumeric GetOnOff MediaControls GetState SetScene);
+        @intents = [] if $data->{Type} eq 'rooms';
+        @intents = qw(GetState GetNumeric) if $data->{Type} eq 'info';
+        @intents = qw(SetScene) if $data->{Type} eq 'scenes';
+
+        my @devsInRoom = values %{$hash->{helper}{devicemap}{rhasspyRooms}{$room}};
+        return respond( $hash, $data, getResponse($hash, 'NoDeviceFound')) if !@devsInRoom;
+        @devsInRoom = get_unique(\@devsInRoom);
+
+        for my $intent (@intents) {
+            for my $dev (@devsInRoom) {
+                next if !defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}->{$intent};
+                push @names, $hash->{helper}{devicemap}{devices}{$dev}->{alias};
+                if ($intent eq 'SetScene') {
+                    my $scenes = $hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene};
+                    for (keys %{$scenes}) {
+                        push @scenes, $scenes->{$_};
+                    }
+                }
+            }
+        }
+
+        return respond( $hash, $data, getResponse($hash, 'NoDeviceFound')) if !@names;
+
+        @names  = uniq(@names);
+        @scenes = uniq(@scenes) if @scenes;
+
+        my $deviceNames = _array2andString( $hash, @names );
+        my $sceneNames = !@scenes ? '' : _array2andString( $hash, @scenes );
+        $response =~ s{(\$\w+)}{$1}eegx;
+        return respond( $hash, $data, $response);
+    }
+
     my $deviceName = $device;
     $device = getDeviceByName($hash, $room, $device);
     my $mapping = getMapping($hash, $device, 'GetState') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
@@ -4569,7 +4612,6 @@ sub handleIntentMediaControls {
 sub handleIntentSetScene{
     my $hash = shift // return;
     my $data = shift // return;
-    my ($scene, $device, $room, $siteId, $mapping, $response);
 
     Log3($hash->{NAME}, 5, "handleIntentSetScene called");
     return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !defined $data->{Scene};
@@ -4578,10 +4620,10 @@ sub handleIntentSetScene{
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !exists $data->{Device};
 
-    $room = getRoomName($hash, $data);
-    $scene = $data->{Scene};
-    $device = getDeviceByName($hash, $room, $data->{Device});
-    $mapping = getMapping($hash, $device, 'SetScene');
+    my $room = getRoomName($hash, $data);
+    my $scene = $data->{Scene};
+    my $device = getDeviceByName($hash, $room, $data->{Device});
+    my $mapping = getMapping($hash, $device, 'SetScene');
     # restore HUE scenes
     $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
 
@@ -4598,7 +4640,7 @@ sub handleIntentSetScene{
     Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
 
     # Define response
-    $response = _shuffle_answer($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
+    my $response = _shuffle_answer($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
 
     respond( $hash, $data, $response );
     return $device;
@@ -5408,6 +5450,22 @@ sub _shuffle_answer {
     return $arr[ rand @arr ];
 }
 
+sub _array2andString {
+    my $hash = shift // return;
+    my $arr  = shift // return;
+
+    return $arr if ref $arr ne 'ARRAY'; 
+
+    my $and = $hash->{helper}{lng}->{words}->{and} // 'and';
+
+    my @all = @{$arr};
+    my $last = pop @all;
+    $last = pop @all if !$last;
+    my $text = join q{, }, @all;
+    $text .=  " $and $last";
+    return $text;
+}
+
 1;
 
 __END__
@@ -6025,9 +6083,10 @@ yellow=rgb FFFF00</code></p>
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
   <li>GetNumeric</li> (as SetNumeric)
-  <li>GetState</li> {State} and {Device} are mandatory, {Room} is optional.
+  <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
+  By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
-  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of cmdStop, cmdPlay, cmdPause, cmdFwd or cmdBack
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i> or <i>cmdBack</i>
   <li>MediaChannels</li> (as configured by the user)
   <li>SetColor</li> 
   {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
