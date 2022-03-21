@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25803 2022-03-18 Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-20 11:08:58Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -141,8 +141,14 @@ my $languagevars = {
     },
     'getStateResponses' => {
       'STATE'  => '$deviceName value is [$device:STATE]',
-      'price'  => 'current prize of $reading in $deviceName is [$device:$reading:d]',
+      'price'  => 'current price of $reading in $deviceName is [$device:$reading:d]',
+      'text'   => '[$device:$reading]',
       'update' => 'initiated update for $deviceName'
+    },
+    'getRHASSPYOptions' => {
+      'control' => 'the following devices can be controlled $deviceNames',
+      'info'    => '$deviceNames may provide ',
+      'scenes'  => '$deviceNames may be able to be set to these $sceneNames'
     }
   },
   'stateResponses' => {
@@ -320,7 +326,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.21';
+    $hash->{MODULE_VERSION} = '0.5.23';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -618,10 +624,10 @@ sub Get {
         if ( $values[0] ne 'stop' && !defined $hash->{testline} ) {
             if($hash->{CL}) {
                 my $start = gettimeofday();
-                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> ' testResult', start=>$start};
+                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
                 $hash->{asyncGet} = $tHash;
-                InternalTimer(gettimeofday()+20, sub {
-                  asyncOutput($tHash->{CL}, "Timeout for test file $values[0] - most likely this is no problem, check testResult reading later");
+                InternalTimer(gettimeofday()+30, sub {
+                  asyncOutput($tHash->{CL}, "Test file $values[0] is initiated. See if internal 'testline' is rising and check testResult reading later");
                   delete($hash->{asyncGet});
                 }, $tHash, 0);
             }
@@ -634,17 +640,16 @@ sub Get {
         if ( !defined $hash->{testline} ) {
             if($hash->{CL}) {
                 my $start = gettimeofday();
-                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> ' testResult', start=>$start};
+                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
                 $hash->{asyncGet} = $tHash;
-                InternalTimer(gettimeofday()+3, sub {
+                InternalTimer(gettimeofday()+4, sub {
                   asyncOutput($tHash->{CL}, "Timeout for test sentence - most likely this is no problem, check testResult reading later, but your system seems to be rather slow...");
                   delete($hash->{asyncGet});
                 }, $tHash, 0);
             }
             my $test = join q{ }, @values;
-            my @content = [$test];
             $hash->{testline} = 0;
-            $hash->{helper}->{test}->{content} = \@content;
+            $hash->{helper}->{test}->{content} = [$test];
             $hash->{helper}->{test}->{filename} = 'none';
             return testmode_next($hash);
         }
@@ -1611,6 +1616,18 @@ sub perlExecute {
     return AnalyzePerlCommand( $hash, $cmd );
 }
 
+sub _AnalyzeCommand {
+    my $hash   = shift // return;
+    my $cmd    = shift // return;
+
+    if ( defined $hash->{testline} ) {
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Command: ${cmd}.";
+        return;
+    }
+    # CMD ausführen
+    return AnalyzeCommand( $hash, $cmd );
+}
+
 sub RHASSPY_DialogTimeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
@@ -2169,6 +2186,9 @@ sub getDevicesByGroup {
         my $prio  = $specials->{prio} // 0;
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
+
+    return join q{,}, keys %{$devices} if defined $hash->{testline};
+
     return $devices;
 }
 
@@ -2177,6 +2197,8 @@ sub getNeedsConfirmation {
     my $data   = shift // return;
     my $intent = shift // return;
     my $device = shift;
+
+    return if defined $hash->{testline};
 
     my $re = defined $device ? $device : $data->{Group};
     return if !defined $re;
@@ -2335,6 +2357,10 @@ sub analyzeAndRunCmd {
     if ($cmd =~ m{\A\s*\{.*\}\s*\z}x) { #escaping closing bracket for editor only
         # CMD ausführen
         Log3($hash->{NAME}, 5, "$cmd is a perl command");
+        if ( defined $hash->{testline} ) {
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Perl: $cmd";
+            return;
+        }
         return perlExecute($hash, $device, $cmd, $val,$siteId);
     }
 
@@ -2362,16 +2388,23 @@ sub analyzeAndRunCmd {
     }
     # FHEM Command oder CommandChain
     elsif (defined $cmds{ (split m{\s+}x, $cmd)[0] }) {
-        #my @test = split q{ }, $cmd;
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
+        if ( defined $hash->{testline} ) {
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Command(s): $cmd";
+            return;
+        }
         $error = AnalyzeCommandChain($hash, $cmd);
         $returnVal = (split m{\s+}x, $cmd)[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m{:}x) {
     $cmd   =~ s{:}{ }x;
-        $cmd   = qq($cmd $val) if defined($val);
+        $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
+        if ( defined $hash->{testline} ) {
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Redirected command: $cmd";
+            return;
+        }
         $error = AnalyzeCommand($hash, "set $cmd");
         $returnVal = (split q{ }, $cmd)[1];
     }
@@ -2380,7 +2413,7 @@ sub analyzeAndRunCmd {
         $cmd   = qq($device $cmd);
         $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd is a normal command");
-        $error = AnalyzeCommand($hash, "set $cmd");
+        $error = _AnalyzeCommand($hash, "set $cmd");
         $returnVal = (split q{ }, $cmd)[1];
     }
     Log3($hash->{NAME}, 1, $_) if defined $error;
@@ -2723,15 +2756,16 @@ sub testmode_next {
     my $fails = $hash->{helper}->{test}->{notRecogn} // 0;
     $result = "tested $result sentences, failed: $fails.";
 
-    if ( $filename ne 'none.result.txt' ) {
+    if ( $filename ne 'none_result.txt' ) {
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
         $result .= " See $filename for detailed results."
     } else {
-        $result .= " result is: $hash->{helper}->{test}->{result}->[0]"
+        $result = $fails ? 'Test failed, ' : 'Test ok, ';
+        $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
     }
     readingsSingleUpdate($hash,'testResult',$result,1);
     if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult' ) {
-          my $duration = sprintf( "%.1f", (gettimeofday() - $hash->{asyncGet}{start})*1);
+          my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
           RemoveInternalTimer($hash->{asyncGet});
           asyncOutput($hash->{asyncGet}{CL}, "test(s) passed successfully. Summary: $result, duration: $duration s");
           delete($hash->{asyncGet});
@@ -2757,9 +2791,14 @@ sub testmode_parse {
         $result = "$line => $intent $json";
     }
     $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
-    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate\z}) {
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|handleIntentMediaControls\z}) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
+    }
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\ASetOnOffGroup|SetColorGroup|SetNumericGroup|SetTimedOnOffGroup\z}) {
+        $result = getDevicesByGroup($hash, $data);
+        $result = q{can't identify any device in group and room} if !$result;
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Devices in group and room: $result";
     }
     $hash->{testline}++;
     return testmode_next($hash);
@@ -3196,7 +3235,8 @@ sub respond {
     my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     if ( defined $hash->{testline} ) {
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " response: $response";
+        $response = $response->{text} if ref $response eq 'HASH';
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
         $hash->{testline}++;
         return testmode_next($hash);
     }
@@ -3405,7 +3445,7 @@ sub updateSlots {
     my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
     $url = qq{/api/slots?overwrite_all=$overwrite};
 
-    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion presence));
+    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion presence info));
     my @aliases = ();
     my @mainrooms = ();
 
@@ -3809,7 +3849,7 @@ sub handleIntentShortcuts {
         Log3($hash->{NAME}, 5, "FHEM shortcut identified: $cmd, device name is $name");
         $cmd      = _replace($hash, $cmd, \%specials);
         $response = _replace($hash, $response, \%specials);
-        AnalyzeCommand($hash, $cmd);
+        _AnalyzeCommand($hash, $cmd);
     }
     $response = _ReplaceReadingsVal( $hash, $response );
     respond( $hash, $data, $response );
@@ -4082,41 +4122,30 @@ sub handleIntentSetTimedOnOffGroup {
 sub handleIntentGetOnOff {
     my $hash = shift // return;
     my $data = shift // return;
-    my $device;
-    my $response;
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
-    # Device AND Status must exist
-    if ( exists $data->{Device}  && exists $data->{State} ) {
-        my $room = getRoomName($hash, $data);
-        $device = getDeviceByName($hash, $room, $data->{Device});
-        my $deviceName = $data->{Device};
-        my $mapping;
-        $mapping = getMapping($hash, $device, 'GetOnOff') if defined $device;
-        my $status = $data->{State};
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{State} || !defined $data->{Device};
 
-        # Mapping found?
-        if ( defined $mapping ) {
-            # Device on or off?
-            my $value = _getOnOffState($hash, $device, $mapping);
+    my $response;
 
-            # Define reponse
-            if ( defined $mapping->{response} ) { 
-                $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $value, $room);
-                $response //= _shuffle_answer($response);
-            }
-            else {
-                my $stateResponseType = $internal_mappings->{stateResponseType}->{$status};
-                $response = _shuffle_answer($hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value});
-                $response =~ s{(\$\w+)}{$1}eegx;
-            }
-        }
+    my $room = getRoomName($hash, $data);
+    my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+
+    my $deviceName = $data->{Device};
+    my $mapping = getMapping($hash, $device, 'GetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+
+    my $value = _getOnOffState($hash, $device, $mapping);
+
+    # Define reponse
+    if ( defined $mapping->{response} ) { 
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $value, $room);
+    } else {
+        my $stateResponseType = $internal_mappings->{stateResponseType}->{$data->{State}};
+        $response = _shuffle_answer($hash->{helper}{lng}->{stateResponses}{$stateResponseType}->{$value});
+        $response =~ s{(\$\w+)}{$1}eegx;
     }
-    # Send response
-    $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response );
-    return $device;
+    return respond( $hash, $data, $response );
 }
 
 
@@ -4454,7 +4483,11 @@ sub handleIntentGetNumeric {
 sub handleIntentGetState {
     my $hash = shift // return;
     my $data = shift // return;
-    my $device = $data->{Device} // return respond( $hash, $data, getResponse($hash, 'NoValidData'));
+    my $device = $data->{Device} // q{RHASSPY};
+
+    if ($device eq 'RHASSPY') {
+        return respond( $hash, $data, getResponse($hash, 'NoValidData'));
+    }
 
     my $response;
     Log3($hash->{NAME}, 5, 'handleIntentGetState called');
@@ -4494,40 +4527,39 @@ sub handleIntentGetState {
 sub handleIntentMediaControls {
     my $hash = shift // return;
     my $data = shift // return;
-    my $command, my $device, my $room;
-    my $mapping;
-    my $response;
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
     # At least one command has to be received
-    return respond( $hash, $data, getResponse($hash, 'DefaultError') ) if !exists $data->{Command};
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !exists $data->{Command};
 
-    $room = getRoomName($hash, $data);
-    $command = $data->{Command};
+    my $room = getRoomName($hash, $data);
+    my $command = $data->{Command};
+
+    my $device;
 
     # Search for matching device
     if (exists $data->{Device}) {
         $device = getDeviceByName($hash, $room, $data->{Device});
     } else {
-        $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef);
-        $response = getResponse($hash, 'NoActiveMediaDevice') if !defined $device;
+        $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef) 
+        // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
 
-    $mapping = getMapping($hash, $device, 'MediaControls');
+    my $mapping = getMapping($hash, $device, 'MediaControls') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
-    if ( defined $device && defined $mapping && defined $mapping->{$command} ) {
-        #check if confirmation is required
-        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
-        my $cmd = $mapping->{$command};
-        # Execute Cmd
-        analyzeAndRunCmd($hash, $device, $cmd);
-        # Define voice response
-        $response = defined $mapping->{response} ?
-            _getValue($hash, $device, _shuffle_answer($mapping->{response}), $command, $room)
-            : getResponse($hash, 'DefaultConfirmation');
-    }
-    $response //= getResponse($hash, 'DefaultError');
+    return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if !defined $mapping->{$command};
+
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
+    my $cmd = $mapping->{$command};
+    # Execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    # Define voice response
+    my $response = defined $mapping->{response} ?
+        _getValue($hash, $device, _shuffle_answer($mapping->{response}), $command, $room)
+        : getResponse($hash, 'DefaultConfirmation');
+
     # Send voice response
     respond( $hash, $data, $response );
     return $device;
@@ -4687,7 +4719,7 @@ sub handleIntentSetColor {
         $response = _runSetColorCmd($hash, $device, $data, $inBulk);
     }
     # Send voice response
-    $response = getResponse($hash, 'DefaultError') if !defined $response;
+    $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response ) if !$inBulk;
     return $device;
 }
@@ -4715,7 +4747,7 @@ sub _runSetColorCmd {
         my $specialmapping = $hash->{helper}{devicemap}{devices}{$device}{color_specials}{$kw};
         if (defined $data->{$kw} && defined $specialmapping && defined $specialmapping->{$data->{$kw}}) {
             my $cmd = $specialmapping->{$data->{$kw}};
-            $error = AnalyzeCommand($hash, "set $device $cmd");
+            $error = _AnalyzeCommand($hash, "set $device $cmd");
             return if $inBulk;
             Log3($hash->{NAME}, 5, "Setting $device to $cmd");
             return respond( $hash, $data, $error ) if $error;
@@ -4723,7 +4755,7 @@ sub _runSetColorCmd {
         } elsif ( defined $data->{$kw} && defined $mapping->{$_} ) {
             my $value = _round( ( $mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal} ) * $data->{$kw} / ( $kw eq 'Hue' ? 360 : 100 ) ) ;
             $value = min(max($mapping->{$_}->{minVal}, $value), $mapping->{$_}->{maxVal});
-            $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
+            $error = _AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
             Log3($hash->{NAME}, 5, "Setting color to $value");
             return respond( $hash, $data, $error ) if $error;
@@ -4734,7 +4766,7 @@ sub _runSetColorCmd {
     #shortcut: Rgb field is used or color is in HEX value and rgb is a possible command
     if ( ( defined $data->{Rgb} || defined $color && $color =~ m{\A[[:xdigit:]]\z}x ) && defined $mapping->{rgb} ) {
         $color = $data->{Rgb} if defined $data->{Rgb};
-        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $color");
+        $error = _AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $color");
         return if $inBulk;
         Log3($hash->{NAME}, 5, "Setting rgb-color to $color");
         return respond( $hash, $data, $error ) if $error;
@@ -4776,7 +4808,7 @@ sub _runSetColorCmd {
         return "mapping problem in Hue2rgb" if !defined $rgb;
         my $rgbcmd = $mapping->{rgb}->{cmd}; 
         $rgb = lc $rgb if $rgbcmd eq 'hex';
-        $error = AnalyzeCommand($hash, "set $device $rgbcmd $rgb");
+        $error = _AnalyzeCommand($hash, "set $device $rgbcmd $rgb");
         return if $inBulk;
         Log3($hash->{NAME}, 5, "Setting rgb-color to $rgb using hue");
         return respond( $hash, $data, $error ) if $error;
@@ -4790,7 +4822,7 @@ sub _runSetColorCmd {
         my $rgb = uc sprintf( "%2.2X%2.2X%2.2X", $r, $g, $b );
 
         return "mapping problem in _ct2rgb" if !defined $rgb;
-        $error = AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $rgb");
+        $error = _AnalyzeCommand($hash, "set $device $mapping->{rgb}->{cmd} $rgb");
         return if $inBulk;
         Log3($hash->{NAME}, 5, "Setting color-temperature to $ct");
         return respond( $hash, $data, $error ) if $error;
@@ -5393,7 +5425,11 @@ https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 - v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
 # auto-training
-Tests/Rückmeldungen fehlen bisher
+Tests/Rückmeldungen fehlen bisher; sieht nicht funktional aus...
+
+# Testsuite: 
+- "Kenner" Dialoge etc. einbauen
+- Mehr Info zu adressierten Geräten (getDevicesByGroup?)
 
 =end ToDo
 
