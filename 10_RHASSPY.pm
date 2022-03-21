@@ -2729,9 +2729,11 @@ sub testmode_next {
     my $hash = shift // return;
 
     my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
-    if ( !$line || $line =~ m{\A\s*[#]}x || $line =~ m{\A\s*\z}x) {
+    if ( !$line || $line =~ m{\A\s*[#]}x || $line =~ m{\A\s*\z}x || $line =~ m{\A\s*(?:DIALOGUE|WAKEWORD)[:]}x ) {
         $line //= '';
         $hash->{helper}->{test}->{result}->[$hash->{testline}] = "$line";
+        $hash->{helper}->{test}->{isInDialogue} = 1 if $line =~ m{\A\s*DIALOGUE[:](?!END)}x;
+        delete $hash->{helper}->{test}->{isInDialogue} if $line =~ m{\A\s*DIALOGUE[:]END}x;
         $hash->{testline}++;
         return testmode_next($hash) if $hash->{testline} <= @{$hash->{helper}->{test}->{content}};
     }
@@ -2756,7 +2758,8 @@ sub testmode_next {
 
     my $result = $hash->{helper}->{test}->{passed} // 0;
     my $fails = $hash->{helper}->{test}->{notRecogn} // 0;
-    $result = "tested $result sentences, failed: $fails.";
+    my $failsInDialogue = $hash->{helper}->{test}->{notRecognInDialogue} // 0;
+    $result = "tested $result sentences, failed total: $fails, amongst these in dialogues: $failsInDialogue.";
 
     if ( $filename ne 'none_result.txt' ) {
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
@@ -2788,6 +2791,7 @@ sub testmode_parse {
     if ( $intent eq 'intentNotRecognized' ) {
         $result = $line;
         $hash->{helper}->{test}->{notRecogn}++;
+        $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
         my $json = toJSON($data);
         $result = "$line => $intent $json";

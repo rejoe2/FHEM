@@ -1,0 +1,236 @@
+  #--------------------------------------
+  #
+  # FHEM Spracherkennungstest - FEST.txt
+  #
+  # Version 1.0
+  #
+  #--------------------------------------
+  DIALOGUE:greetings
+  WAKEWORD:hallo
+  WAKEWORD:hallo computer
+  WAKEWORD:hallo jeannie
+  wer bist du
+  was bist du
+  wie geht es dir
+  ich bin peter
+  ich bin erwin
+  ich bin jeannie
+  ich habe kein problem
+  ich will etwas wissen
+  DIALOGUE:END
+
+  hilfe
+  notfall
+  
+  hilfe
+  abbruch
+  
+  hilfe
+  hilfe
+  
+  hilfe 
+  ok
+  
+  notfall
+  hilfe
+  
+  notfall
+  abbrechen
+  
+  notfall
+  notfall
+  
+  notfall
+  ok
+  
+  wie soll ich dich nennen
+  bist du eine frau
+  bist du ein mensch
+  bist du ein computer
+  was hast du an
+  kennst du einen witz
+  kannst du denken
+  
+  guten morgen
+  gute nacht
+  guten morgen jeannie
+  gute nacht jeannie
+  
+  was kannst du
+  was kannst du für mich tun
+  und was kannst du für mich tun
+  
+  was kannst du steuern
+  was kannst du im haus steuern
+  was kannst du für mich steuern
+  was kannst du anschalten
+  was kannst du schalten
+  
+  welche orte gibt es
+  welche orte gibt es im haus
+  welche ortsangaben gibt es
+  was ist ein ort
+  
+  welche geräte gibt es
+  welche geräte gibt es im haus
+  was für objekte gibt es
+
+  DIALOGUE:add_device
+  lerne etwas hinzu
+  ein gerät
+  windkraftanlage
+  DIALOGUE:END
+
+  DIALOGUE:add_action
+  lerne etwas hinzu
+  eine handlung
+  montieren
+  DIALOGUE:END
+
+  DIALOGUE:add_site
+  lerne etwas hinzu
+  einen ort
+  dach
+  DIALOGUE:END
+
+  
+  bitte spiele musik
+  ich bin im wohnzimmer
+  von den pogues
+  
+  schalte die alarmanlage aus
+  
+  was kannst du mit der beleuchtung machen
+  was ist eine beleuchtung
+  
+  wie warm ist es im wohnzimmer
+  wie warm ist es
+  sag mir die temperatur im wohnzimmer
+  wie ist die temperatur im schlafzimmer
+  
+  wie feucht ist es im wohnzimmer
+  wie feucht ist es
+  sag mir die feuchte im wohnzimmer
+  wie ist die feuchte im schlafzimmer
+  
+  ist irgendwo ein fenster offen
+  
+  schalte die zirkulation an
+  schalte zirkulation an
+  mach die zirkulation an
+  
+  schalte die lüftung an
+  schalte lüftung an
+  mach die lüftung an
+  die lüftung ausschalten
+  lüftung ausschalten
+  
+  schalte beleuchtung im wohnzimmer an
+  schalte die beleuchtung im wohnzimmer aus
+  schalte die beleuchtung in der sitzgruppe an
+  schalte die beleuchtung in der essgruppe an
+  mach die beleuchtung auf terrasse an
+  mache außen die beleuchtung aus
+  
+  wie ist die temperatur im badezimmer
+  wie ist die feuchte im schlafzimmer
+  stelle die temperatur im wohnzimmer auf 19.3 grad
+  
+  spiele musik im wohnzimmer von quelle swr
+  spiele musik im wohnzimmer von quelle jacqueline
+  spiele musik im wohnzimmer von quelle peter
+  spiele musik im wohnzimmer von quelle playlist
+  spiele musik im wohnzimmer von den pogues
+  spiele musik im wohnzimmer von alison balsom
+  
+  spiele musik im schlafzimmer von quelle swr
+  spiele musik im schlafzimmer von quelle jacqueline
+  spiele musik im schlafzimmer von quelle peter
+  spiele musik im schlafzimmer von quelle playlist
+  spiele musik im schlafzimmer von den pogues
+  spiele musik im schlafzimmer von den beatles
+  
+  spiele musik im arbeitszimmer von quelle swr
+  spiele musik im arbeitszimmer von quelle jacqueline
+  spiele musik im arbeitszimmer von quelle peter
+  spiele musik im arbeitszimmer von quelle playlist
+  spiele musik im arbeitszimmer von den dubliners
+  spiele musik im arbeitszimmer von alison balsom
+  
+  starte den staubsauger im arbeitszimmer
+  starte den staubsauger in der bibliothek
+  starte den staubsauger im wohnzimmer
+  stoppe den staubsauger im wohnzimmer
+  
+  wie ist das wetter von morgen
+  wie ist wetter von übermorgen
+  wie ist das wetter heute
+  wie wird morgen das wetter
+
+  schalte den wecker aus
+  schalte wecker aus
+  den wecker ausschalten
+  wie ist die weckzeit
+  wie ist der status des weckers
+  sage mir die weckzeit
+  stelle den wecker auf 17:00
+  wecken um 13:12 Uhr
+  
+  wie spät ist es
+  sage mir die zeit
+  wann kommt die müllabfuhr
+  wann ist die müllabfuhr
+  
+  
+  bitte erinnere mich um 14:00 Uhr an das meeting
+  wann ist die erinnerung
+  lösche die erinnerung
+  erinnere mich um 11:00 uhr
+  für den anruf
+  wann ist die erinnerung
+  lösche die erinnerung
+  erinnere mich in 17 minuten an den ofen
+  lösche die erinnerung
+
+  wie ist der status des hauses
+  wie ist der status vom haus
+  das haus sichern
+  sichere das haus
+  haus sichern
+  das haus entsichern
+  haus entsichern
+
+  zur einkaufsliste hinzufügen bratheringe
+  zu peters liste hinzufügen ticket münchen besorgen
+  von dominics liste entfernen schmieröl
+  baumarktliste löschen
+  einkaufsliste senden
+
+#Beta-User
+  mach alle jalousien im esszimmer zu
+  fahre alle jalousien im wohnzimmer halb auf
+  fahr die jalousie in der mitte halb zu
+
+  wie warm ist es draussen
+ 
+  färbe die stehlampe links rot
+  stelle die stehlampe rechts auf blau
+  dimme das licht
+  mache etwas heller
+  mache etwas dunkler
+
+  mache etwas wärmer
+  stelle etwas kälter
+ 
+  mach überall die rollläden auf fünfzig
+  mach alle lichter im wohnzimmer heller
+  mach alle leuchten im wohnzimmer dunkler
+ 
+  mach lauter
+  mach die musik leiser
+ 
+  halte die wiedergabe an
+  halte die musikwiedergabe an
+ 
+  wie wird das wetter heute
+  was kostet diesel in Karlsruhe
