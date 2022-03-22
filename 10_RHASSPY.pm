@@ -4256,6 +4256,7 @@ sub handleIntentSetNumeric {
     my $type   = $data->{Type};
     if ( !defined $type && defined $change ){
         $type   = $internal_mappings->{Change}->{$change}->{Type};
+        $data->{Type} = $type;
     }
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
@@ -4268,9 +4269,25 @@ sub handleIntentSetNumeric {
         $device = 
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
+    } else {
+        $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type);
     }
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
+
+    #more than one device 
+    if ( ref $device eq 'ARRAY' ) {
+        #until now: only extended test code
+        my $first = $device->[0];
+        my $response = $device->[1];
+        my $all = $device->[2];
+        my $choice = $device->[3];
+        $data->{customData} = $all;
+        my $toActivate = $choice eq 'RequestChoiceDevice' ? [qw(ChoiceDevice CancelAction)] : [qw(ChoiceRoom CancelAction)];
+        $device = $first;
+        Log3($hash->{NAME}, 5, "More than one device possible, response is $response, first is $first, all are $all, type is $choice");
+        return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
+    }
 
     my $mapping = getMapping($hash, $device, 'SetNumeric', $type);
 
@@ -4418,7 +4435,7 @@ sub handleIntentGetNumeric {
         // return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) );
 
     #more than one device 
-    if (ref $device eq 'ARRAY') {
+    if ( ref $device eq 'ARRAY' ) {
         #until now: only extended test code
         my $first = $device->[0];
         my $response = $device->[1];
