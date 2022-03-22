@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-21 Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-22 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -140,10 +140,10 @@ my $languagevars = {
       'unknownType'  => 'value in $location is $value percent'
     },
     'getStateResponses' => {
-      'STATE'  => '$deviceName value is [$device:STATE]',
-      'price'  => 'current price of $reading in $deviceName is [$device:$reading:d]',
-      'text'   => '[$device:$reading]',
-      'update' => 'initiated update for $deviceName'
+      'STATE'   => '$deviceName value is [$device:STATE]',
+      'price'   => 'current price of $reading in $deviceName is [$device:$reading:d]',
+      'reading' => '[$device:$reading]',
+      'update'  => 'initiated update for $deviceName'
     },
     'getRHASSPYOptions' => {
       'generic' => 'actions to devices may be initiated or information known by your automation can be requested',
@@ -1107,6 +1107,15 @@ sub _analyze_rhassypAttr {
         if ($key eq 'confirmValueMap') {
             $hash->{helper}{devicemap}{devices}{$device}{confirmValueMap} = $named if $named;
         }
+        if ($key eq 'blacklistIntents') {
+            $hash->{helper}{devicemap}{devices}{$device}{blacklistIntents} = $val;
+            for ( keys %{$named} ) {
+                delete $hash->{helper}{devicemap}{devices}{$device}{intents}{$named->{$_}};
+            }
+            for ( @{$unnamed} ) {
+                delete $hash->{helper}{devicemap}{devices}{$device}{intents}{$_};
+            }
+        }
     }
 
     my @groups;
@@ -1174,7 +1183,6 @@ sub _analyze_genDevType {
     }
     $hash->{helper}{devicemap}{devices}{$device}{groups} = $attrv if $attrv;
 
-    my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{});
     my $allset = getAllSets($device);
     my $currentMapping;
 
@@ -4497,20 +4505,20 @@ sub handleIntentGetState {
     my $room = getRoomName($hash, $data);
 
     if ($device eq 'RHASSPY') {
-        $data->{Type} //= 'generic';
-        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $data->{Type} !~ m{\Ageneric|control|info|scenes|rooms\z};
-        $response = getResponse( $hash, 'getRHASSPYOptions', $data->{Type} );
+        $data->{type} //= 'generic';
+        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $data->{type} !~ m{\Ageneric|control|info|scenes|rooms\z};
+        $response = getResponse( $hash, 'getRHASSPYOptions', $data->{type} );
         my $roomNames = '';
-        if ( $data->{Type} eq 'rooms' ) {
+        if ( $data->{type} eq 'rooms' ) {
             my @rooms = getAllRhasspyMainRooms($hash);
             $roomNames = _array2andString( $hash, \@rooms);
         }
 
         my @names; my @scenes;
         my @intents = qw(SetNumeric SetOnOff GetNumeric GetOnOff MediaControls GetState SetScene);
-        @intents = [] if $data->{Type} eq 'rooms';
-        @intents = qw(GetState GetNumeric) if $data->{Type} eq 'info';
-        @intents = qw(SetScene) if $data->{Type} eq 'scenes';
+        @intents = [] if $data->{type} eq 'rooms';
+        @intents = qw(GetState GetNumeric) if $data->{type} eq 'info';
+        @intents = qw(SetScene) if $data->{type} eq 'scenes';
 
         my @devsInRoom = values %{$hash->{helper}{devicemap}{rhasspyRooms}{$room}};
         return respond( $hash, $data, getResponse($hash, 'NoDeviceFound')) if !@devsInRoom;
@@ -4521,10 +4529,7 @@ sub handleIntentGetState {
                 next if !defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}->{$intent};
                 push @names, $hash->{helper}{devicemap}{devices}{$dev}->{alias};
                 if ($intent eq 'SetScene') {
-                    my $scenes = $hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene};
-                    for (keys %{$scenes}) {
-                        push @scenes, $scenes->{$_};
-                    }
+                    @scenes = (@scenes, (values %{$hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}}));
                 }
             }
         }
@@ -4534,15 +4539,16 @@ sub handleIntentGetState {
         @names  = uniq(@names);
         @scenes = uniq(@scenes) if @scenes;
 
-        my $deviceNames = _array2andString( $hash, @names );
-        my $sceneNames = !@scenes ? '' : _array2andString( $hash, @scenes );
+        my $deviceNames = _array2andString( $hash, \@names );
+        my $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
         $response =~ s{(\$\w+)}{$1}eegx;
         return respond( $hash, $data, $response);
     }
 
     my $deviceName = $device;
     $device = getDeviceByName($hash, $room, $device);
-    my $mapping = getMapping($hash, $device, 'GetState') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+    my $type = $data->{type} // 'GetState';
+    my $mapping = getMapping($hash, $device, 'GetState', $type) // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
     if ( defined $data->{Update} ) {
         my $cmd = $mapping->{update} // return respond( $hash, $data, getResponse($hash, 'DefaultError') );
@@ -4553,9 +4559,9 @@ sub handleIntentGetState {
     } elsif ( defined $mapping->{response} ) {
         $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), undef, $room);
         $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
-    } elsif ( defined $data->{Type} ) {
+    } elsif ( defined $data->{type} ) {
         my $reading = $data->{Reading} // 'STATE';
-        $response = getResponse( $hash, 'getStateResponses', $data->{Type} );
+        $response = getResponse( $hash, 'getStateResponses', $data->{type} );
         $response =~ s{(\$\w+)}{$1}eegx;
         $response = _ReplaceReadingsVal($hash, $response );
     } else {
@@ -5017,7 +5023,6 @@ sub handleIntentSetTimer {
     my $response;
     if (defined $data->{CancelTimer}) {
         CommandDelete($hash, $roomReading);
-        #readingsSingleUpdate( $hash,$roomReading, 0, 1 );
         readingsDelete($hash, $roomReading);
         Log3($name, 5, "deleted timer: $roomReading");
         $response = getResponse($hash, 'timerCancellation');
@@ -5051,10 +5056,8 @@ sub handleIntentSetTimer {
             CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
         }
 
-        #readingsSingleUpdate($hash, $roomReading, 1, 1);
         readingsSingleUpdate($hash, $roomReading, $readingTime, 1);
 
-        #Log3($name, 5, "Created timer: $roomReading at +$attime");
         Log3($name, 5, "Created timer: $roomReading at $readingTime");
 
         my ($range, $minutes, $hours, $minutetext);
@@ -5458,13 +5461,16 @@ sub _array2andString {
     my $hash = shift // return;
     my $arr  = shift // return;
 
-    return $arr if ref $arr ne 'ARRAY'; 
+    return $arr if ref $arr ne 'ARRAY';
 
     my $and = $hash->{helper}{lng}->{words}->{and} // 'and';
 
     my @all = @{$arr};
     my $last = pop @all;
-    $last = pop @all if !$last;
+    while (@all && !$last) {
+        $last = pop @all;
+    }
+    return $last if !@all;
     my $text = join q{, }, @all;
     $text .=  " $and $last";
     return $text;
@@ -6051,6 +6057,11 @@ yellow=rgb FFFF00</code></p>
         <p>Explanation:
         <p>If set, the label provided will be sent to Rhasspy instead of the <i>tech names</i> (derived from available setters). Keyword <i>none</i> will delete the scene from the internal list, setting the combination <i>all=none</i> will exclude the entire device from beeing recognized for SetScene.</p>
       </li>
+      <li><b>blacklistIntents</b>
+        <p><code>attr weather rhasspySpecials blacklistIntents:MediaControls</code></p>
+        <p>Explanation:
+        <p>If set, the blacklisted intents will be deleted after automated mapping analysis.</p>
+      </li>
 
     </ul>
   </li>
@@ -6087,8 +6098,8 @@ yellow=rgb FFFF00</code></p>
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
   <li>GetNumeric</li> (as SetNumeric)
-  <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
-  By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
+  <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {type} and {Reading} (defaults to internal STATE) are optional.
+  By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
   {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i> or <i>cmdBack</i>
   <li>MediaChannels</li> (as configured by the user)
