@@ -2805,7 +2805,7 @@ sub testmode_parse {
         $result = "$line => $intent $json";
     }
     $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
-    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|handleIntentMediaControls\z}) {
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls\z}) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
     }
@@ -4256,7 +4256,7 @@ sub handleIntentSetNumeric {
     my $type   = $data->{Type};
     if ( !defined $type && defined $change ){
         $type   = $internal_mappings->{Change}->{$change}->{Type};
-        $data->{Type} = $type;
+        $data->{Type} = $type if defined $type;
     }
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
