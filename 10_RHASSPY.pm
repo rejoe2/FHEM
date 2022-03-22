@@ -5546,11 +5546,13 @@ https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 Tests/Rückmeldungen fehlen bisher; sieht nicht funktional aus...
 
 # probability:
-Minimum Level (pro Intent?) festlegen können...?
+Minimum Level (pro Intent?) festlegen können. (muss getestet werden)
 
 # Testsuite: 
-- "Kenner" Dialoge etc. einbauen
-- Mehr Info zu adressierten Geräten (getDevicesByGroup?)
+- "Kenner" Dialoge etc. einbauen (vorl. erledigt)
+- Mehr Info zu adressierten Geräten (getDevicesByGroup?) 
+-- OK für Gruppen;
+-- Nacharbeit erforderlich für Eizel-Intents (vorbereitet).
 
 =end ToDo
 
