@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 d Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 e Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -6176,8 +6176,8 @@ yellow=rgb FFFF00</code></p>
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
   <li>GetNumeric</li> (as SetNumeric)
-  <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {type} and {Reading} (defaults to internal STATE) are optional.
-  By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
+  <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
+  By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
   {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i> or <i>cmdBack</i>
   <li>MediaChannels</li> (as configured by the user)
