@@ -522,6 +522,56 @@ The idea is basically to provide a functionallity of "virtual channels" as known
 
 See e.g. also this <a href="https://forum.fhem.de/index.php/topic,12672.0.html">forum thread</a> for an conceptual example.
 
+durch die kombination und priorisierung lassen sich vorrangschaltungen bauen oder mit readings rechnen:
+
+    treppenhausschaltung
+    zeitgesteuert wird bei dunkelheit ein nachtlicht aktiviert, dieses wird bei erkannter bewegung heller und lässt sich über den lichtschalter überschreiben
+    heizungsteuerung
+    die gewünschte tempereratur lässt sich per fenster offen meldung absenken und über einen party-taster zeitweise erhöhen
+    zirkulationspumpe mit nacht- und abweseheits schaltung
+    verbräuche aufsummieren
+    die verbrauchsreadings in unterschiedlichen devices werden aufsummiert
+    zählen der häufigkeit von zuständen
+    ...
+
+ 
+wie schaut das ganze aus:
+ 
+<a id="combine-define"></a>
+<h4>Define</h4>
+<p><code>define &lt;name&gt; combine &lt;device&gt;:&lt;reading&gt; [&lt;OP&gt; &lt;device1&gt;:&lt;reading1&gt; [&lt;OP&gt; &lt;device2&gt;:&lt;reading2&gt; [...]]]  [= &lt;result&gt;]</code></p>
+
+statt lt;device&gt;:&lt;reading&gt; ist es auch möglich einen festen lt;wert&gt; anzugeben, lt;device&gt; kann eine regex sein. achtung:
+das geht nur wenn lt;device&gt; nicht an erster stelle vorkommt weil es sonst der operator nicht bekannt ist. als workaround kann man an erster stelle einen festen (für den jeweiligen opeartor passenden) wert angeben. aktuell darf nur lt;device&gt; eine regex sein, lt;reading&gt; nicht.
+
+&lt;OP&gt; kann sein: OR (= MAX), AND (= MIN), XOR, PLUS (+), MINUS (-), MULT (*), DIV (/)
+ 
+nicht möglich weil werteberich nicht bekannt und unnötig weil statt dessen &lt;wert&gt; MINUS ... möglich ist. :
+     OR_INVERS, AND_INVERS, PLUS_INVERS, MINUS_INVERS, INVERS_PLUS, INVERS_MINUS, INVERS_MULT
+ 
+&lt;wert&gt;<result> kann sein:
+
+    nicht angeben -> das ergebnis landet in state des &lt;combine&gt; devices
+    &lt;reading&gt; -> das ergebnis landet im entsprechenden reading des <combine> device
+    &lt;device&gt;:&lt;reading&gt; -> das ergebnis landet in &lt;reading&gt; von &lt;device&gt;
+    ein beliebiges fhem kommando, z.b.: set &lt;name&gt; $RESULT
+    $RESULT ist das aktuelle ergebnis
+    das fhem kommando kann auch {perl} code sein
+
+
+<a id="combine-attr"></a>
+<h4>Attributes</h4>
+<a id="combine-attr-values"></a>
+
+über das values attribut lassen sich nicht-numerische reading werte in numerische verwandeln:
+                   
+Code: [Auswählen]
+
+attr &lt;combine&gt; values present:30 absent:20 on:100 off:0 open:1 closed:0
+
+
+in der device detail ansicht gibt es eine tabellarisch übersicht der beteiligten devices und der aktuellen werte. die jeweiligen devStateIcons lassen sich per klick normal bedienen.
+
 =end html
 
 =encoding utf8
