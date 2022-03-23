@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-22 Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -329,7 +329,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.24';
+    $hash->{MODULE_VERSION} = '0.5.25';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2816,7 +2816,7 @@ sub testmode_parse {
         $result = "$line => $intent $json";
     }
     $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
-    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls\z}) {
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric\z}) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
     }
@@ -3230,7 +3230,7 @@ sub analyzeMQTTmessage {
     # update Readings
     updateLastIntentReadings($hash, $topic,$data);
 
-    return [$hash->{NAME}] if !_check_minimumConfindence($hash, $data);
+    return [$hash->{NAME}] if !_check_minimumConfidence($hash, $data);
 
     # Passenden Intent-Handler aufrufen
     if (ref $dispatchFns->{$intent} eq 'CODE') {
@@ -3723,7 +3723,7 @@ sub _check_minimumConfidence {
 
     my $intent = $data->{intent};
     #check minimum confidence levels
-    my $minConf = 0.75;
+    my $minConf = 0.66;
     if ( defined $hash->{helper}{tweaks}{confidenceMin} ) {
         $minConf = $hash->{helper}{tweaks}{confidenceMin}->{$intent} // $hash->{helper}{tweaks}{confidenceMin}->{default} // $minConf;
     }
@@ -4557,21 +4557,22 @@ sub handleIntentGetState {
 
     my $room = getRoomName($hash, $data);
 
+    my $type = $data->{Type} // $data->{type};
     if ($device eq 'RHASSPY') {
-        $data->{type} //= 'generic';
-        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $data->{type} !~ m{\Ageneric|control|info|scenes|rooms\z};
-        $response = getResponse( $hash, 'getRHASSPYOptions', $data->{type} );
+        $type  //= 'generic';
+        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $type !~ m{\Ageneric|control|info|scenes|rooms\z};
+        $response = getResponse( $hash, 'getRHASSPYOptions', $type );
         my $roomNames = '';
-        if ( $data->{type} eq 'rooms' ) {
+        if ( $type eq 'rooms' ) {
             my @rooms = getAllRhasspyMainRooms($hash);
             $roomNames = _array2andString( $hash, \@rooms);
         }
 
         my @names; my @scenes;
         my @intents = qw(SetNumeric SetOnOff GetNumeric GetOnOff MediaControls GetState SetScene);
-        @intents = [] if $data->{type} eq 'rooms';
-        @intents = qw(GetState GetNumeric) if $data->{type} eq 'info';
-        @intents = qw(SetScene) if $data->{type} eq 'scenes';
+        @intents = [] if $type eq 'rooms';
+        @intents = qw(GetState GetNumeric) if $type eq 'info';
+        @intents = qw(SetScene) if $type eq 'scenes';
 
         my @devsInRoom = values %{$hash->{helper}{devicemap}{rhasspyRooms}{$room}};
         return respond( $hash, $data, getResponse($hash, 'NoDeviceFound')) if !@devsInRoom;
@@ -4600,7 +4601,7 @@ sub handleIntentGetState {
 
     my $deviceName = $device;
     $device = getDeviceByName($hash, $room, $device);
-    my $type = $data->{type} // 'GetState';
+    $type //= 'GetState';
     my $mapping = getMapping($hash, $device, 'GetState', $type) // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
     if ( defined $data->{Update} ) {
@@ -4612,9 +4613,9 @@ sub handleIntentGetState {
     } elsif ( defined $mapping->{response} ) {
         $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), undef, $room);
         $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
-    } elsif ( defined $data->{type} ) {
+    } elsif ( defined $data->{type} || $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
-        $response = getResponse( $hash, 'getStateResponses', $data->{type} );
+        $response = getResponse( $hash, 'getStateResponses', $type );
         $response =~ s{(\$\w+)}{$1}eegx;
         $response = _ReplaceReadingsVal($hash, $response );
     } else {
@@ -5920,7 +5921,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confidenceMin"></a>
       <li><b>extrarooms</b>
-        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of 0.75, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
+        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of 0.66, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
         Example: <p><code>confidenceMin= default=0.6 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
       </li>
     </ul>
