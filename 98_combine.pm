@@ -1,5 +1,6 @@
 
 # $Id: 98_combine.pm 21366 2020-03-06 12:01:05Z justme1968 $
+#25 Juli 2021, 12:58:26 von justme1968, https://forum.fhem.de/index.php/topic,110165.0.html
 
 package main;
 
@@ -504,11 +505,23 @@ combine_Undefine($$) {
 
 1;
 
+__END__
+
 =pod
 =item helper
 =item summary    combine multiple device:readings
 =item summary_DE kombiniert mehrere device:readings
+
 =begin html
+
+<a id="combine"></a>
+<h3>combine</h3>
+<p>For examples on this module see <a href="https://forum.fhem.de/index.php/topic,110165.0.html">forum thread</a>.</p>
+
+The idea is basically to provide a functionallity of "virtual channels" as known from Homematic actors. All "conditions" (reading values) from FHEM devices may be transfered to mathematical values and operations that finally can be used to control e.g. an actor.
+
+See e.g. also this <a href="https://forum.fhem.de/index.php/topic,12672.0.html">forum thread</a> for an conceptual example.
+
 =end html
 
 =encoding utf8
