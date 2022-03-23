@@ -103,7 +103,7 @@ my $languagevars = {
     'RequestChoiceDevice' => 'there are several possible devices, choose between $first_items and $last_item',
     'RequestChoiceRoom' => 'more than one possible device, please choose one of the following rooms $first_items and $last_item',
     'DefaultChoiceNoOutstanding' => "no choice expected",
-    'NoMinProbability' => 'minimum probability not accieved, level is $probability',
+    'NoMinConfidence' => 'minimum confidence not given, level is $confidence',
     'timerSet'   => {
         '0' => '$label in room $room has been set to $seconds seconds',
         '1' => '$label in room $room has been set to $minutes minutes $seconds',
@@ -430,7 +430,8 @@ sub initialize_Language {
         updateSingleSlot($hash, $key, $slots->{$key});
     }
     return if !$hash->{autoTraining};
-    return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0);
+    resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0);
+    return;
 }
 
 sub initialize_prefix {
@@ -839,13 +840,13 @@ sub initialize_rhasspyTweaks {
             $hash->{helper}{tweaks}{$tweak} = $values;
             next;
         }
-        if ($line =~ m{\A[\s]*(probabilityMin)[\s]*=}x) {
+        if ($line =~ m{\A[\s]*(confidenceMin)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             return "Error in $line! No content provided!" if !length $values && $init_done;
             my($unnamedParams, $namedParams) = parseParams($values);
             return "Error in $line! Provide at least one item!" if ( !@{$unnamedParams} && !keys %{$namedParams} ) && $init_done;
-            $hash->{helper}{tweaks}{probabilityMin} = $namedParams if $namedParams;
-            $hash->{helper}{tweaks}{probabilityMin}{default} = $unnamedParams->[0] if @{$unnamedParams};
+            $hash->{helper}{tweaks}{confidenceMin} = $namedParams if $namedParams;
+            $hash->{helper}{tweaks}{confidenceMin}{default} = $unnamedParams->[0] if @{$unnamedParams};
         }
     }
     return configure_DialogManager($hash) if $init_done;
@@ -2509,7 +2510,7 @@ sub parseJSONPayload {
 
     # Standard-Keys auslesen
     ($data->{intent} = $decoded->{intent}{intentName}) =~ s{\A.*.:}{}x if exists $decoded->{intent}{intentName};
-    $data->{probability} = $decoded->{intent}{confidenceScore} // 0.75;#        if exists $decoded->{intent}{confidenceScore};
+    $data->{confidence} = $decoded->{intent}{confidenceScore} // 0.75;#        if exists $decoded->{intent}{confidenceScore};
     for my $key (qw(sessionId siteId input rawInput customData lang)) {
         $data->{$key} = $decoded->{$key} if exists $decoded->{$key};
     }
@@ -2811,7 +2812,7 @@ sub testmode_parse {
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
         my $json = toJSON($data);
-        $line .= ' => Probability not sufficient!' if !_check_minimumProbability($hash, $data);
+        $line = "$line => Confidence not sufficient!" if !_check_minimumConfidence($hash, $data, 1);
         $result = "$line => $intent $json";
     }
     $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
@@ -3229,7 +3230,7 @@ sub analyzeMQTTmessage {
     # update Readings
     updateLastIntentReadings($hash, $topic,$data);
 
-    return [$hash->{NAME}] if !_check_minimumProbability($hash, $data);
+    return [$hash->{NAME}] if !_check_minimumConfindence($hash, $data);
 
     # Passenden Intent-Handler aufrufen
     if (ref $dispatchFns->{$intent} eq 'CODE') {
@@ -3715,19 +3716,21 @@ sub RHASSPY_ParseHttpResponse {
     return;
 }
 
-sub _check_minimumProbability {
+sub _check_minimumConfidence {
     my $hash       = shift // return;
     my $data       = shift;
+    my $noResponse = shift;
 
     my $intent = $data->{intent};
-    #check minimum probability levels
+    #check minimum confidence levels
     my $minConf = 0.75;
-    if ( defined $hash->{helper}{tweaks}{probabilityMin} ) {
-        $minConf = $hash->{helper}{tweaks}{probabilityMin}->{$intent} // $hash->{helper}{tweaks}{probabilityMin}->{default} // $minConf;
+    if ( defined $hash->{helper}{tweaks}{confidenceMin} ) {
+        $minConf = $hash->{helper}{tweaks}{confidenceMin}->{$intent} // $hash->{helper}{tweaks}{confidenceMin}->{default} // $minConf;
     }
-    if ( $minConf > $data->{probability} ) {
-        my $probability = _round($data->{probability}*10)/10;
-        my $response = getResponse( $hash, 'NoMinProbability' );
+    if ( $minConf > $data->{confidence} ) {
+        return if $noResponse;
+        my $probability = _round($data->{confidence}*10)/10;
+        my $response = getResponse( $hash, 'NoMinConfidence' );
         $response =_shuffle_answer($response);
         $response =~ s{(\$\w+)}{$1}eegx;
         respond( $hash, $data, $response );
@@ -5915,10 +5918,10 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         Example: <p><code>extrarooms= barn,music collection,cooking recipies</code><br>
         Note: Only do this in case you really know what you are doing! Additional rooms only may be usefull in case you have some external application knowing what to do with info assinged to these rooms!
       </li>
-      <a id="RHASSPY-attr-rhasspyTweaks-probabilityMin"></a>
+      <a id="RHASSPY-attr-rhasspyTweaks-confidenceMin"></a>
       <li><b>extrarooms</b>
-        <p>By default, RHASSPY will use a minimum <i>probability</i> level of 0.75, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
-        Example: <p><code>probabilityMin= default=0.6 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
+        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of 0.75, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
+        Example: <p><code>confidenceMin= default=0.6 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
       </li>
     </ul>
   </li>
