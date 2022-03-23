@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 e Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 f Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -844,9 +844,12 @@ sub initialize_rhasspyTweaks {
             ($tweak, $values) = split m{=}x, $line, 2;
             return "Error in $line! No content provided!" if !length $values && $init_done;
             my($unnamedParams, $namedParams) = parseParams($values);
+            delete $hash->{helper}{tweaks}{confidenceMin};
             return "Error in $line! Provide at least one item!" if ( !@{$unnamedParams} && !keys %{$namedParams} ) && $init_done;
-            $hash->{helper}{tweaks}{confidenceMin} = $namedParams if $namedParams;
-            $hash->{helper}{tweaks}{confidenceMin}{default} = $unnamedParams->[0] if @{$unnamedParams};
+            for ( keys %{$namedParams} ) {
+                $hash->{helper}{tweaks}{confidenceMin}->{$_} = $namedParams->{$_} if looks_like_number($namedParams->{$_});
+            }
+            $hash->{helper}{tweaks}{confidenceMin}{default} = $unnamedParams->[0] if @{$unnamedParams} && looks_like_number($unnamedParams->[0]);
         }
     }
     return configure_DialogManager($hash) if $init_done;
@@ -5764,11 +5767,11 @@ After changing something relevant within FHEM for either the data structure in</
 <ul>
   <li>
     <a id="RHASSPY-get-test_file"></a><b>test_file</b>
-    <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. "stop" as filename will stop test mode if sth. goes wrong. No actions will be derived while test mode is active.</p>
+    <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. <i><b>stop</i></b> as filename will stop test mode if sth. goes wrong. No commands will be executed towards FHEM devices while test mode is active.</p>
   </li>
   <li>
     <a id="RHASSPY-get-test_sentence"></a><b>test_sentence</b>
-    <p>Checks the provided sentence for recognition by Rhasspy NLU. No actions will be derived upon detected content.</p>
+    <p>Checks the provided sentence for recognition by Rhasspy NLU. No commands to be executed as well.</p>
   </li>
 </ul>
 
@@ -5934,9 +5937,9 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         Note: Only do this in case you really know what you are doing! Additional rooms only may be usefull in case you have some external application knowing what to do with info assinged to these rooms!
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confidenceMin"></a>
-      <li><b>extrarooms</b>
-        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of 0.66, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
-        Example: <p><code>confidenceMin= default=0.6 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
+      <li><b>confidenceMin</b>
+        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of <i>0.66</i>, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
+        Example: <p><code>confidenceMin= default=0.6 SetMute=0.4 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
       </li>
     </ul>
   </li>
