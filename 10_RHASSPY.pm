@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 b Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 c Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -6,7 +6,7 @@
 # Originally initiated 2018 by Tobias Wiedenmann (Thyraz)
 # as FHEM Snips.ai module (thanks to Matthias Kleine)
 #
-# Adapted for RHASSPY 2020/2021 by Beta-User and drhirn
+# Adapted for RHASSPY 2020-2022 by Beta-User and drhirn
 #
 # Thanks to rudolfkoenig, JensS, cb2sela and all the others
 # who did a great job getting this to work!
@@ -2183,8 +2183,8 @@ sub getDeviceByMediaChannel {
 }
 
 sub getDevicesByGroup {
-    my $hash = shift // return;
-    my $data = shift // return;
+    my $hash       = shift // return;
+    my $data       = shift // return;
 
     my $group = $data->{Group} // return;
     my $room  = getRoomName($hash, $data);
@@ -2206,8 +2206,6 @@ sub getDevicesByGroup {
         my $prio  = $specials->{prio} // 0;
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
-
-    return join q{,}, keys %{$devices} if defined $hash->{testline};
 
     return $devices;
 }
@@ -2266,7 +2264,6 @@ sub getNeedsConfirmation {
 
     return;
 }
-
 
 # Mappings in Key/Value Paare aufteilen
 sub splitMappingString {
@@ -2820,15 +2817,27 @@ sub testmode_parse {
         #missing: MediaChannels SetTimer
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
-    }
-    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\ASetOnOffGroup|SetColorGroup|SetNumericGroup|SetTimedOnOffGroup\z}) {
-        $result = getDevicesByGroup($hash, $data);
-        $result = q{can't identify any device in group and room} if !$result;
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Devices in group and room: $result";
+    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\ASetOnOffGroup|SetColorGroup|SetNumericGroup|SetTimedOnOffGroup\z}) {
+        my $devices = getDevicesByGroup($hash, $data);
+        $result = ref $devices ne 'HASH' || !keys %{$devices} ?
+                    q{can't identify any device in group and room} 
+                  : join q{,}, keys %{$devices};
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Devices in group and room: $result";
     }
     $hash->{testline}++;
     return testmode_next($hash);
 }
+
+sub _isUnexpectedInTestMode {
+    my $hash   = shift // return;
+    my $data   = shift // return;
+    
+    return if !defined $hash->{testline};
+    $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Unexpected call of $data->{intent} routine!";
+    $hash->{testline}++;
+    return 1;
+}
+
 
 sub RHASSPY_msgDialogTimeout {
     my $fnHash = shift // return;
@@ -3964,6 +3973,7 @@ sub handleIntentSetOnOffGroup {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOffGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
+    return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
@@ -4092,6 +4102,7 @@ sub handleIntentSetTimedOnOffGroup {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOffGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
+    return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
@@ -4228,6 +4239,7 @@ sub handleIntentSetNumericGroup {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumericGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
+    return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
@@ -4980,6 +4992,7 @@ sub handleIntentSetColorGroup {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetColorGroup' );
 
     my $devices = getDevicesByGroup($hash, $data);
+    return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
 
     #see https://perlmaven.com/how-to-sort-a-hash-of-hashes-by-value for reference
     my @devlist = sort {
