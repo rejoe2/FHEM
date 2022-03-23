@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 b Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1641,7 +1641,7 @@ sub _AnalyzeCommand {
     my $cmd    = shift // return;
 
     if ( defined $hash->{testline} ) {
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Command: ${cmd}.";
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command: ${cmd}.";
         return;
     }
     # CMD ausführen
@@ -2378,7 +2378,7 @@ sub analyzeAndRunCmd {
         # CMD ausführen
         Log3($hash->{NAME}, 5, "$cmd is a perl command");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Perl: $cmd";
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Perl: $cmd";
             return;
         }
         return perlExecute($hash, $device, $cmd, $val,$siteId);
@@ -2410,7 +2410,7 @@ sub analyzeAndRunCmd {
     elsif (defined $cmds{ (split m{\s+}x, $cmd)[0] }) {
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Command(s): $cmd";
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command(s): $cmd";
             return;
         }
         $error = AnalyzeCommandChain($hash, $cmd);
@@ -2422,7 +2422,7 @@ sub analyzeAndRunCmd {
         $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " Redirected command: $cmd";
+            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Redirected command: $cmd";
             return;
         }
         $error = AnalyzeCommand($hash, "set $cmd");
@@ -2816,7 +2816,8 @@ sub testmode_parse {
         $result = "$line => $intent $json";
     }
     $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
-    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric\z}) {
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor\z}) {
+        #missing: MediaChannels SetTimer
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
     }
