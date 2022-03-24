@@ -9,7 +9,7 @@
 # Adapted for RHASSPY 2020-2022 by Beta-User and drhirn
 #
 # Thanks to rudolfkoenig, JensS, cb2sela and all the others
-# who did a great job getting this to work!
+# who did a great job getting this to work! 
 #
 # This file is part of fhem.
 #
@@ -48,8 +48,9 @@ use FHEM::Core::Timer::Register qw(:ALL);
 sub ::RHASSPY_Initialize { goto &Initialize }
 
 my %gets = (
-    test_file     => [],
-    test_sentence => []
+    test_file      => [],
+    test_sentence  => [],
+    export_mapping => []
 );
 
 my %sets = (
@@ -626,6 +627,15 @@ sub Get {
                       .join q{,}, @{$gets{$_}} : $_} sort keys %gets)
 
     if !defined $gets{$command};
+    
+    if ($command eq 'export_mapping') {
+        my $device = shift @{$anon} // return 'no device provided';
+        return 'no device from devicemap provided'
+            if !defined $hash->{helper}{devicemap} 
+                || !defined $hash->{helper}{devicemap}{devices}
+                || !defined $hash->{helper}{devicemap}{devices}{$device};
+        return exportMapping($hash, $device);
+    }
 
     if ($command eq 'test_file') {
         return 'provide a filename' if !@values;
@@ -990,7 +1000,6 @@ sub initialize_devicemap {
         _analyze_genDevType($hash, $_) if $hash->{useGenericAttrs};
         _analyze_rhassypAttr($hash, $_);
     }
-
     return;
 }
 
@@ -2337,6 +2346,43 @@ sub getMapping {
     return $matchedMapping;
 }
 
+sub exportMapping {
+    my $hash   = shift // return;
+    my $device = shift // return;
+
+    my $nl = $hash->{CL} ? '<br>' : q{\n};
+
+    my $mapping = $hash->{helper}{devicemap}{devices}{$device}{intents};
+    my $result;
+
+    for my $key ( keys %{$mapping} ) {
+        my $map = $mapping->{$key};
+        my @tokens;
+        if ( defined $mapping->{$key}->{$key} ) {
+            $map = $mapping->{$key}->{$key};
+            delete $map->{type};
+            $result .= $nl if $result;
+            $result .= "${key}:";
+            @tokens = ();
+            for my $skey ( keys %{$map} ) {
+                push @tokens, "${skey}=$map->{$skey}";
+            }
+            $result .= join q{,}, @tokens;
+        } else {
+            for my $skey ( keys %{$map} ) {
+                $result .= $nl if $result;
+                $result .= "${key}:";
+                @tokens = ();
+                for my $sskey ( keys %{$map->{$skey}} ) {
+                    push @tokens, "${sskey}=$map->{$skey}->{$sskey}";
+                }
+                $result .= join q{,}, @tokens;
+            }
+        }
+    }
+    return $result;
+}
+
 
 # Cmd von Attribut mit dem Format value=cmd pro Zeile lesen
 sub getKeyValFromAttr {
@@ -3071,7 +3117,6 @@ sub ttsDialog_progress {
 
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
-    return;
 }
 
 sub ttsDialog_respond {
@@ -5456,8 +5501,8 @@ sub _ReplaceReadingsVal {
         if($s && $s =~ m{:d|:r|:i}x && $val =~ m{(-?\d+(\.\d+)?)}x) {
             $val = $1;
             $val = int($val) if $s eq ':i';
-            my $n = defined $1 ? $1 : 1;
-            $val = sprintf("%.${n}f",$val) if $s =~ m{\A:r(\d)?}x;
+            my $nn = defined $1 ? $1 : 1;
+            $val = sprintf("%.${nn}f",$val) if $s =~ m{\A:r(\d)?}x;
         }
         return $val;
     };
@@ -5548,13 +5593,13 @@ sub _array2andString {
     my $and = $hash->{helper}{lng}->{words}->{and} // 'and';
 
     my @all = @{$arr};
-    my $last = pop @all;
-    while (@all && !$last) {
-        $last = pop @all;
+    my $fin = pop @all;
+    while (@all && !$fin) {
+        $fin = pop @all;
     }
-    return $last if !@all;
+    return $fin if !@all;
     my $text = join q{, }, @all;
-    $text .=  " $and $last";
+    $text .=  " $and $fin";
     return $text;
 }
 
@@ -5708,9 +5753,9 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
 
   <li>
-    <a id="RHASSPY-set-play"></a><b>play</b>
+    <a id="RHASSPY-set-play"></a><b>play &lt;siteId and path+filename&gt;</b>
     <p>Send WAV file to Rhasspy.<br>
-    <i>siteId</i> and <i>path</i> are required!<br>
+    <i>siteId</i> and <i>path and filename</i> are required!<br>
     You may optionally add a number of repeats and a wait time in seconds between repeats. <i>wait</i> defaults to 15, if only <i>repeats</i> is given.</p>
     <p>Examples:<br>
       <code>set &lt;rhasspyDevice&gt; play siteId="default" path="/opt/fhem/test.wav"</code><br>
@@ -5719,7 +5764,7 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
 
   <li>
-    <a id="RHASSPY-set-speak"></a><b>speak</b>
+    <a id="RHASSPY-set-speak"></a><b>speak &lt;siteId and text&gt;</b>
     <p>Voice output over TTS.<br>
     Both arguments (siteId and text) are required!</p>
     <p>Example:<br>
@@ -5727,7 +5772,7 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
 
   <li>
-    <a id="RHASSPY-set-textCommand"></a><b>textCommand</b>
+    <a id="RHASSPY-set-textCommand"></a><b>textCommand &lt;text to analyze&gt;</b>
     <p>Send a text command to Rhasspy.</p>
     <p>Example:<br>
     <code>set &lt;rhasspyDevice&gt; textCommand turn the light on</code></p>
@@ -5749,7 +5794,7 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
 
   <li>
-    <a id="RHASSPY-set-volume"></a><b>volume</b>
+    <a id="RHASSPY-set-volume"></a><b>volume &lt;float value&gt;</b>
     <p>Sets volume of given siteId between 0 and 1 (float)<br>
     Both arguments (siteId and volume) are required!</p>
     <p>Example:<br>
@@ -5757,7 +5802,7 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
 
   <li>
-    <a id="RHASSPY-set-customSlot"></a><b>customSlot</b>
+    <a id="RHASSPY-set-customSlot"></a><b>customSlot &lt;parameters&gt;</b>
     <p>Creates a new - or overwrites an existing slot - in Rhasspy<br>
     Provide slotname, slotdata and (optional) info, if existing data shall be overwritten and training shall be initialized immediately afterwards.<br>
     First two arguments are required, third and fourth are optional.<br>
@@ -5777,11 +5822,15 @@ After changing something relevant within FHEM for either the data structure in</
 <p>Note: To get test results, RHASSPY's siteId has to be configured for intent recognition in Rhasspy as well.</p>
 <ul>
   <li>
-    <a id="RHASSPY-get-test_file"></a><b>test_file</b>
+    <a id="RHASSPY-get-export_mapping"></a><b>export_mapping &lt;devicename&gt;</b>
+    <p>Exports a "classical" rhasspyMapping attribute value for the provided device. You may find this usefull to adopt that further to your individual needs.</p>
+  </li>
+  <li>
+    <a id="RHASSPY-get-test_file"></a><b>test_file &lt;path and filename&gt;</b>
     <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. <i><b>stop</i></b> as filename will stop test mode if sth. goes wrong. No commands will be executed towards FHEM devices while test mode is active.</p>
   </li>
   <li>
-    <a id="RHASSPY-get-test_sentence"></a><b>test_sentence</b>
+    <a id="RHASSPY-get-test_sentence"></a><b>test_sentence &lt;sentence to be analyzed&gt;</b>
     <p>Checks the provided sentence for recognition by Rhasspy NLU. No commands to be executed as well.</p>
   </li>
 </ul>

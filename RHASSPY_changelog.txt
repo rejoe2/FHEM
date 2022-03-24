@@ -1,0 +1,22 @@
+changelog:
+
+- confidenceMin (tweak)
+Ein (einstellbarer) Mindestwert (global oder pro Intent) muss erreicht sein, sonst wird keine Aktion ausgeführt
+
+- blacklistIntents (special)
+einzelne Intents können ignoriert werden, um z.B. "stop"-Kommandos aus HTTPMOD nicht als Kommando verfügbar zu machen 
+
+- intent SetNumeric
+erlaubt mehr "devicelose" Kommandos (wärmer/kälter usw.)
+
+- GetState überarbeitet:
+-- erlaubt es, beliebige Inhalte auszuwerten, indem in rhasspyMapping GetState mit einem type und einer stateFormat-artigen "response" angeben wird;
+-- Status-Infos zu RHASSPY selbst können abgefragt werden (insbesondere auf den aktuellen Raum der Anfrage bezogen)
+
+=> neue keys für languageFile => Neustart notwendig!
+
+- Test-Modus
+Neue getter, getestet werden kann mit File und einzelnen Sätzen (es werden keine Schaltbefehle ausgeführt).
+
+- Export von rhasspyMapping
+Neuer getter, .
