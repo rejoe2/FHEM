@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 f Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 g Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -84,6 +84,8 @@ my $languagevars = {
    },
   'responses' => { 
     'DefaultError' => "Sorry but something seems not to work as expected",
+    'NoValidResponse' => 'Error. respond function called without valid response!',
+    'NoValidIntentResponse' => 'Error. respond function called by $intent without valid response!',
     'NoValidData' => "Sorry but the received data is not sufficient to derive any action",
     'NoDeviceFound' => "Sorry but I could not find a matching device",
     'NoTimedOnDeviceFound' => "Sorry but device does not support requested timed on or off command",
@@ -402,10 +404,11 @@ sub initialize_Language {
     my $lang = shift // return;
     my $cfg  = shift // AttrVal($hash->{NAME},'languageFile',undef);
 
-    my $cp = $hash->{encoding} // q{UTF-8};
+    #my $cp = $hash->{encoding} // q{UTF-8};
 
     #default to english first
     $hash->{helper}->{lng} = $languagevars if !defined $hash->{helper}->{lng} || !$init_done;
+    return if !defined $cfg;
 
     my ($ret, $content) = _readLanguageFromFile($hash, $cfg);
     return $ret if $ret;
@@ -416,16 +419,17 @@ sub initialize_Language {
         Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg: $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
+    return if !defined $decoded;
+    my $slots = $decoded->{slots};
 
-    my $slots = $decoded->{slots}; 
-
-    if ( defined $decoded->{default} ) {
+    if ( defined $decoded->{default} && defined $decoded->{user} ) {
         $decoded = _combineHashes( $decoded->{default}, $decoded->{user} );
-        Log3($hash->{NAME}, 4, "try to use user specific sentences and defaults in languagefile $cfg");
+        Log3($hash->{NAME}, 4, "combined use user specific sentences and defaults provided in $cfg");
     }
-    $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded);
+    $hash->{helper}->{lng} = _combineHashes( $hash->{helper}->{lng}, $decoded );
 
     return if !$init_done;
+
     for my $key (keys %{$slots}) {
         updateSingleSlot($hash, $key, $slots->{$key});
     }
@@ -3270,7 +3274,7 @@ sub analyzeMQTTmessage {
 sub respond {
     my $hash     = shift // return;
     my $data     = shift // return;
-    my $response = shift // return;
+    my $response = shift // getResponse( $hash, 'NoValidResponse' ); 
     my $topic    = shift // q{endSession};
     my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
@@ -4616,6 +4620,8 @@ sub handleIntentGetState {
     }
 
     my $deviceName = $device;
+    my $intent = 'GetState';
+
     $device = getDeviceByName($hash, $room, $device);
     $type //= 'GetState';
     my $mapping = getMapping($hash, $device, 'GetState', $type) // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
@@ -4631,7 +4637,7 @@ sub handleIntentGetState {
         $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
     } elsif ( defined $data->{type} || $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
-        $response = getResponse( $hash, 'getStateResponses', $type );
+        $response = getResponse( $hash, 'getStateResponses', $type ) // getResponse( $hash, 'NoValidIntentResponse') ;
         $response =~ s{(\$\w+)}{$1}eegx;
         $response = _ReplaceReadingsVal($hash, $response );
     } else {
@@ -5483,6 +5489,9 @@ sub _readLanguageFromFile {
         return $ret, undef;
     }
     my @cleaned = grep { $_ !~ m{\A\s*[#]}x } @content;
+    for (@cleaned) {
+        $_ =~ s{\A\s+}{}gmxsu;
+    };
 
     return 0, join q{ }, @cleaned;
 }
