@@ -2,7 +2,7 @@
   #
   # FHEM Spracherkennungstest - FEST.txt
   #
-  # Version 1.0
+  # Version 1.0a
   #
   #--------------------------------------
   DIALOGUE:greetings
@@ -234,3 +234,7 @@
  
   wie wird das wetter heute
   was kostet diesel in Karlsruhe
+  stelle den wecker auf 17 uhr
+  wecken um 13 Uhr 12
+  erinnern in 2 stunden
+  erinnern um 2 30
