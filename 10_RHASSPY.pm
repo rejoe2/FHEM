@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25862 2022-03-23 g Beta-User $
+# $Id: 10_RHASSPY.pm 25862 2022-03-23 h Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2784,8 +2784,10 @@ sub testmode_next {
     $result = "tested $result sentences, failed total: $fails, amongst these in dialogues: $failsInDialogue.";
 
     if ( $filename ne 'none_result.txt' ) {
+        my $duration = '';
+        $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
-        $result .= " See $filename for detailed results."
+        $result .= "$duration See $filename for detailed results."
     } else {
         $result = $fails ? 'Test failed, ' : 'Test ok, ';
         $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
