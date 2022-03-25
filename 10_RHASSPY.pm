@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25880 2022-03-24 17:25:34Z Beta-User $
+# $Id: 10_RHASSPY.pm 25880 2022-03-25 testing timeout Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2817,8 +2817,15 @@ sub testmode_next {
         };
 
         my $json = _toCleanJSON($sendData);
+        resetRegIntTimer( 'testmode_end', time + 10, \&RHASSPY_testmode_timeout, $hash ) if $hash->{helper}->{test}->{filename} ne 'none';
         return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
     }
+    return testmode_end($hash);
+}
+
+sub testmode_end {
+    my $hash = shift // return;
+    my $fail = shift // 0;
 
     my $filename = $hash->{helper}->{test}->{filename};
     $filename =~ s{[.]txt\z}{}i;
@@ -2832,8 +2839,11 @@ sub testmode_next {
     if ( $filename ne 'none_result.txt' ) {
         my $duration = '';
         $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
-        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
-        $result .= "$duration See $filename for detailed results."
+        my $result = $hash->{helper}->{test}->{result};
+        push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
+        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
+        $result .= "$duration See $filename for detailed results." if !$fail;
+        $result = "Test ended incomplete with timeout. See $filename for results up to failure." if $fail;
     } else {
         $result = $fails ? 'Test failed, ' : 'Test ok, ';
         $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
@@ -2842,11 +2852,14 @@ sub testmode_next {
     if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult' ) {
           my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
           RemoveInternalTimer($hash->{asyncGet});
-          asyncOutput($hash->{asyncGet}{CL}, "test(s) passed successfully. Summary: $result, duration: $duration s");
+          my $suc = $fail ? 'not completely passed!' : 'passed successfully.';
+          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result, duration: $duration s");
           delete($hash->{asyncGet});
     }
     delete $hash->{testline};
     delete $hash->{helper}->{test};
+    deleteSingleRegIntTimer('testmode_end', $hash, 1); 
+
     return;
 }
 
@@ -2860,7 +2873,7 @@ sub testmode_parse {
     $hash->{helper}->{test}->{passed}++;
     if ( $intent eq 'intentNotRecognized' ) {
         $result = $line;
-        $result .= " Intent not recognized." if $hash->{helper}->{test}->{filename} eq 'none';
+        $result .= " => Intent not recognized." if $hash->{helper}->{test}->{filename} eq 'none';
         $hash->{helper}->{test}->{notRecogn}++;
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
@@ -2883,6 +2896,17 @@ sub testmode_parse {
     $hash->{testline}++;
     return testmode_next($hash);
 }
+
+sub RHASSPY_testmode_timeout {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+    my $identiy = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identiy, $hash, 1); 
+
+    return testmode_end($hash, 1);
+}
+
 
 sub _isUnexpectedInTestMode {
     my $hash   = shift // return;
