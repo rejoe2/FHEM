@@ -1239,7 +1239,7 @@ sub _analyze_genDevType {
     }
 
     if ( $gdt eq 'thermostat' ) {
-        my $desTemp = $allset =~ m{\b(desiredTemp)([\b:\s]|\Z)}xms ? $1 : 'desired-temp';
+        my $desTemp = $allset =~ m{\b(desiredTemp|desired)([\b:\s]|\Z)}xms ? $1 : 'desired-temp';
         my $measTemp = InternalVal($device, 'TYPE', 'unknown') eq 'CUL_HM' ? 'measured-temp' : 'temperature';
         $currentMapping = 
             { GetNumeric => { 'desired-temp' => {currentVal => $desTemp, type => 'desired-temp'},
@@ -2037,13 +2037,13 @@ sub getDeviceByIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
-    #my $inBulk = shift // 0;
+    my $subType = shift // $type;
 
     #rem. Beta-User: atm function is only called by GetNumeric!
     my $device;
 
     # Devices sammeln
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
     Log3($hash->{NAME}, 5, "matches in room: @{$matchesInRoom}, matches outside: @{$matchesOutsideRoom}");
     my ($response, $last_item, $first_items);
 
@@ -2135,9 +2135,10 @@ sub getActiveDeviceForIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
+    my $subType = shift // $type;
 
     my $device;
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
 
     # Anonyme Funktion zum finden des aktiven Geräts
     my $activeDevice = sub ($$) {
@@ -2827,7 +2828,7 @@ sub testmode_end {
     my $hash = shift // return;
     my $fail = shift // 0;
 
-    my $filename = $hash->{helper}->{test}->{filename};
+    my $filename = $hash->{helper}->{test}->{filename} // q{none};
     $filename =~ s{[.]txt\z}{}i;
     $filename = "${filename}_result.txt";
 
@@ -2853,12 +2854,12 @@ sub testmode_end {
           my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
           RemoveInternalTimer($hash->{asyncGet});
           my $suc = $fail ? 'not completely passed!' : 'passed successfully.';
-          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result, duration: $duration s");
+          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result duration: $duration s");
           delete($hash->{asyncGet});
     }
     delete $hash->{testline};
     delete $hash->{helper}->{test};
-    deleteSingleRegIntTimer('testmode_end', $hash, 1); 
+    deleteSingleRegIntTimer('testmode_end', $hash); 
 
     return;
 }
@@ -4382,9 +4383,12 @@ sub handleIntentSetNumeric {
     my $unit   = $data->{Unit};
     my $change = $data->{Change};
     my $type   = $data->{Type};
+    my $subType= $data->{Type};
+    
     if ( !defined $type && defined $change ){
         $type   = $internal_mappings->{Change}->{$change}->{Type};
         $data->{Type} = $type if defined $type;
+        $subType = 'desired-temp' if $data->{Type} eq 'temperature';
     }
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
@@ -4398,7 +4402,7 @@ sub handleIntentSetNumeric {
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
     } else {
-        $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type);
+        $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $subType);
     }
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
@@ -4520,9 +4524,9 @@ sub handleIntentSetNumeric {
     if ( defined $specials ) {
         my $vencmd = $specials->{setter} // $cmd;
         my $vendev = $specials->{device} // $device;
-        if ( $change ne 'cmdStop' ) {
+        if ( defined $change && $change ne 'cmdStop' ) {
             analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
-        } elsif ( defined $specials->{stopCommand} ) {
+        } elsif ( defined $change && $change eq 'cmdStop' && defined $specials->{stopCommand} ) {
             analyzeAndRunCmd($hash, $vendev, $specials->{stopCommand});
         }
     }
