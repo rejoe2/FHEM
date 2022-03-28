@@ -3248,7 +3248,7 @@ sub analyzeMQTTmessage {
     # Hotword detection
     if ($topic =~ m{\Ahermes/hotword/toggle(O[nf]+)}x) {
         my $active = $1 eq 'On' ? 1 : 0;
-        my $siteId = $data->{siteId} // return;
+        return if !$siteId;
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
@@ -3272,7 +3272,6 @@ sub analyzeMQTTmessage {
 
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         my $hotword = $1;
-        my $siteId = $data->{siteId};
         if ( 0 && $siteId ) { #Beta-User: deactivated
             my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
@@ -3307,7 +3306,8 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
-        return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline} && $data->{siteId} eq $hash->{siteId};
+        return if !$hash->{siteId} || $siteId ne $hash->{siteId};
+        return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline};
         handleIntentNotRecognized($hash, $data);
         return $hash->{NAME};
     }
