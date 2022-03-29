@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 25786 2022-03-06 12:49:53Z Beta-User $
+# $Id: mqtt2.template 25892 2022-03-28 18:54:47Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -155,7 +155,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
-  permit_join:true,false $\DEVICETOPIC/bridge/config/permit_join $EVTPART1\
+  permit_join:true,false $\DEVICETOPIC/bridge/request/permit_join $EVTPART1\
   remove:textField $\DEVICETOPIC/bridge/config/remove $EVTPART1\
   ota_update:textField $\DEVICETOPIC/bridge/ota_update/update $EVTPART1\
   ota_update_check:textField $\DEVICETOPIC/bridge/ota_update/check $EVTPART1\
@@ -178,7 +178,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20220218
+setreading DEVICE attrTemplateVersion 20220328
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -1203,7 +1203,7 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 readingList \
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER2:.* state
-attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0
+attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 Color:rgb
 attr DEVICE_CH2 webCmd pct:white:rgb
 attr DEVICE_CH2 webCmdLabel Helligkeit\
 :Weiss\
@@ -1213,7 +1213,7 @@ attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220228
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220329
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
@@ -4438,13 +4438,13 @@ attr OMG_BT_ID readingList\
 attr OMG_BT_ID event-min-interval .*:300
 attr OMG_BT_ID event-on-change-reading temperature:0.2,moisture:0.2,rssi:5,distance:5,fertility:5,lux:5
 attr OMG_BT_ID icon temperature_humidity
-attr OMG_BT_ID jsonMap tem:temperature hum:humidity moi:moisture fer:fertility servicedatauuid:0 servicedata:0
+attr OMG_BT_ID jsonMap tempc:temperature tempf:0 hum:humidity moi:moisture fer:fertility servicedatauuid:0 servicedata:0
 attr OMG_BT_ID stateFormat T: temperature°C, M: moisture%, L: lux, F: fertility
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_mi_flora_sensor
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220307
+setreading OMG_BT_ID attrTemplateVersion 20220326
 
 
 name:OpenMQTTGateway_simple_RF433_switch

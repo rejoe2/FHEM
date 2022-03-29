@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25886 2022-03-28 Beta-User $
+# $Id: 10_RHASSPY.pm 25894 2022-03-29 09:39:30Z drhirn $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2891,8 +2891,7 @@ sub testmode_parse {
                     q{can't identify any device in group and room} 
                   : join q{,}, keys %{$devices};
         $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Devices in group and room: $result";
-    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor\z}) {
-        #missing: MediaChannels SetTimer
+    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor|SetTimer|MediaChannels|Shortcuts\z}) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
     }
@@ -5177,9 +5176,11 @@ sub handleIntentSetTimer {
 
     my $response;
     if (defined $data->{CancelTimer}) {
-        CommandDelete($hash, $roomReading);
-        readingsDelete($hash, $roomReading);
-        Log3($name, 5, "deleted timer: $roomReading");
+        if ( !defined $hash->{testline} ) {
+            CommandDelete($hash, $roomReading);
+            readingsDelete($hash, $roomReading);
+            Log3($name, 5, "deleted timer: $roomReading");
+        }
         $response = getResponse($hash, 'timerCancellation');
         $response =~ s{(\$\w+)}{$1}eegx;
         respond( $hash, $data, $response );
@@ -5190,9 +5191,9 @@ sub handleIntentSetTimer {
         $value = InternalVal($roomReading, 'TRIGGERTIME', undef) // return respond( $hash, $data, getResponse( $hash, 'timerSet', 6 ) );
     }
 
-    if( $value && $timerRoom ) {
+    if ( $value && $timerRoom ) {
         my $seconds = $value - $now;
-        if ( !defined $data->{GetTimer} ) {
+        if ( !defined $data->{GetTimer} && !defined $hash->{testline}) {
             my $diff = $seconds;
             my $attime = strftime( '%H', gmtime $diff );
             $attime += 24 if $tomorrow;
@@ -5660,27 +5661,11 @@ __END__
 
 # Continous mode? (Wackelig, mehr oder weniger ungetestet...)
 
-# GetTimer implementieren?
-https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
-
 # Rückmeldung zu den AMAD.*-Schnittstellen 
 - v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
 # auto-training
 Tests/Rückmeldungen fehlen bisher; sieht nicht funktional aus...
-
-# probability:
-Minimum Level (pro Intent?) festlegen können. (muss getestet werden)
-
-# Testsuite: 
-- "Kenner" Dialoge etc. einbauen (vorl. erledigt)
-- Mehr Info zu adressierten Geräten (getDevicesByGroup) 
--- OK für Gruppen;
--- Nacharbeit erforderlich für Einzel-Intents (paßt soweit).
-
-# https://forum.fhem.de/index.php/topic,119447.msg1215408.html#msg1215408
-- die "not recognized"-Fälle sollte man bei den "echten" Messenger-Fällen vermutlich auch noch gesondert mit einer Antwort bedenken, damit der Anfragende jedenfalls eine Rückmeldung bekommt; (VB: 28.03.?)
-- die doppelte Zeitausgabe muss nicht sein...(VB: 28.03.)
 
 =end ToDo
 
@@ -6302,7 +6287,7 @@ yellow=rgb FFFF00</code></p>
   <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!).
   <li>GetTime</li>
   <li>GetDate</li>
-  <li>SetTimer</li> Timer info as described in SetTimedOnOff is mandatory, {Room} and/or {Label} are optional to distinguish between different timers. {CancelTimer} key will force RHASSPY to try to remove a running timer (using optional {Room} and/or {Label} key to identify the respective timer).
+  <li>SetTimer</li> Timer info as described in SetTimedOnOff is mandatory, {Room} and/or {Label} are optional to distinguish between different timers. {CancelTimer} key will force RHASSPY to try to remove a running timer (using optional {Room} and/or {Label} key to identify the respective timer), {GetTimer} key will be treated as request if there's a timer running (optionally also identified by {Room} and/or {Label} keys).
   Required tags to set a timer: at least one of {Hour}, {Hourabs}, {Min} or {Sec}. {Label} and {Room} are optional to distinguish between different timers. If {Hourabs} is provided, all timer info will be regarded as absolute time of day info, otherwise everything is calculated using a "from now" logic.
   <li>ConfirmAction</li>
   {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
