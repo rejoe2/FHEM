@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25894 2022-03-29 Beta-User $
+# $Id: 10_RHASSPY.pm 25894 2022-03-29 a Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
