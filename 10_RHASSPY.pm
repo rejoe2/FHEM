@@ -4655,7 +4655,7 @@ sub handleIntentGetState {
     my $room = getRoomName($hash, $data);
 
     my $type = $data->{Type} // $data->{type};
-    my @scenes;
+    my @scenes; my $deviceNames; my $sceneNames;
     if ($device eq 'RHASSPY') {
         $type  //= 'generic';
         return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $type !~ m{\Ageneric|control|info|scenes|rooms\z};
@@ -4692,8 +4692,8 @@ sub handleIntentGetState {
         @names  = uniq(@names);
         @scenes = uniq(@scenes) if @scenes;
 
-        my $deviceNames = _array2andString( $hash, \@names );
-        my $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
+        $deviceNames = _array2andString( $hash, \@names );
+        $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
 
         $response =~ s{(\$\w+)}{$1}eegx;
         return respond( $hash, $data, $response);
@@ -4707,8 +4707,9 @@ sub handleIntentGetState {
     if ( $type eq 'scenes' ) {
         $response = getResponse( $hash, 'getRHASSPYOptions', $type );
         @scenes = values %{$hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}};
-        my $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
-
+        @scenes = uniq(@scenes) if @scenes;
+        $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
+        $deviceNames = $deviceName;
         $response =~ s{(\$\w+)}{$1}eegx;
         return respond( $hash, $data, $response);
     }
@@ -4725,7 +4726,7 @@ sub handleIntentGetState {
     } elsif ( defined $mapping->{response} ) {
         $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), undef, $room);
         $response = _ReplaceReadingsVal($hash, _shuffle_answer($mapping->{response})) if !$response; #Beta-User: case: plain Text with [device:reading]
-    } elsif ( defined $data->{type} || $data->{Type} ) {
+    } elsif ( defined $data->{type} || defined $data->{Type} ) {
         my $reading = $data->{Reading} // 'STATE';
         $response = getResponse( $hash, 'getStateResponses', $type ) // getResponse( $hash, 'NoValidIntentResponse') ;
         $response =~ s{(\$\w+)}{$1}eegx;
