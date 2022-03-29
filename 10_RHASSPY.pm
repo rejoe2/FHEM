@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25894 2022-03-29 09:39:30Z drhirn $
+# $Id: 10_RHASSPY.pm 25894 2022-03-29 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -4655,6 +4655,7 @@ sub handleIntentGetState {
     my $room = getRoomName($hash, $data);
 
     my $type = $data->{Type} // $data->{type};
+    my @scenes;
     if ($device eq 'RHASSPY') {
         $type  //= 'generic';
         return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $type !~ m{\Ageneric|control|info|scenes|rooms\z};
@@ -4663,11 +4664,12 @@ sub handleIntentGetState {
         if ( $type eq 'rooms' ) {
             my @rooms = getAllRhasspyMainRooms($hash);
             $roomNames = _array2andString( $hash, \@rooms);
+            $response =~ s{(\$\w+)}{$1}eegx;
+            return respond( $hash, $data, $response);
         }
 
-        my @names; my @scenes;
+        my @names;
         my @intents = qw(SetNumeric SetOnOff GetNumeric GetOnOff MediaControls GetState SetScene);
-        @intents = [] if $type eq 'rooms';
         @intents = qw(GetState GetNumeric) if $type eq 'info';
         @intents = qw(SetScene) if $type eq 'scenes';
 
@@ -4692,6 +4694,7 @@ sub handleIntentGetState {
 
         my $deviceNames = _array2andString( $hash, \@names );
         my $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
+
         $response =~ s{(\$\w+)}{$1}eegx;
         return respond( $hash, $data, $response);
     }
@@ -4699,7 +4702,17 @@ sub handleIntentGetState {
     my $deviceName = $device;
     my $intent = 'GetState';
 
-    $device = getDeviceByName($hash, $room, $device);
+    $device = getDeviceByName($hash, $room, $device) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+
+    if ( $type eq 'scenes' ) {
+        $response = getResponse( $hash, 'getRHASSPYOptions', $type );
+        @scenes = values %{$hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}};
+        my $sceneNames = !@scenes ? '' : _array2andString( $hash, \@scenes );
+
+        $response =~ s{(\$\w+)}{$1}eegx;
+        return respond( $hash, $data, $response);
+    }
+
     $type //= 'GetState';
     my $mapping = getMapping($hash, $device, 'GetState', $type) // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
