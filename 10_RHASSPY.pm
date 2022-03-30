@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25894 2022-03-30 Beta-User $
+# $Id: 10_RHASSPY.pm 25894 2022-03-30 a Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -335,7 +335,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.26';
+    $hash->{MODULE_VERSION} = '0.5.26a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -3474,7 +3474,7 @@ sub sendSpeakCommand {
     my $hash = shift;
     my $cmd  = shift;
 
-    my $sendData =  { 
+    my $sendData = {
         init => {
             type          => 'notification',
             canBeEnqueued => 'true',
@@ -3483,13 +3483,13 @@ sub sendSpeakCommand {
     };
     if (ref $cmd eq 'HASH') {
         return 'speak with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
-        $sendData->{siteId} =  $cmd->{siteId};
+        $sendData->{siteId} = _getSiteIdbyRoom($hash, $cmd->{siteId});
         $sendData->{init}->{text} =  $cmd->{text};
     } else {
         my($unnamedParams, $namedParams) = parseParams($cmd);
 
         if (defined $namedParams->{siteId} && defined $namedParams->{text}) {
-            $sendData->{siteId} = $namedParams->{siteId};
+            $sendData->{siteId} = _getSiteIdbyRoom($hash, $namedParams->{siteId});
             $sendData->{init}->{text} = $namedParams->{text};
         } else {
             return 'speak needs siteId and text as arguments!';
@@ -3499,12 +3499,25 @@ sub sendSpeakCommand {
     return IOWrite($hash, 'publish', qq{hermes/dialogueManager/startSession $json});
 }
 
+sub _getSiteIdbyRoom {
+    my $hash   = shift // return;
+    my $siteId = shift // return;
+
+    my $siteIdList = ReadingsVal($hash->{NAME}, 'siteIds', $siteId);
+    my $siteId2 = ReadingsVal($hash->{NAME}, "room2siteId_$siteId", $siteId);
+    for my $id ($siteId2, $siteId) {
+        return $1 if $siteIdList =~ m{\b($id)(?:[,]|\Z)}xmsi;
+        return $1 if $siteIdList =~ m{\b($id[^,]+)(?:[,]|\Z)}xmsi;
+    }
+    return $siteId;
+}
+
 # start intent recognition by Rhasspy service, see https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
 sub msgDialog {
     my $hash = shift;
     my $cmd  = shift;
 
-    readingsSingleUpdate($hash,"enableMsgDialog", $cmd eq 'enable' ? 1 : 0 ,1);
+    readingsSingleUpdate($hash,'enableMsgDialog', $cmd eq 'enable' ? 1 : 0 ,1);
 
     return initialize_msgDialog($hash) if $cmd eq 'enable';
     return disable_msgDialog($hash);
@@ -5510,7 +5523,7 @@ sub setPlayWav {
 
     return 'playWav needs siteId and path to file as parameters!' if !defined $cmd->{siteId} || !defined $cmd->{path};
 
-    my $siteId   = $cmd->{siteId};
+    my $siteId   = _getSiteIdbyRoom($hash, $cmd->{siteId});
     my $filename = $cmd->{path};
     my $repeats  = $cmd->{repeats};
     my $encoding = q{:raw :bytes};
@@ -6359,6 +6372,7 @@ yellow=rgb FFFF00</code></p>
   <li>siteId2room_&lt;siteId&gt;</li>
   Typically, RHASSPY derives room info from the name of the siteId. So naming a satellite <i>bedroom</i> will let RHASSPY assign this satellite to the same room, using the group sheme is also supported, e.g. <i>kitchen.front</i> will refer to <i>kitchen</i> as room (if not explicitly given). <br>
   You may overwrite that behaviour by setting values to siteId2room readings: <code>setreading siteId2room_mobile_phone1 kitchen</code> will force RHASSPY to link your satellite <i>phone1 kitchen</i> to kitchen as room.
+  <li>room2siteId_&lt;siteId&gt;</li> Used to identify the satellite to speak messages addressed to a room (same for playing sound files)
   <li>siteId2doubleSpeak_&lt;siteId&gt;</li>
   RHASSPY will always respond via the satellite where the dialogue was initiated from. In some cases, you may want additional output to other satellites - e.g. if they don't have (always on) sound output options. Setting this type of reading will lead to (additional!) responses to the given second satellite; naming scheme is the same as for site2room.
   <li>sessionTimeout_&lt;siteId&gt;</li>
