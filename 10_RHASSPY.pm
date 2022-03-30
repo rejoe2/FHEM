@@ -6372,7 +6372,7 @@ yellow=rgb FFFF00</code></p>
   <li>siteId2room_&lt;siteId&gt;</li>
   Typically, RHASSPY derives room info from the name of the siteId. So naming a satellite <i>bedroom</i> will let RHASSPY assign this satellite to the same room, using the group sheme is also supported, e.g. <i>kitchen.front</i> will refer to <i>kitchen</i> as room (if not explicitly given). <br>
   You may overwrite that behaviour by setting values to siteId2room readings: <code>setreading siteId2room_mobile_phone1 kitchen</code> will force RHASSPY to link your satellite <i>phone1 kitchen</i> to kitchen as room.
-  <li>room2siteId_&lt;siteId&gt;</li> Used to identify the satellite to speak messages addressed to a room (same for playing sound files)
+  <li>room2siteId_&lt;room&gt;</li> Used to identify the satellite to speak messages addressed to a room (same for playing sound files). Should deliver exactly one possible siteId, e.g. &lt;lingingroom.04&gt;
   <li>siteId2doubleSpeak_&lt;siteId&gt;</li>
   RHASSPY will always respond via the satellite where the dialogue was initiated from. In some cases, you may want additional output to other satellites - e.g. if they don't have (always on) sound output options. Setting this type of reading will lead to (additional!) responses to the given second satellite; naming scheme is the same as for site2room.
   <li>sessionTimeout_&lt;siteId&gt;</li>
