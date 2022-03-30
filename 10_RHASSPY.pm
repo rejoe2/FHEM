@@ -4812,6 +4812,22 @@ sub handleIntentSetScene{
     my $scene = $data->{Scene};
     my $device = getDeviceByName($hash, $room, $data->{Device});
     my $mapping = getMapping($hash, $device, 'SetScene');
+
+    #Welche (Szenen | Szenarien | Einstellungen){Get:scenes} (kennt|kann) [(der | die | das)] $de.fhem.Device-scene{Device}
+    if ( defined $data->{Get} && $data->{Get} eq 'scenes' ) {
+        delete $data->{Get};
+        my $response = getResponse( $hash, 'RequestChoiceGeneric' );
+        my @scenes = values %{$hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}};
+        @scenes = uniq(@scenes) if @scenes;
+        my $options = !@scenes ? '' : _array2andString( $hash, \@scenes );
+        $response =~ s{(\$\w+)}{$1}eegx;
+
+        #until now: only extended test code
+        $data->{customData} = join q{,}, @scenes;
+        my $toActivate = [qw(Choice CancelAction)];
+        return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
+    }
+
     # restore HUE scenes
     $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
 
@@ -6320,7 +6336,7 @@ yellow=rgb FFFF00</code></p>
   <li>SetColor</li> 
   {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
   <li>SetColorGroup</li> (as SetColor, except for {Group} instead of {Device}).
-  <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!).
+  <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!), {Room} is optional, {Get} with value <i>scenes</i> may be used to request all possible scenes for a device prior to make a choice.
   <li>GetTime</li>
   <li>GetDate</li>
   <li>Timer</li> Timer info as described in <i>SetTimedOnOff</i> is mandatory, {Room} and/or {Label} are optional to distinguish between different timers. {CancelTimer} key will force RHASSPY to try to remove a running timer (using optional {Room} and/or {Label} key to identify the respective timer), {GetTimer} key will be treated as request if there's a timer running (optionally also identified by {Room} and/or {Label} keys).
