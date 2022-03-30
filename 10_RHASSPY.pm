@@ -1922,7 +1922,7 @@ sub getAllRhasspyScenes {
         push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names}; 
         my $scenes = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene};
         for (keys %{$scenes}) {
-            push @sentences, qq{( $scenes->{$_} ){Scene:$_}};
+            push @sentences, qq{( $scenes->{$_} ){Scene:$_}} if $scenes->{$_} ne 'cmdBack' && $scenes->{$_} ne 'cmdFwd' ;
         }
     }
 
