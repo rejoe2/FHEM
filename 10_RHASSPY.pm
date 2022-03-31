@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25894 2022-03-30 a Beta-User $
+# $Id: 10_RHASSPY.pm 25899 2022-03-31 a Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -868,6 +868,13 @@ sub initialize_rhasspyTweaks {
             }
             $hash->{helper}{tweaks}{confidenceMin}{default} = $unnamedParams->[0] if @{$unnamedParams} && looks_like_number($unnamedParams->[0]);
         }
+        if ($line =~ m{\A[\s]*(mappingOverwrite)[\s]*=}x) {
+            ($tweak, $values) = split m{=}x, $line, 2;
+            $tweak = trim($tweak);
+            $values= trim($values);
+            return "Error in $line! No content provided!" if !length $values && $init_done;
+            $hash->{helper}{tweaks}{$tweak} = $values;
+        }
     }
     return configure_DialogManager($hash) if $init_done;
     return;
@@ -990,7 +997,6 @@ sub init_custom_intents {
 
 sub initialize_devicemap {
     my $hash = shift // return;
-    Log3($hash->{NAME}, 5, "initialize_devicemap called");
     my $devspec = $hash->{devspec};
     delete $hash->{helper}{devicemap};
 
@@ -1067,9 +1073,13 @@ sub _analyze_rhassypAttr {
 
     #Hash mit {FHEM-Device-Name}{$intent}{$type}?
     my $mappingsString = AttrVal($device, "${prefix}Mapping", q{});
+    delete $hash->{helper}{devicemap}{devices}{$device}{intents} if $mappingsString && defined $hash->{helper}->{tweaks} && $hash->{helper}{tweaks}->{mappingOverwrite};
+    my @dones;
     for (split m{\n}x, $mappingsString) {
         my ($key, $val) = split m{:}x, $_, 2;
         next if !$val;
+        delete $hash->{helper}{devicemap}{devices}{$device}{intents}->{$key} if !grep {$key} @dones;
+        push @dones, $key;
         my $currentMapping = splitMappingString($val) // next;
         # Übersetzen, falls möglich:
         $currentMapping->{type} //= $key;
@@ -1123,7 +1133,7 @@ sub _analyze_rhassypAttr {
         if ( $key eq 'scenes' && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene} ) {
             my $combined = _combineHashes( $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}, $named);
             for (keys %{$combined}) {
-                delete $combined->{$_} if $combined->{$_} eq 'none' || defined $named->{all} && $named->{all} eq 'none';
+                delete $combined->{$_} if $combined->{$_} eq 'none' || defined $named->{all} && $named->{all} eq 'none' || defined $named->{rest} && $named->{rest} eq 'none' && !defined $named->{$_};
             }
             keys %{$combined} ?
                 $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene} = $combined
@@ -1922,7 +1932,7 @@ sub getAllRhasspyScenes {
         push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names}; 
         my $scenes = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene};
         for (keys %{$scenes}) {
-            push @sentences, qq{( $scenes->{$_} ){Scene:$_}} if $scenes->{$_} ne 'cmdBack' && $scenes->{$_} ne 'cmdFwd' ;
+            push @sentences, qq{( $scenes->{$_} ){Scene:$_}} if $_ ne 'cmdBack' && $_ ne 'cmdFwd' ;
         }
     }
 
@@ -2385,7 +2395,8 @@ sub exportMapping {
                 $result .= "${key}:";
                 @tokens = ();
                 for my $sskey ( keys %{$map->{$skey}} ) {
-                    push @tokens, "${sskey}=$map->{$skey}->{$sskey}";
+                    #push @tokens, "${sskey}=$map->{$skey}->{$sskey}";
+                    push @tokens, "${skey}=$map->{$skey}->{$sskey}"; #Beta-User: desired-temp?
                 }
                 $result .= join q{,}, @tokens;
             }
@@ -4706,7 +4717,7 @@ sub handleIntentGetState {
                 next if !defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}->{$intent};
                 push @names, $hash->{helper}{devicemap}{devices}{$dev}->{alias};
                 if ($intent eq 'SetScene') {
-                    @scenes = (@scenes, (values %{$hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}}));
+                    @scenes = (@scenes, grep { $_ !~ m{cmdFwd|cmdBack}xms} values %{$hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}} );
                 }
             }
         }
@@ -4815,7 +4826,7 @@ sub handleIntentSetScene{
     my $data = shift // return;
 
     Log3($hash->{NAME}, 5, "handleIntentSetScene called");
-    return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !defined $data->{Scene};
+    return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !defined $data->{Scene} && (!defined $data->{Get} || $data->{Get} ne 'scenes');
 
     # Device AND Scene are optimum exist
 
@@ -5548,7 +5559,7 @@ sub setPlayWav {
     $repeats--;
     my $attime = strftime( '%H:%M:%S', gmtime $wait );
     return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait id=$id")}, $hash ) if $repeats;
-    return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait")}, $hash ) if !$id;
+    #return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait")}, $hash ) if !$id; #Beta-User: nonsense w/o $id?!?
     return InternalTimer(time, sub (){CommandDefMod($hash, "-temporary $id at +$attime set $name play siteId=\"$siteId\" path=\"$filename\" repeats=$repeats wait=$wait; deletereading $name $id")}, $hash );
 }
 
@@ -6103,6 +6114,12 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <p>By default, RHASSPY will use a minimum <i>confidence</i> level of <i>0.66</i>, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
         Example: <p><code>confidenceMin= default=0.6 SetMute=0.4 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
       </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-mappingOverwrite"></a>
+      <li><b>mappingOverwrite</b>
+        <p>If set, any value set in rhasspyMapping attribute will delete all content detected by automated mapping analysis (default: only overwrite keys set in devices rhasspyMapping attributes.</p>
+        <p>Example: <p><code>mappingOverwrite=1</code></p>
+      </li>
+
     </ul>
   </li>
   <li>
@@ -6298,14 +6315,13 @@ yellow=rgb FFFF00</code></p>
       <li><b>scenes</b>
         <p><code>attr lamp1 rhasspySpecials scenes:scene2="Kino zu zweit" scene3=Musik scene1=none scene4=none</code></p>
         <p>Explanation:
-        <p>If set, the label provided will be sent to Rhasspy instead of the <i>tech names</i> (derived from available setters). Keyword <i>none</i> will delete the scene from the internal list, setting the combination <i>all=none</i> will exclude the entire device from beeing recognized for SetScene.</p>
+        <p>If set, the value (e.g. "Kino zu zweit") provided will be sent to Rhasspy instead of the <i>tech names</i> (e.g. "scene2", derived from available setters). Value <i>none</i> will delete the scene from the internal list, setting the combination <i>all=none</i> will exclude the entire device from beeing recognized for SetScene, <i>rest=none</i> will only include the labeled scenes. These values finally will be what's expected to be spoken to identificate a specific scene.</p>
       </li>
       <li><b>blacklistIntents</b>
         <p><code>attr weather rhasspySpecials blacklistIntents:MediaControls</code></p>
-        <p>Explanation:
+        <p>Explanation:</p>
         <p>If set, the blacklisted intents will be deleted after automated mapping analysis.</p>
       </li>
-
     </ul>
   </li>
   <li>
