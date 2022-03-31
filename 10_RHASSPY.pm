@@ -5934,7 +5934,7 @@ After changing something relevant within FHEM for either the data structure in</
 <ul>
   <li>
     <a id="RHASSPY-get-export_mapping"></a><b>export_mapping &lt;devicename&gt;</b>
-    <p>Exports a "classical" rhasspyMapping attribute value for the provided device. You may find this usefull to adopt that further to your individual needs.</p>
+    <p><a href="#RHASSPY-experimental"><b>experimental!</b></a> Exports a "classical" rhasspyMapping attribute value for the provided device. You may find this usefull to adopt that further to your individual needs. Will not completely work in all cases, especially wrt. to SetScene and HUEBridge formated scenes.</p>
   </li>
   <li>
     <a id="RHASSPY-get-test_file"></a><b>test_file &lt;path and filename&gt;</b>
