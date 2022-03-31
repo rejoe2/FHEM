@@ -2395,8 +2395,8 @@ sub exportMapping {
                 $result .= "${key}:";
                 @tokens = ();
                 for my $sskey ( keys %{$map->{$skey}} ) {
-                    #push @tokens, "${sskey}=$map->{$skey}->{$sskey}";
-                    push @tokens, "${skey}=$map->{$skey}->{$sskey}"; #Beta-User: desired-temp?
+                    #my $special = $skey eq 'desired-temp' ? 'desired-temp' : "$sskey";#Beta-User: desired-temp?
+                    push @tokens, "${sskey}=$map->{$skey}->{$sskey}"; 
                 }
                 $result .= join q{,}, @tokens;
             }
