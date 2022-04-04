@@ -4430,7 +4430,6 @@ sub handleIntentSetNumeric {
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
 
-
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
     if ( !defined $device && exists $data->{Device} ) {
         $device = getDeviceByName($hash, $room, $data->{Device});
@@ -4438,14 +4437,14 @@ sub handleIntentSetNumeric {
         $device = 
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
-    } else {
+    } elsif ( !defined $data->{'.DevName'} ) {
         $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $subType);
     }
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
 
     #more than one device 
-    if ( ref $device eq 'ARRAY' && !defined $data->{'.DevName'} ) {
+    if ( ref $device eq 'ARRAY' ) {
         #until now: only extended test code
         my $first = $device->[0];
         $response = $device->[1];
@@ -4458,7 +4457,7 @@ sub handleIntentSetNumeric {
         return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
     }
 
-    my $mapping = getMapping($hash, $device, 'SetNumeric', $type);
+    my $mapping = getMapping($hash, $device, 'SetNumeric', { type => $type, subType => $subType });
 
     if ( !defined $mapping ) {
         if ( defined $data->{'.inBulk'} ) {
@@ -4547,6 +4546,7 @@ sub handleIntentSetNumeric {
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
     $data->{Value} //= $newVal;
+    $data->{Type}  //= $type;
 
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
