@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25899 2022-03-31 a Beta-User $
+# $Id: 10_RHASSPY.pm 25918 2022-04-03 16:12:02Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -335,7 +335,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.26a';
+    $hash->{MODULE_VERSION} = '0.5.27';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2269,7 +2269,7 @@ sub getNeedsConfirmation {
          && defined $hash->{helper}{tweaks}{confirmIntents} 
          && defined $hash->{helper}{tweaks}{confirmIntents}{$intent} 
          && $re =~ m{\A($hash->{helper}{tweaks}{confirmIntents}{$intent})\z}m ) { 
-        $response = defined $hash->{helper}{tweaks}{confirmIntentResponses} 
+        $response = defined $hash->{heler}{tweaks}{confirmIntentResponses} 
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                     : getResponse($hash, 'DefaultConfirmationRequestRawInput');
 
@@ -2295,6 +2295,7 @@ sub getNeedsConfirmation {
         $Value    = $words->{$data->{Value}} // $Value;
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level, response is $response" );
+        $data->{'.DevName'} = $device;
         setDialogTimeout($hash, $data, $timeout, $response);
         return 1;
     }
@@ -2864,7 +2865,7 @@ sub testmode_end {
     if ( $filename ne 'none_result.txt' ) {
         my $duration = '';
         $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
-        my $result = $hash->{helper}->{test}->{result};
+        $result = $hash->{helper}->{test}->{result};
         push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
         $result .= "$duration See $filename for detailed results." if !$fail;
@@ -3294,7 +3295,7 @@ sub analyzeMQTTmessage {
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         my $hotword = $1;
         if ( 0 && $siteId ) { #Beta-User: deactivated
-            my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
+            $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
             $device //= $hash->{helper}->{STT}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{STT} && defined $hash->{helper}->{STT}->{config} && defined $hash->{helper}->{STT}->{config}->{wakeword};
             if ($device) {
@@ -4444,10 +4445,10 @@ sub handleIntentSetNumeric {
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
 
     #more than one device 
-    if ( ref $device eq 'ARRAY' ) {
+    if ( ref $device eq 'ARRAY' && !defined $data->{'.DevName'} ) {
         #until now: only extended test code
         my $first = $device->[0];
-        my $response = $device->[1];
+        $response = $device->[1];
         my $all = $device->[2];
         my $choice = $device->[3];
         $data->{customData} = $all;
@@ -4545,9 +4546,10 @@ sub handleIntentSetNumeric {
     # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
+    $data->{Value} //= $newVal;
 
     #check if confirmation is required
-    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric' );
+    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
     # execute Cmd
     !defined $change || $change ne 'cmdStop' || !defined $mapping->{cmdStop} 
@@ -4717,7 +4719,10 @@ sub handleIntentGetState {
                 next if !defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}->{$intent};
                 push @names, $hash->{helper}{devicemap}{devices}{$dev}->{alias};
                 if ($intent eq 'SetScene') {
-                    @scenes = (@scenes, grep { $_ !~ m{cmdFwd|cmdBack}xms} values %{$hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}} );
+                    for my $scene (keys %{$hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}} ) {
+                        next if $scene eq 'cmdFwd' || $scene eq 'cmdBack';
+                        push @scenes , $hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}->{$scene};
+                    }
                 }
             }
         }
@@ -4806,7 +4811,7 @@ sub handleIntentMediaControls {
     return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if !defined $mapping->{$command};
 
     #check if confirmation is required
-    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls' );
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
     my $cmd = $mapping->{$command};
     # Execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd);
@@ -4859,7 +4864,7 @@ sub handleIntentSetScene{
     return respond( $hash, $data, getResponse( $hash, 'NoValidData' ) ) if !$device || !defined $mapping;
 
     #check if confirmation is required
-    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetScene' );
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetScene', $device );
 
     my $cmd = qq(scene $scene);
     $cmd = $scene if $scene eq 'cmdBack' || $scene eq 'cmdFwd';
@@ -4936,7 +4941,7 @@ sub handleIntentMediaChannels {
     my $cmd = $hash->{helper}{devicemap}{devices}{$device}{Channels}{$channel} // return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') );
 
     #check if confirmation is required
-    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaChannels' );
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaChannels', $device );
     # Cmd ausführen
     analyzeAndRunCmd($hash, $device, $cmd);
 
@@ -4980,7 +4985,7 @@ sub handleIntentSetColor {
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
 
     #check if confirmation is required
-    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetColor' );
+    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetColor', $device );
 
     if ( defined $cmd || defined $cmd2 ) {
         $response = getResponse($hash, 'DefaultConfirmation');
