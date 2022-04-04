@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25918 2022-04-04 Beta-User $
+# $Id: 10_RHASSPY.pm 25918 2022-04-04 a Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -4548,7 +4548,7 @@ sub handleIntentSetNumeric {
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
     $data->{Value} //= $newVal;
     $data->{Type}  //= $type;
-    delete $data->{Change} if $data->{Change} ne 'cmdStop';
+    delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
 
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
