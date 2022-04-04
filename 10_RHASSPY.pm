@@ -963,14 +963,14 @@ sub init_custom_intents {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         #return "invalid line $line" if $line !~ m{(?<intent>[^=]+)\s*=\s*(?<perlcommand>(?<function>([^(]+))\((?<arg>.*)\)\s*)}x;
-        return "invalid line $line" if $line !~ m{ 
+        return "invalid line $line" if $line !~ m{
             (?<intent>[^=]+)\s*     #string up to  =, w/o ending whitespace 
             =\s*                    #separator = and potential whitespace
             (?<perlcommand>         #identifier
                 (?<function>([^(]+))#string up to opening bracket
                 \(                  #opening bracket
                 (?<arg>.*)\))\s*    #everything up to the closing bracket, w/o ending whitespace
-                }xms; 
+                }xms;                                         ##no critic qw(Capture)
         my $intent = trim($+{intent});
         return "no intent found in $line!" if (!$intent || $intent eq q{}) && $init_done;
         my $function = trim($+{function});
@@ -1362,10 +1362,10 @@ sub _getGenericOnOff {
         };
     my @onwords = qw(on open an auf 1);
     for (@onwords) {
-        next if $allset !~ m{\b($_)([\b:\s]|\Z)}xmsi;
-        my $on = $1;
-        next if $allset !~ m{\b($onoff_map->{$_})([\b:\s]|\Z)}xmsi;
-        return ($on,$1);
+        next if $allset !~ m{\b($_)([\b:\s]|\Z)}xmsi;               ##no critic qw(Capture)
+        my $on = $1;                                                ##no critic qw(Capture)
+        next if $allset !~ m{\b($onoff_map->{$_})([\b:\s]|\Z)}xmsi; ##no critic qw(Capture)
+        return ($on,$1);                                            ##no critic qw(Capture)
     }
     return (undef,undef);
 }
@@ -1433,7 +1433,7 @@ sub _analyze_genDevType_setter {
         }
     }
 
-    if ($setter =~ m{\bscene:(?<scnames>[\S]+)}xm) {
+    if ($setter =~ m{\bscene:(?<scnames>[\S]+)}xm) {            ##no critic qw(Capture)
         for my $scname (split m{,}xms, $+{scnames}) {
             my $clscene = $scname;
             # cleanup HUE scenes
@@ -2667,8 +2667,8 @@ sub Notify {
         my @devs = devspec2array("$hash->{devspec}");
         for my $evnt(@{$events}){
             next if $evnt !~ m{\A(?:ATTR|DELETEATTR|DELETED|RENAMED)\s+(\w+)(?:\s+)(.*)}xms;
-            my $dev = $1;
-            my $rest = $2;
+            my $dev = $1;           ##no critic qw(Capture)
+            my $rest = $2;          ##no critic qw(Capture)
             next if !grep { $dev } @devs;
 
             if ( $evnt =~ m{\A(?:DELETED|RENAMED)\s+\w+}xms || $rest =~ m{\A(alias|$hash->{prefix}|genericDeviceType|(alexa|siri|gassistant)Name|group)}xms ) {
@@ -2688,7 +2688,7 @@ sub Notify {
     for my $event (@events){
         next if $event !~ m{(?:fhemMsgPushReceived|fhemMsgRcvPush):.(.+)}xms;
 
-        my $msgtext = trim($1);
+        my $msgtext = trim($1);         ##no critic qw(Capture)
         Log3($name, 4 , qq($name received $msgtext from $device));
 
         my $tocheck = $hash->{helper}->{msgDialog}->{config}->{close};
@@ -2713,7 +2713,7 @@ sub notifySTT {
 
     for my $event (@events){
         next if $event !~ m{(?:receiveVoiceCommand):.(.+)}xms;
-        my $msgtext = trim($1);
+        my $msgtext = trim($1);         ##no critic qw(Capture)
         my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
         return if $hash->{helper}->{STT}->{config}->{allowed} !~ m{\b(?:$client|everyone)(?:\b|\z)}xms;
 
@@ -3520,7 +3520,7 @@ sub _getSiteIdbyRoom {
     my $siteId2 = ReadingsVal($hash->{NAME}, "room2siteId_$siteId", $siteId);
     for my $id ($siteId2, $siteId) {
         return $1 if $siteIdList =~ m{\b($id)(?:[,]|\Z)}xmsi;
-        return $1 if $siteIdList =~ m{\b($id[^,]+)(?:[,]|\Z)}xmsi;
+        return $1 if $siteIdList =~ m{\b($id[^,]+)(?:[,]|\Z)}xmsi;      ##no critic qw(Capture)
     }
     return $siteId;
 }
@@ -5283,7 +5283,7 @@ sub handleIntentTimer {
             if ( !defined $soundoption ) {
                 CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
             } else {
-                $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
+                $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;   ##no critic qw(Capture)
                 my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return respond( $hash, $data, getResponse( $hash, 'DefaultError' ) );
                 my $repeats = $+{repeats} // 5;
                 my $duration = $+{duration} // 15;
@@ -5695,7 +5695,7 @@ sub _toCleanJSON {
     return $json;
 }
 
-sub _round { int( $_[0] + ( $_[0] < 0 ? -.5 : .5 ) ); }
+sub _round { int( $_[0] + ( $_[0] < 0 ? -.5 : .5 ) ); } ##no critic qw(return unpack)
 
 sub _toregex {
     my $toclean = shift // return;
@@ -5743,7 +5743,10 @@ __END__
 - v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
 # auto-training
-Tests/Rückmeldungen fehlen bisher; sieht nicht funktional aus...
+Erste Tests laufen; sieht teilweise funktional aus...
+
+# mehr wie ein Device?
+
 
 =end ToDo
 
