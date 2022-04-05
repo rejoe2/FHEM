@@ -1534,7 +1534,7 @@ sub initialize_msgDialog {
 
     return disable_msgDialog($hash) if $mode ne 'set';
 
-    return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr};
+    return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr} && $attrVal;
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
@@ -1548,7 +1548,7 @@ sub initialize_msgDialog {
         }
     }
 
-    return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
+    return disable_msgDialog($hash) if !$attrVal || !keys %{$hash->{helper}->{msgDialog}->{config}};
     if ( !defined $hash->{helper}->{msgDialog}->{config}->{allowed} ) {
         delete $hash->{helper}->{msgDialog};
         return 'Setting the allowed key is mandatory!' ;
@@ -2677,6 +2677,7 @@ sub notifySTT {
             return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}ix;
             $msgtext =~ s{\A[\b]*$tocheck}{}ix;
         }
+        return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
         return SpeechDialog_open($hash, $client, $msgtext);
     }
 
