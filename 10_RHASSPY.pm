@@ -2272,7 +2272,7 @@ sub getIsVirtualGroup {
 
     for my $room ( @rooms ) {
         for my $dev ( @devs ) {
-        my $single = getDeviceByName($hash, $room eq 'noneInData' ? undef : $data->{$room}, $data->{$dev});
+        my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev});
             next if !$single;
             push @devlist, $single;
             $needsConfirmation //= getNeedsConfirmation($hash, $restdata, $intent, $data->{$dev}, 1);
@@ -3105,7 +3105,7 @@ sub msgDialog_progress {
 sub msgDialog_respond {
     my $hash        = shift // return;
     my $recipients  = shift // return;
-    my $message     = shift // return;
+    my $message     = shift // '';
     my $keepopen    = shift // 1;
     my $cntByDelay  = shift // 0;
 
