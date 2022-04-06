@@ -1582,10 +1582,10 @@ sub disable_msgDialog {
     if ( defined $hash->{helper}->{SpeechDialog} 
         && defined $hash->{helper}->{SpeechDialog}->{config}
         && defined $hash->{helper}->{SpeechDialog}->{config}->{AMADCommBridge} ) {
-            $devsp = 'TYPE=AMADCommBridge';
+            $devsp = 'TYPE=(AMADCommBridge|AMADDevice)';
     }
     if ( $enable ) { 
-        $devsp = $devsp ? 'TYPE=(AMADCommBridge|ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+        $devsp = $devsp ? 'TYPE=(AMADCommBridge|AMADDevice|ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
     if ( $hash->{autoTraining} ) {
         $devsp .= ',global' if $devsp;
@@ -2611,6 +2611,7 @@ sub Notify {
     Log3($name, 5, "[$name] NotifyFn called with event in $device");
 
     return notifySTT($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADCommBridge';
+    return notifyAMADDev($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADDevice';
 
     if ( $device eq 'global' ) {
         return if !$hash->{autoTraining};
@@ -2679,6 +2680,29 @@ sub notifySTT {
         }
         return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
         return SpeechDialog_open($hash, $client, $msgtext);
+    }
+
+    return;
+}
+
+sub notifyAMADDev{
+    my $hash     = shift // return;
+    my $dev_hash = shift // return;
+    my $name = $hash->{NAME} // return;
+    my $device = $dev_hash->{NAME} // return;
+
+    my @events = @{deviceEvents($dev_hash, 1)};
+
+    return if !@events;
+
+    for my $event (@events){
+        next if $event !~ m{lastSetCommandState:.setCmd_done}xms;
+        return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
+
+        Log3($name, 4 , qq($name: $device may have finished voice output));
+
+        #return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
+        #return SpeechDialog_open($hash, $client, $msgtext);
     }
 
     return;
