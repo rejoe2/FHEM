@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25925 2022-04-0 Beta-User $
+# $Id: 10_RHASSPY.pm 25925 2022-04-06 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1604,6 +1604,37 @@ sub disable_msgDialog {
     return;
 }
 
+#Make globally available to allow later use by other functions, esp.  handleIntentConfirmAction
+my $dispatchFns = {
+    Shortcuts           => \&handleIntentShortcuts, 
+    SetOnOff            => \&handleIntentSetOnOff,
+    SetOnOffGroup       => \&handleIntentSetOnOffGroup,
+    SetTimedOnOff       => \&handleIntentSetTimedOnOff,
+    SetTimedOnOffGroup  => \&handleIntentSetTimedOnOffGroup,
+    GetOnOff            => \&handleIntentGetOnOff,
+    SetNumeric          => \&handleIntentSetNumeric,
+    SetNumericGroup     => \&handleIntentSetNumericGroup,
+    GetNumeric          => \&handleIntentGetNumeric,
+    GetState            => \&handleIntentGetState,
+    MediaControls       => \&handleIntentMediaControls,
+    MediaChannels       => \&handleIntentMediaChannels,
+    SetColor            => \&handleIntentSetColor,
+    SetColorGroup       => \&handleIntentSetColorGroup,
+    SetScene            => \&handleIntentSetScene,
+    GetTime             => \&handleIntentGetTime,
+    GetDate             => \&handleIntentGetDate,
+    SetTimer            => \&handleIntentSetTimer,
+    GetTimer            => \&handleIntentGetTimer,
+    Timer               => \&handleIntentSetTimer,
+    ConfirmAction       => \&handleIntentConfirmAction,
+    CancelAction        => \&handleIntentCancelAction,
+    ChoiceRoom          => \&handleIntentChoiceRoom,
+    ChoiceDevice        => \&handleIntentChoiceDevice,
+    Choice              => \&handleIntentChoice,
+    MsgDialog           => \&handleIntentMsgDialog,
+    ReSpeak             => \&handleIntentReSpeak
+};
+
 
 sub perlExecute {
     my $hash   = shift // return;
@@ -1945,7 +1976,7 @@ sub getRoomName {
 # Gerät über Raum und Namen suchen.
 sub getDeviceByName {
     my $hash = shift // return;
-    my $room = shift; 
+    my $room = shift;
     my $name = shift; #either of the two required
 
     return if !$room && !$name;
@@ -1954,7 +1985,7 @@ sub getDeviceByName {
 
     return if !defined $hash->{helper}{devicemap};
 
-    $device = $hash->{helper}{devicemap}{rhasspyRooms}{$room}{$name};
+    $device = $hash->{helper}{devicemap}{rhasspyRooms}{$room}{$name} if $room && defined $hash->{helper}{devicemap}{rhasspyRooms}->{$room};
 
     if ($device) {
         Log3($hash->{NAME}, 5, "Device selected (by hash, with room and name): $device");
@@ -1968,7 +1999,8 @@ sub getDeviceByName {
             return $device ;
         }
     }
-    Log3($hash->{NAME}, 1, "No device for >>$name<< found, especially not in room >>$room<< (also not outside)!");
+    $room = $room ? "especially not in room >>$room<< (also not outside)!" : 'room not provided!';
+    Log3($hash->{NAME}, 1, "No device for >>$name<< found, $room");
     return;
 }
 
@@ -2173,20 +2205,31 @@ sub getDeviceByMediaChannel {
 }
 
 sub getDevicesByGroup {
-    my $hash       = shift // return;
-    my $data       = shift // return;
+    my $hash    = shift // return;
+    my $data    = shift // return;
+    my $getVirt = shift;
 
-    my $group = $data->{Group} // return;
+    my $group = $data->{Group};
+    return if !$group && !$getVirt;
     my $room  = getRoomName($hash, $data);
 
     my $devices = {};
+    my @devs;
+    my $isVirt = defined $data->{'.virtualGroup'};
+    if ( $isVirt ) {
+        @devs = split m{,}, $data->{'.virtualGroup'};
+    } else {
+        @devs = keys %{$hash->{helper}{devicemap}{devices}};
+    }
 
-    for my $dev (keys %{$hash->{helper}{devicemap}{devices}}) {
-        my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms};
-        next if $room ne 'global' && $allrooms !~ m{\b$room(?:[\b:\s]|\Z)}i; ##no critic qw(RequireExtendedFormatting)
+    for my $dev (@devs) {
+        if ( !$isVirt ) {
+            my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms};
+            next $room ne 'global' && $allrooms !~ m{\b$room(?:[\b:\s]|\Z)}i; ##no critic qw(RequireExtendedFormatting)
 
-        my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // next;
-        next if $allgroups !~ m{\b$group\b}i; ##no critic qw(RequireExtendedFormatting)
+            my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // next;
+            next if $allgroups !~ m{\b$group\b}i; ##no critic qw(RequireExtendedFormatting)
+        }
 
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
         my $label = $specials->{partOf} // $dev;
@@ -2197,7 +2240,78 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
+    return keys %{$devices} if $getVirt;
     return $devices;
+}
+
+sub getIsVirtualGroup {
+    my $hash    = shift // return;
+    my $data    = shift // return;
+    my $getVirt = shift;
+
+    my @devlist;
+    
+    my @rooms = grep { m{\ARoom}x } keys %{$data};
+    my @grps  = grep { m{\AGroup}x } keys %{$data};
+    my @devs  = grep { m{\ADevice}x } keys %{$data};
+
+    #do we not have more than one room or more than one device and/or group?
+    return if (!@rooms || @rooms == 1) && (@grps + @devs) < 2; 
+
+    my $restdata = {};
+    for ( keys %{$data} ) {
+        $restdata->{$_} = $data->{$_} if $_ !~ m{\A(?:Room|Group|Device|intent)}x;
+    }
+
+    my $intent = $data->{intent} // return;
+    $intent =~ s{Group\z}{};
+    my $grpIntent = $intent.'Group';
+    my $needsConfirmation;
+
+    $rooms[0] = getRoomName($hash, $data) if !defined $rooms[0];
+
+    for my $room ( @rooms ) {
+        for my $dev ( @devs ) {
+        my $single = getDeviceByName($hash, $data->{$room}, $data->{$dev});
+            next if !$single;
+            push @devlist, $single;
+            $needsConfirmation //= getNeedsConfirmation($hash, $restdata, $intent, $data->{$dev}, 1);
+        }
+        for my $grp ( @grps ) {
+            my $checkdata = $restdata;
+            $checkdata->{Group}  = $data->{$grp};
+            $checkdata->{Room}   = $data->{$room};
+            @devlist = ( @devlist, getDevicesByGroup($hash, $checkdata, 1) );
+            $needsConfirmation //= getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
+        }
+    }
+
+    return if !@devlist;
+    @devlist = uniq(@devlist);
+
+    if (!$needsConfirmation) {
+        my $checkdata = $restdata;
+        $checkdata->{Group}  = 'virtualGroup';
+        $needsConfirmation = getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
+    }
+
+    $restdata->{intent}          = $grpIntent;
+    $restdata->{'.virtualGroup'} = join q{,}, @devlist;
+    
+    if ( $needsConfirmation ) {
+        my $response = getResponse($hash, 'DefaultConfirmationRequestRawInput');
+        $response =~ s{(\$\w+)}{$1}eegx;
+        Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true for virtual group, response is $response" );
+        setDialogTimeout($hash, $restdata, _getDialogueTimeout($hash), $response);
+        return $hash->{NAME};
+    }
+
+    if (ref $dispatchFns->{$grpIntent} eq 'CODE' ) {
+        $restdata->{Confirmation} = 1;
+        return $dispatchFns->{$grpIntent}->($hash, $restdata);
+    }
+
+    return;
 }
 
 sub getNeedsConfirmation {
@@ -2205,8 +2319,9 @@ sub getNeedsConfirmation {
     my $data   = shift // return;
     my $intent = shift // return;
     my $device = shift;
+    my $fromVG = shift;
 
-    return if defined $hash->{testline};
+    return if defined $hash->{testline} && !$fromVG;;
 
     my $re = defined $device ? $device : $data->{Group};
     return if !defined $re;
@@ -2222,6 +2337,7 @@ sub getNeedsConfirmation {
          && defined $hash->{helper}{tweaks}{confirmIntents} 
          && defined $hash->{helper}{tweaks}{confirmIntents}{$intent} 
          && $re =~ m{\A($hash->{helper}{tweaks}{confirmIntents}{$intent})\z}xms ) { 
+        return 1 if $fromVG;
         $response = defined $hash->{helper}{tweaks}{confirmIntentResponses} 
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                     : getResponse($hash, 'DefaultConfirmationRequestRawInput');
@@ -2237,6 +2353,7 @@ sub getNeedsConfirmation {
     my $confirm = $hash->{helper}{devicemap}{devices}{$device}->{confirmIntents};
     return if !defined $confirm;
     if ( $confirm =~ m{\b$intent(?:[,]|\Z)}i ) { ##no critic qw(RequireExtendedFormatting)
+        return 1 if $fromVG;
         $response = defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses} 
                     && defined $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent} 
                   ? $hash->{helper}{devicemap}{devices}{$device}->{confirmIntentResponses}{$intent}
@@ -2754,38 +2871,6 @@ sub sayFinished {
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
 }
-
-
-#Make globally available to allow later use by other functions, esp.  handleIntentConfirmAction
-my $dispatchFns = {
-    Shortcuts           => \&handleIntentShortcuts, 
-    SetOnOff            => \&handleIntentSetOnOff,
-    SetOnOffGroup       => \&handleIntentSetOnOffGroup,
-    SetTimedOnOff       => \&handleIntentSetTimedOnOff,
-    SetTimedOnOffGroup  => \&handleIntentSetTimedOnOffGroup,
-    GetOnOff            => \&handleIntentGetOnOff,
-    SetNumeric          => \&handleIntentSetNumeric,
-    SetNumericGroup     => \&handleIntentSetNumericGroup,
-    GetNumeric          => \&handleIntentGetNumeric,
-    GetState            => \&handleIntentGetState,
-    MediaControls       => \&handleIntentMediaControls,
-    MediaChannels       => \&handleIntentMediaChannels,
-    SetColor            => \&handleIntentSetColor,
-    SetColorGroup       => \&handleIntentSetColorGroup,
-    SetScene            => \&handleIntentSetScene,
-    GetTime             => \&handleIntentGetTime,
-    GetDate             => \&handleIntentGetDate,
-    SetTimer            => \&handleIntentSetTimer,
-    GetTimer            => \&handleIntentGetTimer,
-    Timer               => \&handleIntentSetTimer,
-    ConfirmAction       => \&handleIntentConfirmAction,
-    CancelAction        => \&handleIntentCancelAction,
-    ChoiceRoom          => \&handleIntentChoiceRoom,
-    ChoiceDevice        => \&handleIntentChoiceDevice,
-    Choice              => \&handleIntentChoice,
-    MsgDialog           => \&handleIntentMsgDialog,
-    ReSpeak             => \&handleIntentReSpeak
-};
 
 
 #reference: https://forum.fhem.de/index.php/topic,124952.msg1213902.html#msg1213902
@@ -4052,6 +4137,9 @@ sub handleIntentSetOnOff {
 
     # Device AND Value must exist
     return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Device} || !defined $data->{Value};
+
+    my $redirects = getIsVirtualGroup($hash,$data);
+    return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
     my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
