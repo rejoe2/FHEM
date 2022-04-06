@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25920 2022-04-05 + some modifications Beta-User $
+# $Id: 10_RHASSPY.pm 25925 2022-04-0 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -83,31 +83,32 @@ my $languagevars = {
       }
    },
   'responses' => { 
-    'DefaultError' => "Sorry but something seems not to work as expected",
+    'DefaultError' => "Sorry but something seems not to work as expected!",
+    'ContinueSession' => "Something else? | Any more wishes?",
     'NoValidResponse' => 'Error. respond function called without valid response!',
     'NoValidIntentResponse' => 'Error. respond function called by $intent without valid response!',
     'NoIntentRecognized' => 'Your input could not be assigned to one of the known intents!',
-    'NoValidData' => "Sorry but the received data is not sufficient to derive any action",
-    'NoDeviceFound' => "Sorry but I could not find a matching device",
-    'NoTimedOnDeviceFound' => "Sorry but device does not support requested timed on or off command",
-    'NoMappingFound' => "Sorry but I could not find a suitable mapping",
-    'NoNewValDerived' => "Sorry but I could not calculate a new value to set",
-    'NoActiveMediaDevice' => "Sorry no active playback device",
-    'NoMediaChannelFound' => "Sorry but requested channel seems not to exist",
+    'NoValidData' => "Sorry but the received data is not sufficient to derive any action.",
+    'NoDeviceFound' => "Sorry but I could not find a matching device.",
+    'NoTimedOnDeviceFound' => "Sorry but device does not support requested timed on or off command.",
+    'NoMappingFound' => "Sorry but I could not find a suitable mapping.",
+    'NoNewValDerived' => "Sorry but I could not calculate a new value to set.",
+    'NoActiveMediaDevice' => "Sorry no active playback device.",
+    'NoMediaChannelFound' => "Sorry but requested channel seems not to exist.",
     'DefaultConfirmation' => "OK",
-    'DefaultConfirmationBack' => "So once more",
-    'DefaultConfirmationTimeout' => "Sorry too late to confirm",
-    'DefaultCancelConfirmation' => "Thanks aborted",
+    'DefaultConfirmationBack' => "So once more.",
+    'DefaultConfirmationTimeout' => "Sorry, too late to confirm.",
+    'DefaultCancelConfirmation' => "Thanks, aborted.",
     'SilentCancelConfirmation' => "",
-    'DefaultConfirmationReceived' => "ok will do it",
-    'DefaultConfirmationNoOutstanding' => "no command is awaiting confirmation",
-    'DefaultConfirmationRequestRawInput' => 'please confirm: $rawInput',
-    'DefaultChangeIntentRequestRawInput' => 'change command to $rawInput',
-    'RequestChoiceDevice' => 'there are several possible devices, choose between $first_items and $last_item',
-    'RequestChoiceRoom' => 'more than one possible device, please choose one of the following rooms $first_items and $last_item',
-    'RequestChoiceGeneric' => 'there are several options, choose between $options',
-    'DefaultChoiceNoOutstanding' => "no choice expected",
-    'NoMinConfidence' => 'minimum confidence not given, level is $confidence',
+    'DefaultConfirmationReceived' => "Ok, will do it!",
+    'DefaultConfirmationNoOutstanding' => "No command is awaiting confirmation!",
+    'DefaultConfirmationRequestRawInput' => 'Please confirm: $rawInput!',
+    'DefaultChangeIntentRequestRawInput' => 'Change command to $rawInput!',
+    'RequestChoiceDevice' => 'There are several possible devices, choose between $first_items and $last_item.',
+    'RequestChoiceRoom' => 'More than one possible device, please choose one of the following rooms $first_items and $last_item.',
+    'RequestChoiceGeneric' => 'There are several options, choose between $options.',
+    'DefaultChoiceNoOutstanding' => "No choice expected!",
+    'NoMinConfidence' => 'Minimum confidence not given, level is $confidence',
     'timerSet'   => {
         '0' => '$label in room $room has been set to $seconds seconds',
         '1' => '$label in room $room has been set to $minutes minutes $seconds',
@@ -122,40 +123,40 @@ my $languagevars = {
         '1' =>  '$label in room $room expired'
     },
     'timerCancellation' => '$label for $room deleted',
-    'timeRequest' => 'it is $hour o clock $min minutes',
-    'weekdayRequest' => 'today is $weekDay, $month the $day., $year',
+    'timeRequest' => 'It is $hour o clock $min minutes',
+    'weekdayRequest' => 'Today is $weekDay, $month the $day., $year',
     'duration_not_understood'   => "Sorry I could not understand the desired duration",
-    'reSpeak_failed'   => 'i am sorry i can not remember',
+    'reSpeak_failed'   => 'I am sorry i can not remember',
     'Change' => {
-      'humidity'     => 'air humidity in $location is $value percent',
+      'humidity'     => 'Air humidity in $location is $value percent',
       'battery'      => {
-        '0' => 'battery level in $location is $value',
-        '1' => 'battery level in $location is $value percent'
+        '0' => 'Battery level in $location is $value',
+        '1' => 'Battery level in $location is $value percent'
       },
       'brightness'   => '$device was set to $value',
       'setTarget'    => '$device is set to $value',
-      'soilMoisture' => 'soil moisture in $location is $value percent',
+      'soilMoisture' => 'Soil moisture in $location is $value percent',
       'temperature'  => {
-        '0' => 'temperature in $location is $value',
-        '1' => 'temperature in $location is $value degrees',
+        '0' => 'Temperature in $location is $value',
+        '1' => 'Temperature in $location is $value degrees',
       },
-      'desired-temp' => 'target temperature for $location is set to $value degrees',
+      'desired-temp' => 'Target temperature for $location is set to $value degrees',
       'volume'       => '$device set to $value',
-      'waterLevel'   => 'water level in $location is $value percent',
+      'waterLevel'   => 'Water level in $location is $value percent',
       'knownType'    => '$mappingType in $location is $value percent',
-      'unknownType'  => 'value in $location is $value percent'
+      'unknownType'  => 'Value in $location is $value percent'
     },
     'getStateResponses' => {
       'STATE'   => '$deviceName value is [$device:STATE]',
-      'price'   => 'current price of $reading in $deviceName is [$device:$reading:d]',
+      'price'   => 'Current price of $reading in $deviceName is [$device:$reading:d]',
       'reading' => '[$device:$reading]',
-      'update'  => 'initiated update for $deviceName'
+      'update'  => 'Initiated update for $deviceName'
     },
     'getRHASSPYOptions' => {
-      'generic' => 'actions to devices may be initiated or information known by your automation can be requested',
-      'control' => 'in $room amongst others the following devices can be controlled $deviceNames',
-      'info'    => 'especially $deviceNames may serve as information source in $room',
-      'rooms'   => 'amongst others i know $roomNames as rooms',
+      'generic' => 'Actions to devices may be initiated or information known by your automation can be requested',
+      'control' => 'In $room amongst others the following devices can be controlled $deviceNames',
+      'info'    => 'Especially $deviceNames may serve as information source in $room',
+      'rooms'   => 'Amongst others i know $roomNames as rooms',
       'scenes'  => '$deviceNames in $room may be able to be set to $sceneNames'
     }
   },
@@ -2701,8 +2702,11 @@ sub notifyAMADDev{
 
         Log3($name, 4 , qq($name: $device may have finished voice output));
 
-        #return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
-        #return SpeechDialog_open($hash, $client, $msgtext);
+        my $iscont = SpeechDialog_sayFinish($hash, $device);
+        if ( $iscont && ReadingsVal($device, 'rhasspy_dialogue', 'closed') eq 'open' ) {
+            AnalyzeCommand( $hash, "set $device activateVoiceInput" );
+            readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'listening', 1);
+        }
     }
 
     return;
@@ -3014,20 +3018,29 @@ sub msgDialog_progress {
 }
 
 sub msgDialog_respond {
-    my $hash       = shift // return;
-    my $recipients = shift // return;
-    my $message    = shift // return;
-    my $keepopen   = shift // 1;
+    my $hash        = shift // return;
+    my $recipients  = shift // return;
+    my $message     = shift // return;
+    my $keepopen    = shift // 1;
+    my $cntByDelay  = shift // 0;
 
     Log3($hash, 5, "msgDialog_respond called with $recipients and text $message");
     trim($message);
-    return if !$message; # empty?
+    $message .= ' ' . getResponse( $hash, 'ContinueSession' ) if $cntByDelay;
+    if ( !$message ) { # empty?
+        delete $hash->{helper}{msgDialog}->{$recipients};
+        return $recipients;
+    }
 
     my $msgCommand = $hash->{helper}->{msgDialog}->{config}->{msgCommand};
     $msgCommand =~ s{\\[\@]}{@}x;
     $msgCommand =~ s{(\$\w+)}{$1}eegx;
     AnalyzeCommand($hash, $msgCommand);
-    resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{sessionTimeout}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
+    if ( $keepopen ) {
+        resetRegIntTimer( $recipients, time + $hash->{helper}->{msgDialog}->{config}->{sessionTimeout}, \&RHASSPY_msgDialogTimeout, $hash, 0);
+    } else {
+        msgDialog_close($hash, $recipients);
+    }
     return $recipients;
 }
 
@@ -3060,7 +3073,7 @@ sub handleTtsMsgDialog {
     } elsif ( defined $hash->{helper}->{SpeechDialog} 
         && defined $hash->{helper}->{SpeechDialog}->{config}->{$recipient} ) {
         SpeechDialog_respond($hash,$recipient,$message,0);
-        sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
+        #sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
     }
 
     return $recipient;
@@ -3088,10 +3101,24 @@ sub setSpeechDialogTimeout {
     return;
 }
 
+sub SpeechDialog_sayFinish{
+    my $hash     = shift // return;
+    my $device   = shift // return;
+
+    return if !defined $hash->{helper}{SpeechDialog}->{$device} 
+           || !defined $hash->{helper}{SpeechDialog}->{$device}->{data} 
+           || !defined $hash->{helper}{SpeechDialog}->{$device}->{data}->{id};
+    sayFinished($hash, $hash->{helper}{SpeechDialog}->{$device}->{data}->{id}, $hash->{siteId});
+    return 1;
+}
+
+
 sub SpeechDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
     Log3($hash, 5, "SpeechDialog_close called with $device");
+
+    SpeechDialog_sayFinish($hash, $device);
 
     deleteSingleRegIntTimer($device, $hash);
     readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
@@ -3153,6 +3180,7 @@ sub SpeechDialog_respond {
     my $device     = shift // return;
     my $message    = shift // return;
     my $keepopen   = shift // 1;
+    my $cntByDelay = shift // 0;
 
     Log3($hash, 5, "SpeechDialog_respond called with $device and text $message");
     trim($message);
@@ -3279,6 +3307,7 @@ sub analyzeMQTTmessage {
             $device //= $hash->{helper}->{SpeechDialog}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{SpeechDialog} && defined $hash->{helper}->{SpeechDialog}->{config} && defined $hash->{helper}->{SpeechDialog}->{config}->{wakeword};
             if ($device) {
                 AnalyzeCommand( $hash, "set $device activateVoiceInput" );
+                readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'listening', 1);
                 push @updatedList, $device;
             }
         }
@@ -3352,7 +3381,10 @@ sub respond {
     my $data     = shift // return;
     my $response = shift // getResponse( $hash, 'NoValidResponse' );
     my $topic    = shift // q{endSession};
-    my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
+    my $delay    = shift;
+
+    my $contByDelay = $delay // $topic ne 'endSession';
+    $delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     if ( defined $hash->{testline} ) {
         $response = $response->{text} if ref $response eq 'HASH';
@@ -3404,12 +3436,12 @@ sub respond {
     if ( defined $hash->{helper}->{msgDialog} 
       && defined $hash->{helper}->{msgDialog}->{$identity} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
-        return msgDialog_respond($hash, $identity, $response);
+        return msgDialog_respond($hash, $identity, $response, $topic eq 'continueSession', $contByDelay);
     } elsif (defined $hash->{helper}->{SpeechDialog} 
         && defined $hash->{helper}->{SpeechDialog}->{config}->{$identity} ) {
         Log3($hash, 5, "respond deviated to SpeechDialog_respond for $identity.");
         #$hash->{helper}->{SpeechDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
-        return SpeechDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
+        return SpeechDialog_respond($hash,$identity,$response,$topic eq 'continueSession', $contByDelay);
     }
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
