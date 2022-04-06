@@ -2268,11 +2268,11 @@ sub getIsVirtualGroup {
     my $grpIntent = $intent.'Group';
     my $needsConfirmation;
 
-    $rooms[0] = getRoomName($hash, $data) if !defined $rooms[0];
+    $rooms[0] = 'noneInData' if !defined $rooms[0];
 
     for my $room ( @rooms ) {
         for my $dev ( @devs ) {
-        my $single = getDeviceByName($hash, $data->{$room}, $data->{$dev});
+        my $single = getDeviceByName($hash, $room eq 'noneInData' ? undef : $data->{$room}, $data->{$dev});
             next if !$single;
             push @devlist, $single;
             $needsConfirmation //= getNeedsConfirmation($hash, $restdata, $intent, $data->{$dev}, 1);
@@ -2280,7 +2280,7 @@ sub getIsVirtualGroup {
         for my $grp ( @grps ) {
             my $checkdata = $restdata;
             $checkdata->{Group}  = $data->{$grp};
-            $checkdata->{Room}   = $data->{$room};
+            $checkdata->{Room}   = $data->{$room} if $room ne 'noneInData' ;
             @devlist = ( @devlist, getDevicesByGroup($hash, $checkdata, 1) );
             $needsConfirmation //= getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
         }
