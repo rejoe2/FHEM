@@ -2013,6 +2013,7 @@ sub getDeviceByName {
             push @maybees, $dev;
         }
     }
+    @maybees = uniq(@maybees);
     return $maybees[0] if @maybees == 1; # exactly one device matching name
     if (@maybees) {
         Log3($hash->{NAME}, 3, "[$hash->{NAME}] Too many matches for >>$name<< found (provide room info may help)");
