@@ -2297,13 +2297,22 @@ sub getIsVirtualGroup {
     my $needsConfirmation;
 
     $rooms[0] = 'noneInData' if !defined $rooms[0];
+    my $maynotbe_in_room;
+    my $cleared_in_room;
+    my @probrooms;
 
     for my $room ( @rooms ) {
         for my $dev ( @devs ) {
         my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev}, $room eq 'noneInData' ? undef : $data->{$room}, $intent);
+            if ( defined $single && $single ne '0' ) {
+                $maynotbe_in_room->{$dev} = $room if !defined $cleared_in_room->{$dev};
+                push @probrooms, $data->{$room};
+            }
             next if !$single;
             push @devlist, $single;
             $needsConfirmation //= getNeedsConfirmation($hash, $restdata, $intent, $data->{$dev}, 1);
+            delete $maynotbe_in_room->{$dev};
+            $cleared_in_room->{$dev} = 1;
         }
         for my $grp ( @grps ) {
             my $checkdata = $restdata;
@@ -2321,6 +2330,15 @@ sub getIsVirtualGroup {
         my $checkdata = $restdata;
         $checkdata->{Group}  = 'virtualGroup';
         $needsConfirmation = getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
+    }
+    
+    if ( !$needsConfirmation && keys %{$maynotbe_in_room} ) {
+        $needsConfirmation = 1;
+        my @outs = keys %{$maynotbe_in_room};
+        @probrooms = uniq(@probrooms);
+        my $devlist = _array2andString($hash, \@outs);
+        my $roomlist = _array2andString($hash, \@probrooms);
+        $hash->{helper}->{lng}->{$data->{sessionId}}->{pre} = getExtrapolatedResponse($hash, 'ParadoxData', 'Room', [$devlist, $roomlist], 'hint');
     }
 
     $restdata->{intent}          = $grpIntent;
