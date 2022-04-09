@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25925 2022-04-08 Beta-User $
+# $Id: 10_RHASSPY.pm 25925 2022-04-09 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1994,7 +1994,7 @@ sub getDeviceByName {
 
     return if !defined $hash->{helper}{devicemap};
 
-    $device = $hash->{helper}{devicemap}{rhasspyRooms}{$room}{$name} if $room && defined $hash->{helper}{devicemap}{rhasspyRooms}->{$room};
+    $device = $hash->{helper}{devicemap}{rhasspyRooms}{$room}{$name} if $room && $name && defined $hash->{helper}{devicemap}{rhasspyRooms}->{$room};
 
     if ($device) {
         Log3($hash->{NAME}, 5, "Device selected (by hash, with room and name): $device");
@@ -2887,7 +2887,7 @@ sub notifyAMADDev{
         next if $event !~ m{lastSetCommandState:.setCmd_done}xms;
         return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
 
-        Log3($name, 4 , qq($name: $device may have finished voice output));
+        Log3($name, 5 , qq($name: $device may have finished voice output));
 
         my $iscont = SpeechDialog_sayFinish($hash, $device);
         if ( $iscont && ReadingsVal($device, 'rhasspy_dialogue', 'closed') eq 'open' ) {
@@ -2934,9 +2934,11 @@ sub sayFinished {
     my $data    = shift // return;
     my $siteId  = shift // $hash->{siteId};
 
+    my $id = $data->{id} // $data->{sessionId};
+
     my $sendData =  { 
-        id           => $data->{id},
-        siteId       => $siteId
+        id           => $id,
+        siteId       => $siteId 
     };
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
@@ -3252,17 +3254,17 @@ sub setSpeechDialogTimeout {
     return;
 }
 
+
 sub SpeechDialog_sayFinish{
     my $hash     = shift // return;
     my $device   = shift // return;
 
     return if !defined $hash->{helper}{SpeechDialog}->{$device} 
            || !defined $hash->{helper}{SpeechDialog}->{$device}->{data} 
-           || !defined $hash->{helper}{SpeechDialog}->{$device}->{data}->{id};
-    sayFinished($hash, $hash->{helper}{SpeechDialog}->{$device}->{data}->{id}, $hash->{siteId});
+           || !defined $hash->{helper}{SpeechDialog}->{$device}->{data}->{sessionId};
+    sayFinished($hash, $hash->{helper}{SpeechDialog}->{$device}->{data}, $hash->{siteId});
     return 1;
 }
-
 
 sub SpeechDialog_close {
     my $hash     = shift // return;
@@ -3349,6 +3351,7 @@ sub SpeechDialog_respond {
     AnalyzeCommandChain($hash, $msgCommand);
     if ( $keepopen ) {
         my $tout = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+        $tout //= _getDialogueTimeout($hash) if !$cntByDelay;
         resetRegIntTimer( $device, time + $tout, \&RHASSPY_SpeechDialogTimeout, $hash, 0);
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
     } else {
