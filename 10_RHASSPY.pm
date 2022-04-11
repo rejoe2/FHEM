@@ -1384,7 +1384,7 @@ sub _clean_ignored_keywords {
     return lc $toclean if !defined $hash->{helper}->{tweaks}
                         ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}
                         ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword};
-    $toclean =~ s{\A$hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword}\z}{}gi;
+    $toclean =~ s{\A$hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword}\z}{}gxi;
     return lc $toclean;
 }
 
@@ -2243,7 +2243,7 @@ sub getDevicesByGroup {
     my @devs;
     my $isVirt = defined $data->{'.virtualGroup'};
     if ( $isVirt ) {
-        @devs = split m{,}, $data->{'.virtualGroup'};
+        @devs = split m{,}x, $data->{'.virtualGroup'};
     } else {
         @devs = keys %{$hash->{helper}{devicemap}{devices}};
     }
@@ -2292,7 +2292,7 @@ sub getIsVirtualGroup {
     }
 
     my $intent = $data->{intent} // return;
-    $intent =~ s{Group\z}{};
+    $intent =~ s{Group\z}{}x;
     my $grpIntent = $intent.'Group';
     my $needsConfirmation;
 
@@ -2437,7 +2437,7 @@ sub getNeedsClarification {
     my $response2 = getExtrapolatedResponse($hash, $identifier, $problems, 'confirm');
 
     my $timeout = _getDialogueTimeout($hash);
-    for (split m{,}, $todelete) {
+    for (split m{,}x, $todelete) {
         delete $data->{$_};
     }
     setDialogTimeout($hash, $data, $timeout, "$response $response2");
@@ -2995,7 +2995,7 @@ sub testmode_end {
     my $fail = shift // 0;
 
     my $filename = $hash->{helper}->{test}->{filename} // q{none};
-    $filename =~ s{[.]txt\z}{}i;
+    $filename =~ s{[.]txt\z}{}ix;
     $filename = "${filename}_result.txt";
 
     my $result = $hash->{helper}->{test}->{passed} // 0;
@@ -3217,7 +3217,7 @@ sub handleTtsMsgDialog {
 
     my $recipient = $data->{sessionId} // return;
     my $message    = $data->{text}      // return;
-    $recipient = (split m{_$hash->{siteId}_}, $recipient,3)[0] // return;
+    $recipient = (split m{_$hash->{siteId}_}x, $recipient,3)[0] // return;
 
     Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipient and text $message");
     if ( defined $hash->{helper}->{msgDialog} 
@@ -4867,7 +4867,7 @@ sub handleIntentGetState {
     my @scenes; my $deviceNames; my $sceneNames;
     if ($device eq 'RHASSPY') {
         $type  //= 'generic';
-        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $type !~ m{\Ageneric|control|info|scenes|rooms\z};
+        return respond( $hash, $data, getResponse($hash, 'NoValidData')) if $type !~ m{\Ageneric|control|info|scenes|rooms\z}x;
         $response = getResponse( $hash, 'getRHASSPYOptions', $type );
         my $roomNames = '';
         if ( $type eq 'rooms' ) {
