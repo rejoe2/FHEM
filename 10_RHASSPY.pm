@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25925 2022-04-09 Beta-User $
+# $Id: 10_RHASSPY.pm 25925 2022-04-11 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2353,6 +2353,7 @@ sub getIsVirtualGroup {
     }
 
     if (ref $dispatchFns->{$grpIntent} eq 'CODE' ) {
+        return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
         $restdata->{Confirmation} = 1;
         return $dispatchFns->{$grpIntent}->($hash, $restdata);
     }
@@ -5586,6 +5587,7 @@ sub handleIntentConfirmAction {
 
     #continued session after intentNotRecognized
     if ( defined $data_old->{intentNotRecognized} 
+         && defined $mode
          && (   $mode eq 'OK' 
              || $mode eq 'Back' 
              || $mode eq 'Next' ) ) {
