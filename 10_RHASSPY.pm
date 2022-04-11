@@ -5932,16 +5932,19 @@ __END__
 
 =begin ToDo
 
-# Continous mode? (Wackelig, mehr oder weniger ungetestet...)
-
 # Rückmeldung zu den AMAD.*-Schnittstellen 
-- v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
+Dialoge/Rückfragen, wann Input aufmachen (erl.?)
 
 # auto-training
-Erste Tests laufen; sieht teilweise funktional aus...
+sieht funktional aus, bisher keine Beschwerden...
 
-# mehr wie ein Device?
+# mehr wie ein Device/Group/Room?
+(Tests laufen, sieht prinzipiell ok aus).
 
+# Continous mode? (Wackelig, mehr oder weniger ungetestet...)
+
+#Who am I / Who are you?
+Personenbezogene Kommunikation? möglich, erwünscht, typische Anwendungsszenarien...?
 
 =end ToDo
 
@@ -6540,11 +6543,12 @@ yellow=rgb FFFF00</code></p>
 <ul>
   <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
-  {Device} and {Value} (on/off) are mandatory, {Room} is optional.
+  {Device} and {Value} (on/off) are mandatory, {Room} is optional.<br>
+  <a id="RHASSPY-multicommand">Note: As <a href="#RHASSPY-experimental"><b>experimental</b></a> feature, you may hand over additional fields, like {Device1} ("1" here and in the follwoing keys may be any additonal postfix), {Group}/{Group1} and/or {Room1}. Then the intent will be interpreted as SetOnOffGroup intent adressing all the devices matching the {Device}s or {Group}s name(s), as long as they are in (one of) the respective {Room}s.
   <li>SetOnOffGroup</li>
-  {Group} and {Value} (on/off) are mandatory, {Room} is optional, <i>global</i> in {Room} will be interpreted as "everywhere".
+  {Group} and {Value} (on/off) are mandatory, {Room} is optional, <i>global</i> in {Room} will be interpreted as "everywhere".<br>
+  <a href="#RHASSPY-multicommand"><b>Experimental multicommand</b></a> feature should work also with this intent, (redirecting to itself and adding devices according to the additional keys).
   <li>SetTimedOnOff</li>Basic keywords see SetOnOff, plus timer info in at least one of the fields {Hour} (for relative additions starting now), {Hourabs} (absolute time of day), {Min} (minutes) and {Sec} (seconds). If {Hourabs} is provided, {Min} and {Sec} will also be interpreted as absolute values.
- uhr [(1..60){Min!int}] $OnOffValue{Value}
   <li>SetTimedOnOffGroup</li> (for keywords see SetOnOffGroup)
   <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
@@ -6557,6 +6561,7 @@ yellow=rgb FFFF00</code></p>
     <li>cmdStop (applies only for blinds)</li>
   </ul>
   allowing to decide on calculation scheme and to guess for the proper device and/or answer.
+  <a href="#RHASSPY-multicommand"><b>experimental multicommand</b></a> feature should work also with this intent (switching intent to SetNumericGroup).
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
   <li>GetNumeric</li> (as SetNumeric)
@@ -6567,6 +6572,7 @@ yellow=rgb FFFF00</code></p>
   <li>MediaChannels</li> (as configured by the user)
   <li>SetColor</li> 
   {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
+  <a href="#RHASSPY-multicommand"><b>experimental multicommand</b></a> feature should work as well.
   <li>SetColorGroup</li> (as SetColor, except for {Group} instead of {Device}).
   <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!), {Room} is optional, {Get} with value <i>scenes</i> may be used to request all possible scenes for a device prior to make a choice.
   <li>GetTime</li>
