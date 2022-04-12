@@ -3053,7 +3053,7 @@ sub testmode_parse {
     my $intent = shift // return;
     my $data   = shift // return;
 
-    my $line;# = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
     my $result;
     $hash->{helper}->{test}->{passed}++;
     if ( $intent eq 'intentNotRecognized' ) {
@@ -3063,8 +3063,8 @@ sub testmode_parse {
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
         my $json = toJSON($data);
-        $line = "Confidence not sufficient!" if !_check_minimumConfidence($hash, $data, 1);
-        $result = "$intent $json";
+        $result = "Confidence not sufficient! " if !_check_minimumConfidence($hash, $data, 1);
+        $result .= "$intent $json";
     }
     push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, $result;
     if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\ASetOnOffGroup|SetColorGroup|SetNumericGroup|SetTimedOnOffGroup\z}xms) {
