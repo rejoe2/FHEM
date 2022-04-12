@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25925 2022-04-11 Beta-User $
+# $Id: 10_RHASSPY.pm 25948 2022-04-12 05:30:56Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -161,7 +161,7 @@ my $languagevars = {
     },
     'getRHASSPYOptions' => {
       'generic' => 'Actions to devices may be initiated or information known by your automation can be requested',
-      'control' => 'In $room amongst others the following devices can be controlled $deviceNames',
+      'control' => 'In $room amongst others the following entities can be controlled $deviceNames',
       'info'    => 'Especially $deviceNames may serve as information source in $room',
       'rooms'   => 'Amongst others i know $roomNames as rooms',
       'scenes'  => '$deviceNames in $room may be able to be set to $sceneNames'
@@ -1900,12 +1900,11 @@ sub getAllRhasspyColors {
 sub getAllRhasspyGroups {
     my $hash = shift // return;
     my @groups;
-    
+
     for my $device (keys %{$hash->{helper}{devicemap}{devices}}) {
-        my $devgroups = $hash->{helper}{devicemap}{devices}{$device}->{groups} // q{};;
-        #for (@{$devgroups}) {
+        my $devgroups = $hash->{helper}{devicemap}{devices}{$device}->{groups} // q{};
         for (split m{,}xi, $devgroups ) {
-            push @groups, $_;
+                push @groups, $_;
         }
     }
     return get_unique(\@groups, 1);
@@ -2353,9 +2352,12 @@ sub getIsVirtualGroup {
     }
 
     if (ref $dispatchFns->{$grpIntent} eq 'CODE' ) {
-        return testmode_next($hash) if _isUnexpectedInTestMode($hash, $data);
-        $restdata->{Confirmation} = 1;
-        return $dispatchFns->{$grpIntent}->($hash, $restdata);
+         if ( _isUnexpectedInTestMode($hash, $restdata) ) {
+             testmode_next($hash);
+             return 1;
+         }	
+         $restdata->{Confirmation} = 1;
+         return $dispatchFns->{$grpIntent}->($hash, $restdata);
     }
 
     return;
@@ -3004,12 +3006,12 @@ sub testmode_end {
     $result = "tested $result sentences, failed total: $fails, amongst these in dialogues: $failsInDialogue.";
 
     if ( $filename ne 'none_result.txt' ) {
-        my $duration = '';
-        $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
+        my $duration = $result;
+        $duration .= sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
         $result = $hash->{helper}->{test}->{result};
         push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
-        $result .= "$duration See $filename for detailed results." if !$fail;
+        $result = "$duration See $filename for detailed results." if !$fail;
         $result = "Test ended incomplete with timeout. See $filename for results up to failure." if $fail;
     } else {
         $result = $fails ? 'Test failed, ' : 'Test ok, ';
@@ -4596,7 +4598,8 @@ sub handleIntentSetNumeric {
         $type   = $internal_mappings->{Change}->{$change}->{Type};
         $data->{Type} = $type if defined $type;
     }
-    my $subType = $data->{Type} eq 'temperature' ? 'desired-temp' : $data->{Type};
+    my $subType = $data->{Type};
+    $subType =  'desired-temp' if defined $subType && $subType eq 'temperature';
 
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
@@ -4877,7 +4880,7 @@ sub handleIntentGetState {
             return respond( $hash, $data, $response);
         }
 
-        my @names;
+        my @names; my @grps;
         my @intents = qw(SetNumeric SetOnOff GetNumeric GetOnOff MediaControls GetState SetScene);
         @intents = qw(GetState GetNumeric) if $type eq 'info';
         @intents = qw(SetScene) if $type eq 'scenes';
@@ -4895,13 +4898,16 @@ sub handleIntentGetState {
                         next if $scene eq 'cmdFwd' || $scene eq 'cmdBack';
                         push @scenes , $hash->{helper}{devicemap}{devices}{$dev}{intents}{SetScene}->{SetScene}->{$scene};
                     }
+                } elsif ( $intent =~ m{SetNumeric|SetOnOff}x ) {
+                     my $devgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // q{};
+                     push @grps, (split m{,}xi, $devgroups, 2)[0];
                 }
             }
         }
 
         return respond( $hash, $data, getResponse($hash, 'NoDeviceFound')) if !@names;
 
-        @names  = uniq(@names);
+        @names  = uniq(@names, @grps);
         @scenes = uniq(@scenes) if @scenes;
 
         $deviceNames = _array2andString( $hash, \@names );
@@ -6544,7 +6550,8 @@ yellow=rgb FFFF00</code></p>
   <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
   {Device} and {Value} (on/off) are mandatory, {Room} is optional.<br>
-  <a id="RHASSPY-multicommand">Note: As <a href="#RHASSPY-experimental"><b>experimental</b></a> feature, you may hand over additional fields, like {Device1} ("1" here and in the follwoing keys may be any additonal postfix), {Group}/{Group1} and/or {Room1}. Then the intent will be interpreted as SetOnOffGroup intent adressing all the devices matching the {Device}s or {Group}s name(s), as long as they are in (one of) the respective {Room}s.
+  <a id="RHASSPY-multicommand">Note: As <a href="#RHASSPY-experimental"><b>experimental</b></a> feature, you may hand over additional fields, like {Device1} ("1" here and in the follwoing keys may be any additonal postfix), {Group}/{Group1} and/or {Room1}. Then the intent will be interpreted as SetOnOffGroup intent adressing all the devices matching the {Device}s or {Group}s name(s), as long as they are in (one of) the respective {Room}s.<br>
+  The only restriction is: The intented {Value} (or, for other multicommand intents: Color etc.-value) has to be unique.
   <li>SetOnOffGroup</li>
   {Group} and {Value} (on/off) are mandatory, {Room} is optional, <i>global</i> in {Room} will be interpreted as "everywhere".<br>
   <a href="#RHASSPY-multicommand"><b>Experimental multicommand</b></a> feature should work also with this intent, (redirecting to itself and adding devices according to the additional keys).
