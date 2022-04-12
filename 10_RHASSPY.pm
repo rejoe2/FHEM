@@ -1669,7 +1669,8 @@ sub _AnalyzeCommand {
     my $cmd    = shift // return;
 
     if ( defined $hash->{testline} ) {
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command: ${cmd}.";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command: ${cmd}.";
+        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command: ${cmd}.";
         return;
     }
     # CMD ausführen
@@ -2595,7 +2596,8 @@ sub analyzeAndRunCmd {
         # CMD ausführen
         Log3($hash->{NAME}, 5, "$cmd is a perl command");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Perl: $cmd";
+            push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Perl: $cmd";
+            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Perl: $cmd";
             return;
         }
         return perlExecute($hash, $device, $cmd, $val,$siteId);
@@ -2627,7 +2629,8 @@ sub analyzeAndRunCmd {
     elsif (defined $cmds{ (split m{\s+}x, $cmd)[0] }) {
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command(s): $cmd";
+            push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command(s): $cmd";
+            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command(s): $cmd";
             return;
         }
         $error = AnalyzeCommandChain($hash, $cmd);
@@ -2639,7 +2642,8 @@ sub analyzeAndRunCmd {
         $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         if ( defined $hash->{testline} ) {
-            $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Redirected command: $cmd";
+            push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Redirected command: $cmd";
+            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Redirected command: $cmd";
             return;
         }
         $error = AnalyzeCommand($hash, "set $cmd");
@@ -2968,7 +2972,7 @@ sub testmode_next {
     my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
     if ( !$line || $line =~ m{\A\s*[#]}x || $line =~ m{\A\s*\z}x || $line =~ m{\A\s*(?:DIALOGUE|WAKEWORD)[:]}x ) {
         $line //= '';
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] = "$line";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, $line;
         $hash->{helper}->{test}->{isInDialogue} = 1 if $line =~ m{\A\s*DIALOGUE[:](?!END)}x;
         delete $hash->{helper}->{test}->{isInDialogue} if $line =~ m{\A\s*DIALOGUE[:]END}x;
         $hash->{testline}++;
@@ -3008,14 +3012,26 @@ sub testmode_end {
     if ( $filename ne 'none_result.txt' ) {
         my $duration = $result;
         $duration .= sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
-        $result = $hash->{helper}->{test}->{result};
+        my $rawresult = $hash->{helper}->{test}->{result};
+        my $text;
+        for my $line ( @{$rawresult} ) {
+            if ( defined $line->[1] ) {
+                push @{$result}, qq(   [RHASSPY] Input:      $line->[0]);
+                for ( 1..@{$line}-1) {
+                    push @{$result}, qq(             $line->[$_]);
+                }
+            } else {
+                push @{$result}, "$line->[0]";
+            }
+        }
         push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
         $result = "$duration See $filename for detailed results." if !$fail;
         $result = "Test ended incomplete with timeout. See $filename for results up to failure." if $fail;
     } else {
         $result = $fails ? 'Test failed, ' : 'Test ok, ';
-        $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
+        $result .= 'result is: ';
+        $result .= join q{ => }, @{$hash->{helper}->{test}->{result}->{0}};
     }
     readingsSingleUpdate($hash,'testResult',$result,1);
     if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult' ) {
@@ -3037,7 +3053,7 @@ sub testmode_parse {
     my $intent = shift // return;
     my $data   = shift // return;
 
-    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    my $line;# = $hash->{helper}->{test}->{content}->[$hash->{testline}];
     my $result;
     $hash->{helper}->{test}->{passed}++;
     if ( $intent eq 'intentNotRecognized' ) {
@@ -3047,16 +3063,16 @@ sub testmode_parse {
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
         my $json = toJSON($data);
-        $line = "$line => Confidence not sufficient!" if !_check_minimumConfidence($hash, $data, 1);
-        $result = "$line => $intent $json";
+        $line = "Confidence not sufficient!" if !_check_minimumConfidence($hash, $data, 1);
+        $result = "$intent $json";
     }
-    $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
+    push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, $result;
     if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\ASetOnOffGroup|SetColorGroup|SetNumericGroup|SetTimedOnOffGroup\z}xms) {
         my $devices = getDevicesByGroup($hash, $data);
         $result = ref $devices ne 'HASH' || !keys %{$devices} ?
                     q{can't identify any device in group and room} 
                   : join q{,}, keys %{$devices};
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Devices in group and room: $result";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Devices in group and room: $result";
     } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor|SetTimer|MediaChannels|Shortcuts\z}xms) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
@@ -3082,9 +3098,11 @@ sub _isUnexpectedInTestMode {
     
     return if !defined $hash->{testline};
     if ( defined $data->{'.virtualGroup'} ) {
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => redirected group intent ($data->{intent}), adressed devices: $data->{'.virtualGroup'}";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "redirected group intent ($data->{intent}), adressed devices: $data->{'.virtualGroup'}";
+        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => redirected group intent ($data->{intent}), adressed devices: $data->{'.virtualGroup'}";
     } else {
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Unexpected call of $data->{intent} routine!";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Unexpected call of $data->{intent} routine!";
+        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Unexpected call of $data->{intent} routine!";
     }
     $hash->{testline}++;
     return 1;
@@ -3551,7 +3569,8 @@ sub respond {
 
     if ( defined $hash->{testline} ) {
         $response = $response->{text} if ref $response eq 'HASH';
-        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Response: $response";
+        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
         $hash->{testline}++;
         return testmode_next($hash);
     }
