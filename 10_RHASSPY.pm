@@ -3014,14 +3014,18 @@ sub testmode_end {
         $duration .= sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
         my $rawresult = $hash->{helper}->{test}->{result};
         my $text;
-        for my $line ( @{$rawresult} ) {
+        for my $resu ( sort keys %{$rawresult} ) {
+            my $line = $rawresult->{$resu};
             if ( defined $line->[1] ) {
-                push @{$result}, qq(   [RHASSPY] Input:      $line->[0]);
+                my $single = $line->[0];
+                push @{$result}, qq(   [RHASSPY] Input:      $single);
                 for ( 1..@{$line}-1) {
-                    push @{$result}, qq(             $line->[$_]);
+                    $single = $line->[$_];
+                    push @{$result}, qq(             $single);
                 }
             } else {
-                push @{$result}, "$line->[0]";
+                my $singl = $line->[0];
+                push @{$result}, qq($singl);
             }
         }
         push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
