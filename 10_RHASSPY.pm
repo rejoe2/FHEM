@@ -3011,25 +3011,26 @@ sub testmode_end {
 
     if ( $filename ne 'none_result.txt' ) {
         my $duration = $result;
+        my $aresult;
         $duration .= sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
         my $rawresult = $hash->{helper}->{test}->{result};
         my $text;
-        for my $resu ( sort keys %{$rawresult} ) {
+        for my $resu ( sort { $a <=> $b } keys %{$rawresult} ) {
             my $line = $rawresult->{$resu};
             if ( defined $line->[1] ) {
                 my $single = $line->[0];
-                push @{$result}, qq(   [RHASSPY] Input:      $single);
+                push @{$aresult}, qq(   [RHASSPY] Input:      $single);
                 for ( 1..@{$line}-1) {
                     $single = $line->[$_];
-                    push @{$result}, qq(             $single);
+                    push @{$aresult}, qq(             $single);
                 }
             } else {
-                my $singl = $line->[0];
-                push @{$result}, qq($singl);
+                my $singl = ref $line eq 'ARRAY' ? $line->[0] : $line;
+                push @{$aresult}, qq($singl);
             }
         }
-        push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
-        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
+        push @{$aresult}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
+        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$aresult} );
         $result = "$duration See $filename for detailed results." if !$fail;
         $result = "Test ended incomplete with timeout. See $filename for results up to failure." if $fail;
     } else {
