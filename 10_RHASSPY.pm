@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 25948 2022-04-12 05:30:56Z Beta-User $
+# $Id: 10_RHASSPY.pm 25948 2022-04-13 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3067,6 +3067,7 @@ sub testmode_parse {
         $hash->{helper}->{test}->{notRecogn}++;
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, $line if $hash->{helper}->{test}->{filename} ne 'none';
         my $json = toJSON($data);
         $result = "Confidence not sufficient! " if !_check_minimumConfidence($hash, $data, 1);
         $result .= "$intent $json";
