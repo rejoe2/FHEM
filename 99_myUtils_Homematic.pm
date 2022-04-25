@@ -405,71 +405,63 @@ __END__
 <a name="myUtils_Homematic"></a>
 <h3>myUtils_Homematic</h3>
 <ul>
-  <b>devStateIcon_Clima</b>
+  <li><b>devStateIcon_Clima</b>
   <br>
   Use this to get a multifunctional iconset to control HM-CC-RT-DN or HM-TC-IT-WM-W-EU devices<br>
   Examples: 
   <ul>
    <code>attr Thermostat_Esszimmer_Gang_Clima devStateIcon {devStateIcon_Clima($name)}<br> attr Thermostat_Esszimmer_Gang_Clima webCmd desired-temp</code><br>
   </ul>
-  <b>HM_TC_Holiday</b>
-  <br>
-  Use this to set one RT or WT device in party mode<br>
-  Parameters: Device, Temperature, start date, start time, end date, end time<br>
-  NOTE: as these devices only accept time settings to 00 minutes and 30 minutes, all other figures will be rounded down to 00 or 30 minutes. Don't bother to do it by yourself, but note, effectively, the result could be a shorter periode of party mode.<br>
-  Example: 
-  <ul>
-   <code>{HM_TC_Holiday ("Thermostat_Esszimmer_Gang","16", "14.02.19", "16:30", "15.02.19" ,"05:00")}</code><br>
-  </ul>
-  <b>easy_HM_TC_Holiday</b>
+  </li><br>
+  <li><b>easy_HM_TC_Holiday</b>
   <br>
   Use this to set one RT or WT device in party mode (or end it) without doing much calculation in advance<br>
   Parameters: Device, Temperature. Optional: duration and/or starttime (in seconds or as days:hours). Starttime may also be "now" (default, when no argument is given), keyword "stop" ends holiday mode immedately.<br>
     NOTE: rounding is applied as described at HM_TC_Holiday.<br>
   Examples: 
   <ul>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","16")}</code><br>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","16","now")}</code><br>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","16","stop")}</code><br>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","16","9000","now")}</code><br>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","21.5","3600","9000")}</code><br>
-   <code>{easy_HM_TC_Holiday("Thermostat_Esszimmer_Gang","21.5","1:5","32:14")}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','16')}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','16','now')}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','16','stop')}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','16','9000','now')}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','21.5','3600','9000')}</code><br>
+   <code>{easy_HM_TC_Holiday('Thermostat_Esszimmer_Gang','21.5','1:5','32:14')}</code><br>
   </ul>
-  
-  <b>HM_TC_Holiday</b>
+  </li><br>
+  <li><b>HM_TC_Holiday</b>
   <br>
   Use this to set one RT or WT device in party mode<br>
   Parameters: Device, Temperature, start date, start time, end date, end time<br>
   NOTE: as these devices only accept time settings to 00 minutes and 30 minutes, all other figures will be rounded down to 00 or 30 minutes. Don't bother to do it by yourself, but note, effectively, the result could be a shorter periode of party mode.<br>
   Example: 
   <ul>
-   <code>{HM_TC_Holiday ("Thermostat_Esszimmer_Gang","16", "14.02.19", "16:30", "15.02.19" ,"05:00")}</code><br>
+   <code>{HM_TC_Holiday ('Thermostat_Esszimmer_Gang','16', '14.02.19', '16:30', '15.02.19' ,'05:00')}</code><br>
   </ul>
-  
-  <b>hm_copy_HMInfoTowp</b>
+  </li><br>
+  <li><b>hm_copy_HMInfoTowp</b>
   <br>
   Use this to import existant CUL_HM-tempList file(s) to weekprofile (useTopics has to be enabled there). Filename will be used as topic, "entities" will be used as profile names.
   <br>
     NOTE: May not work, if there's a comma-separated list of entities in the file.<br>
   Example: 
   <ul>
-   <code>{hm_copy_HMInfoTowp("hm","weekprofiles")}</code><br>
+   <code>{hm_copy_HMInfoTowp('hm','weekprofiles')}</code><br>
   
   </ul>
-  
-  <b>hm_copy_wpToHMInfo</b>
+  </li><br>
+  <li><b>hm_copy_wpToHMInfo</b>
   <br>
   Use this to export existant weekprofiles to CUL_HM-comatible tempList file(s). Filename(s) will be derived from weekprofile device name and topic, you can decide with an optional third argument wheather existant content shall be kept (1) or overwritten (0) (default is 1=keep), or if there should be the weekprofile name as prefix in filenames.
   
   <br>
   Examples: 
   <ul>
-   <code>{hm_copy_wpToHMInfo("weekprofiles","hm")}</code><br>
-   <code>{hm_copy_wpToHMInfo("weekprofiles","hm",0)}</code><br>
-   <code>{hm_copy_wpToHMInfo("weekprofiles","hm",0,0)}</code><br>
+   <code>{hm_copy_wpToHMInfo('weekprofiles','hm')}</code><br>
+   <code>{hm_copy_wpToHMInfo('weekprofiles','hm',0)}</code><br>
+   <code>{hm_copy_wpToHMInfo('weekprofiles','hm',0,0)}</code><br>
 
   </ul>
-  
+  </li>
 </ul>
 =end html
 =cut
