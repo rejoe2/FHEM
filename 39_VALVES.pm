@@ -61,9 +61,11 @@ sub VALVES_Define {
 
     return 'Wrong syntax: use define <name> VALVES' if defined $tomuch || !defined $TYPE;
     Log3($name, 4, "VALVES $name has been defined");
-    readingsSingleUpdate($hash, 'state', 'initialized',1);
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, 'state', 'initialized');
     #first run after 61 seconds, wait for other devices
-    readingsSingleUpdate($hash, 'busy', 0+gettimeofday(),1); #waiting for attr check
+    readingsBulkUpdate($hash, 'busy', 0+gettimeofday()); #waiting for attr check
+    readingsEndUpdate($hash, 1);
     InternalTimer(gettimeofday() + 61, 'VALVES_GetUpdate', $hash, 0);
     return;
 }
@@ -174,6 +176,7 @@ sub VALVES_GetUpdate {
         InternalTimer(gettimeofday() + $valvesPollInterval, 'VALVES_GetUpdate', $hash, 0);
     }
     return if IsDisabled($name);
+
     if ( AttrVal($name,'valvesDeviceList','none') eq 'none'){
         readingsSingleUpdate($hash, 'state', 'missing attr valvesDeviceList', 1);
         return;
@@ -194,12 +197,15 @@ sub VALVES_GetUpdate {
         #check ignorelist
         next if $valvesIgnoreDeviceList =~ m/$dev/x;
         #get val
-        $pos = ReadingsVal($dev, AttrVal($name,'valvesDeviceReading','valveposition'),'err');
+        my ($unnamedParams, $namedParams) = parseParams(AttrVal($name,'valvesDeviceReading','valveposition'));
+        my $posRead = $namedParams->{InternalVal($dev,'TYPE','none')} // $unnamedParams->[0];
+        $pos = ReadingsVal($dev, $posRead,'err');
         if ( !defined $pos || $pos eq 'err' || $pos eq 'lime-protection' ) {
             Log3($name, 4, "VALVES $name ".$_." [$pos] DeviceReading not present");
             next;
         }
-        $pos =~ s/%//x;
+        #$pos =~ s/%//x;
+        $pos = $pos =~ /(-?\d+(\.\d+)?)/ ? $1 : $pos;
         push @raw_average,$pos;
         #calc prio
         $prio = AttrVal($name,'valves'.$dev.'Weighting',AttrVal($name,'valves'.$dev.'Gewichtung',1));
@@ -209,6 +215,7 @@ sub VALVES_GetUpdate {
     }
     #ignore highest/lowest N values
     my @sorted = sort { $valveShort{$a} <=> $valveShort{$b} } keys %valveShort;
+
     if ( $#sorted == -1 ){
         readingsSingleUpdate($hash, 'state', 'attr valvesDeviceList is empty', 1);
         return;
@@ -228,15 +235,15 @@ sub VALVES_GetUpdate {
         setReadingsVal($hash,'valve_'.$_,$valveShort{$_},$valveDetail{$_}[1]);
     }
     #set min and max from sorted
-    if ( ReadingsVal($name,'valve_min','err') ne $valveShort{$sorted[0]} ) {
-        readingsSingleUpdate($hash, 'valve_min', $valveShort{$sorted[0]}, 1);
-    }
-    @sorted = reverse @sorted;
-    if ( ReadingsVal($name,'valve_max','err') ne $valveShort{$sorted[0]} ) {
-        readingsSingleUpdate($hash, 'valve_max', $valveShort{$sorted[0]}, 1);
-    }
-    my $valvesPriorityDeviceList = AttrVal($name,'valvesPriorityDeviceList','0');
     readingsBeginUpdate($hash);
+    #if ( ReadingsVal($name,'valve_min','err') ne $valveShort{$sorted[0]} ) {
+        readingsBulkUpdateIfChanged($hash, 'valve_min', $valveShort{$sorted[0]},1);
+    #}
+    #@sorted = reverse @sorted;
+    #if ( ReadingsVal($name,'valve_max','err') ne $valveShort{$sorted[-1]} ) {
+        readingsBulkUpdateIfChanged($hash, 'valve_max', $valveShort{$sorted[-1]},1);
+    #}
+    my $valvesPriorityDeviceList = AttrVal($name,'valvesPriorityDeviceList','0');
     for my $dev ( keys %valveDetail ) {
         if ( !exists $valveShort{$dev} ) {
             $valveShort{$dev} = 'ignored';
@@ -248,20 +255,16 @@ sub VALVES_GetUpdate {
         }
         readingsBulkUpdate($hash,'valveDetail_'.$dev,'pos:' . $valveDetail{$dev}[0] . ' calc:'.$valveShort{$dev}.
             ( $valvesPriorityDeviceList =~ m/$dev/x ? '-priority' : '') .
-            ' time:' . $valveDetail{$dev}[1]);
+            ' time:' . $valveDetail{$dev}[1],0);
     }
-    readingsEndUpdate($hash, 0);
     my $state;
     for ( @sorted ) {
         $state+=$valveShort{$_};
     }
     $state = ($state/($#sorted+1));
-    readingsBeginUpdate($hash);
-    my $changed = 0;
     if(ReadingsVal($name,'state','err') ne $state){
-        readingsBulkUpdate($hash, 'valve_average', $state);
-        readingsBulkUpdate($hash, 'state', $state);
-        $changed = 1;
+        readingsBulkUpdate($hash, 'valve_average', $state,1);
+        readingsBulkUpdate($hash, 'state', $state,1);
     }
     $state = 0;
     for ( @raw_average ) {
@@ -269,10 +272,9 @@ sub VALVES_GetUpdate {
     }
     $state=($state/($#raw_average+1));
     if ( ReadingsVal($name,'raw_average','err') ne $state ) {
-        readingsBulkUpdate($hash, 'raw_average', $state);
-        $changed = 1;
+        readingsBulkUpdate($hash, 'raw_average', $state,1);
     }
-    readingsEndUpdate($hash, $changed);
+    readingsEndUpdate($hash, 1);
 
     return;
 }
