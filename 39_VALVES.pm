@@ -1,31 +1,33 @@
-# $Id: 39_VALVES.pm 1015 2016-12-04 09:55:00Z Florian Duesterwald $
+# $Id: 39_VALVES.pm 2022-04-27 Beta-User $
 ####################################################################################################
 #
-#	39_VALVES.pm
+#   39_VALVES.pm
 #
-#	heating valves average, with some adjust and ignore options
-#	http://forum.fhem.de/index.php/topic,24658.0.html
-#	refer to mail a.T. duesterwald do T info if necessary
+#   originally developed by Florian Duesterwald 
 #
-#	thanks to cwagner for testing and a great documentation of the module:
-#	http://www.fhemwiki.de/wiki/Raumbedarfsabh%C3%A4ngige_Heizungssteuerung
-#	http://www.fhemwiki.de/wiki/VALVES
+#   heating valves average, with some adjust and ignore options
+#   http://forum.fhem.de/index.php/topic,24658.0.html
+#   refer to mail a.T. duesterwald do T info if necessary
+#
+#   thanks to cwagner for testing and a great documentation of the module:
+#   http://www.fhemwiki.de/wiki/Raumbedarfsabh%C3%A4ngige_Heizungssteuerung
+#   http://www.fhemwiki.de/wiki/VALVES
 #   thanks to stromer-12 for fixing attr probs
 #
-#	This file is free contribution and not part of fhem.
+#   This file is free contribution and not part of fhem.
 #
-#	Fhem is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 2 of the License, or
-#	(at your option) any later version.
+#   Fhem is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 2 of the License, or
+#   (at your option) any later version.
 #
-#	Fhem is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
+#   Fhem is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
 #
-#	You should have received a copy of the GNU General Public License
-#	along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#   You should have received a copy of the GNU General Public License
+#   along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ####################################################################################################
 package main;
@@ -36,277 +38,341 @@ use warnings;
 #Heizg_Bad,Heizg_Buero,Heizg_Flur,Heizg_Kammer,Heizg_Kueche,Heizg_Lena,Heizg_Lisa,Heizg_Schlafzimmer,Heizg_WC_oben,Heizg_WC_unten,Heizg_Wohnzimmer1,Heizg_Wohnzimmer2
 #}
 
-sub VALVES_Initialize($){
-	my ($hash) = @_;
-	$hash->{DefFn}		= "VALVES_Define";
-	$hash->{UndefFn}	= "VALVES_Undefine";
-	$hash->{SetFn}		= "VALVES_Set";
-	$hash->{GetFn}		= "VALVES_Get";
-	$hash->{NotifyFn}	= "VALVES_Notify";
-	$hash->{AttrFn}		= "VALVES_Attr";
-	my($attrList)=" valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900".
-		" valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList".
-		" valvesPriorityDeviceList valvesInitialDelay";
-	my($i)=0;
-	$hash->{AttrList}	= "disable:0,1 ".$readingFnAttributes.$attrList;
-	}
-sub VALVES_Define($$){
-	my ($hash, $def) = @_;
-	my @args = split("[ \t][ \t]*", $def);
-	return "Wrong syntax: use define <name> VALVES" if(int(@args) != 2);
-	my $name = $args[0];
-	Log3($name, 4, "VALVES $name has been defined");
-	readingsSingleUpdate($hash, "state", "initialized",1);
-	#first run after 61 seconds, wait for other devices
-	readingsSingleUpdate($hash, "busy", 0+gettimeofday(),1); #waiting for attr check
-	InternalTimer(gettimeofday() + 61, "VALVES_GetUpdate", $hash, 0);
-	return undef;
-	}
-sub VALVES_Undefine($$){
-  my($hash, $name) = @_;
-  RemoveInternalTimer($hash);
-  return;
+sub VALVES_Initialize {
+    my $hash = shift // return;
+    $hash->{DefFn}      = "VALVES_Define";
+    $hash->{UndefFn}    = "VALVES_Undefine";
+    $hash->{SetFn}      = "VALVES_Set";
+    $hash->{GetFn}      = "VALVES_Get";
+    $hash->{NotifyFn}   = "VALVES_Notify";
+    $hash->{AttrFn}     = "VALVES_Attr";
+    my $attrList =" valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900".
+        " valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList".
+        " valvesPriorityDeviceList valvesInitialDelay";
+    #my $i = 0;
+    $hash->{AttrList}   = "disable:0,1 ".$readingFnAttributes.$attrList;
+    return;
 }
-sub VALVES_Get($@){
-	my ($hash, @a) = @_;
-	my $name = $hash->{NAME};
-	my $get = $a[1];
-	my @stmgets = (keys(%{$hash->{READINGS}}));
-	$get="?" if(!_in_array($get,(@stmgets,"attrHelp","state","html")));
-	my $usage = "Unknown argument $get, choose one of";
-	foreach(@stmgets){
-		$usage.=" ".$_.":noArg";
-		}
-	$usage.=" attrHelp:";
-	my($first)=0;
-	foreach(_valvesAttribs("keys","")){
-		if($first){
-			$usage.=$_;
-			$first=0;
-		}else{
-			$usage.=",".$_;
-			}
-		}
-	return $usage if $get eq "?";
-	if($get eq "attrHelp"){return _valvesAttribs("help",$a[2]);}
-	my $ret = $get.": ".ReadingsVal($name,$get, "Unknown at line ".__LINE__);
-	return $ret;
-	}
-sub VALVES_Set($@){
-	my ($hash, @a) = @_;
-	my $name = shift @a;
-	return "no set value specified" if(int(@a) < 1);
-	my $setList = "reset:noArg ";
-	if($a[0] eq "?"){
-		return "Unknown argument ?, choose one of $setList";
-	}elsif($a[0] eq "reset"){
-		Log3($name,4,"VALVES set $name ".join(" ", @a));
-		foreach(keys(%{$hash->{READINGS}})){
-			CommandDeleteReading(undef,"$name $_");
-			}
-		return undef;
-#	}elsif($a[0] eq "setAttr"){
-#		Log3($name,4,"VALVES set $name ".join(" ", @a));
-#		CommandAttr(undef,"$name ".join(" ",@a));
-#		return undef;
-		}
-	}
-sub VALVES_Attr($@){
-	my ($cmd, $name, $attrName, $attrVal) = @_;
-	my $hash = $defs{$name};
-	#special attr valvesDeviceList #valvesDeviceList: addToAttrList
-	if ($attrName eq "valvesDeviceList") {
-		if(length($attrVal)>2){
-			Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
-			foreach(split(/,/,$attrVal)){
-				addToDevAttrList("$name","valves".$_."Gewichtung");
-				}
-			VALVES_GetUpdate($hash);
-		} else {
-			Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
-			}
-	#validate special attr valvesPollInterval
-	}elsif ($attrName eq "valvesPollInterval") {
-		if(($attrVal>=1) and ($attrVal<=900)){
-			Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
-			VALVES_GetUpdate($hash);
-		} else {
-			Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, use seconds >1 as float (max 900)");
-			}
-	#other attribs
-	}elsif($attrName =~/^valves\d+/){
-		if(!defined $attrVal){
-			if(defined $attrVal){
-				Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed");
-			}else{
-				CommandDeleteAttr(undef, "$name attrName");
-				Log3($name, 4, "VALVES $name: attribute [$attrName] deleted");
-				}
-			}
-	}else{
-		Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed");
-		}
-	return;
-	}
-sub VALVES_Notify(@){
-	my ($hash, $dev) = @_;
-	my $name = $hash->{NAME}; 
-	if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
-		Log3($name, 3, "VALVES $name initialized");
-		VALVES_GetUpdate($hash);    
-		}
-	return;
-	}
-sub VALVES_GetUpdate($) {
-	my($hash)= @_;
-	my($name)=$hash->{NAME};
-	my($valvesPollInterval)=AttrVal($name, "valvesPollInterval", 10);
-	if ($valvesPollInterval ne "off") {
-		RemoveInternalTimer($hash);
-		InternalTimer(gettimeofday() + ($valvesPollInterval), "VALVES_GetUpdate", $hash, 0);
-		}
-	if (IsDisabled($name)) {
-		return;
-		}
-	if(AttrVal($name,"valvesDeviceList","none") eq "none"){
-		readingsSingleUpdate($hash, "state", "missing attr valvesDeviceList", 1);
-		return;
-		}
-	#check all attr at first loop
-	if(ReadingsVal($name,"busy","done") ne "done"){		#"waiting for attr check"
-		if((gettimeofday()-AttrVal($name,"valvesInitialDelay",61))>ReadingsVal($name, "busy",0)){
-			foreach(split(/,/,AttrVal($name,"valvesDeviceList",""))){
-				addToDevAttrList("$name","valves".$_."Gewichtung");
-				}
-			CommandDeleteReading(undef,"$name busy")
-			}
-		}
-	my(%valveDetail,%valveShort,@raw_average,$dev,$pos,$prio);
-	my($valvesIgnoreDeviceList)=AttrVal($name,"valvesIgnoreDeviceList","0");
-	foreach(split(/,/,AttrVal($name,"valvesDeviceList",""))){
-		$dev=$_;
-		#check ignorelist
-		if($valvesIgnoreDeviceList=~/$dev/){
-			next;
-			}
-		#get val
-		$pos=ReadingsVal($dev,AttrVal($name,"valvesDeviceReading","valveposition"),"err");
-		if(!defined($pos) or ($pos eq "err") or ($pos eq "lime-protection")){
-			Log3($name, 4, "VALVES $name ".$_." [$pos] DeviceReading not present");
-			next;
-			}
-		$pos=~s/%//;
-		push(@raw_average,$pos);
-		#calc prio
-		$prio=AttrVal($name,"valves".$dev."Gewichtung",1);
-		#fill hash
-		$valveDetail{$dev}=[($pos,ReadingsTimestamp($dev,AttrVal($name,"valvesDeviceReading","valveposition"),undef))];
-		$valveShort{$dev}=$pos*$prio;
-		}
-	#ignore highest/lowest N values
-	my(@sorted)=sort { $valveShort{$a} <=> $valveShort{$b} } keys %valveShort;
-	if($#sorted==-1){
-		readingsSingleUpdate($hash, "state", "attr valvesDeviceList is empty", 1);
-		return;
-		}
-	my($valvesIgnoreLowest)=AttrVal($name,"valvesIgnoreLowest",0);
-	while($valvesIgnoreLowest>0){
-		shift(@sorted);
-		$valvesIgnoreLowest--;
-		}
-	my($valvesIgnoreHighest)=AttrVal($name,"valvesIgnoreHighest",0);
-	while($valvesIgnoreHighest>0){
-		pop(@sorted);
-		$valvesIgnoreHighest--;
-		}
-	#fill readings, bypass usual way to conserve valveposition timestamps
-	foreach(@sorted){
-		setReadingsVal($hash,"valve_".$_,$valveShort{$_},$valveDetail{$_}[1]);
-		}
-	#set min and max from sorted
-	if(ReadingsVal($name,"valve_min","err") ne $valveShort{$sorted[0]}){
-		readingsSingleUpdate($hash, "valve_min", $valveShort{$sorted[0]}, 1);
-		}
-	@sorted=reverse(@sorted);
-	if(ReadingsVal($name,"valve_max","err") ne $valveShort{$sorted[0]}){
-		readingsSingleUpdate($hash, "valve_max", $valveShort{$sorted[0]}, 1);
-		}
-	my($valvesPriorityDeviceList)=AttrVal($name,"valvesPriorityDeviceList","0");
-	readingsBeginUpdate($hash);
-	foreach(keys(%valveDetail)){
-		$dev=$_;
-		if(!exists($valveShort{$dev})){
-			$valveShort{$dev}="ignored";
-			}
-		#create double hash entry for prio dev
-		if($valvesPriorityDeviceList=~/$dev/){
-			$valveShort{$dev."P"}=$valveShort{$dev};
-			push(@sorted,$dev."P");
-			}
-		readingsBulkUpdate($hash,"valveDetail_".$dev,"pos:".$valveDetail{$dev}[0]." calc:".$valveShort{$dev}.
-			(($valvesPriorityDeviceList=~/$dev/)?"-priority":"").
-			" time:".$valveDetail{$dev}[1]);		
-		}
-	readingsEndUpdate($hash, 0);
-	my($state);
-	foreach(@sorted){
-		$state+=$valveShort{$_};
-		}
-	$state=($state/($#sorted+1));
-	if(ReadingsVal($name,"state","err") ne $state){
-		readingsSingleUpdate($hash, "valve_average", $state, 1);
-		readingsSingleUpdate($hash, "state", $state, 1);
-		}
-	$state=0;
-	foreach(@raw_average){
-		$state+=$_;
-		}
-	$state=($state/($#raw_average+1));
-	if(ReadingsVal($name,"raw_average","err") ne $state){
-		readingsSingleUpdate($hash, "raw_average", $state, 1);
-		}
-	}
 
-sub _in_array($@){
-	my ($search_for,@arr) = @_;
-	foreach(@arr){
-		return 1 if $_ eq $search_for;
-		}
-	return 0;
-	}
-sub _valvesAttribs($@){
-	#usage: _valvesAttribs("type","stmVarName")
-	# "keys" || "default" || "type" || "help"  ,<keyname>
-	my($type,$reqKey)=@_;
-	my %attribs = (
-"valvesInitialDelay"=>[("61","int","Zeitintervall nach FHEM-Start oder Dev.-Define bevor die Berechnung gestartet wird")],
-"valvesPollInterval"=>[("10","int","Zeitintervall nach dem FHEM die daten versucht zu aktualisieren")],
-"valvesDeviceList"=>[("none","string","Liste aller Heizungsthermostate mit Komma getrennt ohne Leerzeichen")],
-"valvesDeviceReading"=>[("valveposition","string","Reading das die Ventilposition zeigt, default: valveposition")],
-"valvesIgnoreLowest"=>[("0","int","ignoriere die niedrigsten N Thermostate")],
-"valvesIgnoreHighest"=>[("0","int","ignoriere die h�chsten N Thermostate")],
-"valvesIgnoreDeviceList"=>[("0","string","Ignoriere diese Devicenamen")],
-"valvesPriorityDeviceList"=>[("0","string","Thermostate in dieser Liste werden doppelt gez�hlt")],
-"valves<Devicename>Gewichtung"=>[("1","float","F�r jedes Thermostat kann ein individueller Gewichtungsfaktor multipliziert werden. So kann zB ein schlechter hydraulischer Abgleich ber�cksichtigt werden")],
-"disable"=>[("0","int","Berechnung anhalten und einfrieren")],
-	);
-	if($type eq "keys"){
-		return keys(%attribs);
-	}elsif($type eq "default"){
-		return $attribs{$reqKey}[0];
-	}elsif($type eq "type"){
-		return $attribs{$reqKey}[1];
-	}elsif($type eq "description"){
-		return $attribs{$reqKey}[2];
-	}elsif($type eq "help"){
-		return "attrHelp for ".$reqKey.":\n default:".$attribs{$reqKey}[0]." type:".$attribs{$reqKey}[1].
-			" \ndescription:".$attribs{$reqKey}[2];
-	}else{
-		return "_ attribs?";
-		}
-	}
+sub VALVES_Define {
+    my $hash = shift // return;
+    my $def  = shift // return;
+    my ($name, $TYPE, $tomuch) = split m{\s+}xms, $def;
 
+    return 'Wrong syntax: use define <name> VALVES' if defined $tomuch || !defined $TYPE;
+    Log3($name, 4, "VALVES $name has been defined");
+    readingsSingleUpdate($hash, 'state', 'initialized',1);
+    #first run after 61 seconds, wait for other devices
+    readingsSingleUpdate($hash, 'busy', 0+gettimeofday(),1); #waiting for attr check
+    InternalTimer(gettimeofday() + 61, 'VALVES_GetUpdate', $hash, 0);
+    return;
+}
+
+sub VALVES_Undefine{
+    my $hash = shift // return;
+    RemoveInternalTimer($hash);
+    return;
+}
+
+sub VALVES_Get {
+    my ($hash, @arr) = @_;
+    my $name = $hash->{NAME};
+    my $get = $arr[1];
+
+    if ( $get eq 'attrHelp' ) { return _valvesAttribs('help',$arr[2]); }
+
+    my @stmgets = keys %{$hash->{READINGS}};
+    $get = '?' if ! grep { m{$get}x } (@stmgets,'attrHelp','state','html');
+
+    if ( $get ne '?' ) {
+        return $get.': '.ReadingsVal($name,$get, 'Unknown at line '.__LINE__);
+    }
+    my $usage = "Unknown argument $get, choose one of";
+    for (@stmgets){
+        $usage.=" ".$_.":noArg";
+    }
+    $usage.=" attrHelp:";
+    for(_valvesAttribs('keys','')){
+        $usage.=",$_";
+    }
+    return $usage;
+}
+
+sub VALVES_Set{
+    my ($hash, @arr) = @_;
+    my $name = shift @arr;
+    return 'no set value specified' if !@arr;
+    if ($arr[0] eq 'reset'){
+        Log3($name,4,"VALVES set $name " . join(q{ }, @arr));
+        for(keys(%{$hash->{READINGS}})){
+            CommandDeleteReading(undef,"$name $_");
+        }
+        return;
+    }
+
+    my $setList = 'reset:noArg';
+    return "Unknown argument $arr[0], choose one of $setList";
+}
+
+sub VALVES_Attr {
+    my ($cmd, $name, $attrName, $attrVal) = @_;
+    my $hash = $defs{$name};
+    #special attr valvesDeviceList #valvesDeviceList: addToAttrList
+    if ($attrName eq 'valvesDeviceList') {
+        if(length($attrVal)>2){
+            Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
+            for( split m{,}x,$attrVal ) {
+                #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
+                addToDevAttrList("$name","valves".$_."Weighting",'VALVES');
+            }
+            VALVES_GetUpdate($hash);
+        } else {
+            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
+        }
+        return;
+    }
+    #validate special attr valvesPollInterval
+    if ( $attrName eq 'valvesPollInterval' ) {
+        if( $attrVal >= 1 && $attrVal <= 900 ) {
+            Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
+            VALVES_GetUpdate($hash);
+        } else {
+            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, use seconds >1 as float (max 900)");
+        }
+        return;
+    }
+    #other attribs
+    if ( $attrName =~ m{\Avalves\d+}x ) {
+        if ( !defined $attrVal ){
+            CommandDeleteAttr(undef, "$name attrName");
+            Log3($name, 4, "VALVES $name: attribute [$attrName] deleted");
+        }
+    } else {
+        Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed");
+    }
+    return;
+}
+
+sub VALVES_Notify{
+    my $hash     = shift // return;
+    my $dev      = shift // return;
+    my $name = $hash->{NAME};
+    if ( $dev->{NAME} eq 'global' && grep { m/^INITIALIZED|REREADCFG$/x } @{$dev->{CHANGED}} ){
+        Log3($name, 3, "VALVES $name initialized");
+        VALVES_GetUpdate($hash);
+    }
+    return;
+}
+
+sub VALVES_GetUpdate {
+    my $hash     = shift // return;
+    my $name = $hash->{NAME};
+    my $valvesPollInterval = AttrVal($name, 'valvesPollInterval', 10);
+    if ( $valvesPollInterval ne 'off' ) {
+        RemoveInternalTimer($hash);
+        $valvesPollInterval = 10 if !looks_like_number($valvesPollInterval);
+        InternalTimer(gettimeofday() + $valvesPollInterval, 'VALVES_GetUpdate', $hash, 0);
+    }
+    return if IsDisabled($name);
+    if ( AttrVal($name,'valvesDeviceList','none') eq 'none'){
+        readingsSingleUpdate($hash, 'state', 'missing attr valvesDeviceList', 1);
+        return;
+    }
+    #check all attr at first loop
+    if ( ReadingsVal($name,'busy','done') ne 'done'){       #"waiting for attr check"
+        if ( (gettimeofday() - AttrVal($name,'valvesInitialDelay',61) ) > ReadingsVal($name, 'busy',0)){
+            for ( split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
+                #addToDevAttrList("$name",'valves'.$_.'Gewichtung','VALVES');
+                addToDevAttrList("$name",'valves'.$_.'Weighting','VALVES');
+            }
+            CommandDeleteReading(undef,"$name busy")
+        }
+    }
+    my(%valveDetail,%valveShort,@raw_average,$pos,$prio);
+    my $valvesIgnoreDeviceList = AttrVal($name,'valvesIgnoreDeviceList','0');
+    for my $dev ( split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
+        #check ignorelist
+        next if $valvesIgnoreDeviceList =~ m/$dev/x;
+        #get val
+        $pos = ReadingsVal($dev, AttrVal($name,'valvesDeviceReading','valveposition'),'err');
+        if ( !defined $pos || $pos eq 'err' || $pos eq 'lime-protection' ) {
+            Log3($name, 4, "VALVES $name ".$_." [$pos] DeviceReading not present");
+            next;
+        }
+        $pos =~ s/%//x;
+        push @raw_average,$pos;
+        #calc prio
+        $prio = AttrVal($name,'valves'.$dev.'Weighting',AttrVal($name,'valves'.$dev.'Gewichtung',1));
+        #fill hash
+        $valveDetail{$dev}=[($pos,ReadingsTimestamp($dev,AttrVal($name,'valvesDeviceReading','valveposition'),undef))];
+        $valveShort{$dev}=$pos*$prio;
+    }
+    #ignore highest/lowest N values
+    my @sorted = sort { $valveShort{$a} <=> $valveShort{$b} } keys %valveShort;
+    if ( $#sorted == -1 ){
+        readingsSingleUpdate($hash, 'state', 'attr valvesDeviceList is empty', 1);
+        return;
+    }
+    my $valvesIgnoreLowest = AttrVal($name,'valvesIgnoreLowest',0);
+    while ( $valvesIgnoreLowest > 0 ) {
+        shift @sorted;
+        $valvesIgnoreLowest--;
+    }
+    my $valvesIgnoreHighest = AttrVal($name,'valvesIgnoreHighest',0);
+    while ( $valvesIgnoreHighest > 0 ) {
+        pop @sorted;
+        $valvesIgnoreHighest--;
+    }
+    #fill readings, bypass usual way to conserve valveposition timestamps
+    for ( @sorted ){
+        setReadingsVal($hash,'valve_'.$_,$valveShort{$_},$valveDetail{$_}[1]);
+    }
+    #set min and max from sorted
+    if ( ReadingsVal($name,'valve_min','err') ne $valveShort{$sorted[0]} ) {
+        readingsSingleUpdate($hash, 'valve_min', $valveShort{$sorted[0]}, 1);
+    }
+    @sorted = reverse @sorted;
+    if ( ReadingsVal($name,'valve_max','err') ne $valveShort{$sorted[0]} ) {
+        readingsSingleUpdate($hash, 'valve_max', $valveShort{$sorted[0]}, 1);
+    }
+    my $valvesPriorityDeviceList = AttrVal($name,'valvesPriorityDeviceList','0');
+    readingsBeginUpdate($hash);
+    for my $dev ( keys %valveDetail ) {
+        if ( !exists $valveShort{$dev} ) {
+            $valveShort{$dev} = 'ignored';
+        }
+        #create double hash entry for prio dev
+        if ( $valvesPriorityDeviceList =~ m/$dev/x ) {
+            $valveShort{$dev.'P'} = $valveShort{$dev};
+            push @sorted, $dev . 'P';
+        }
+        readingsBulkUpdate($hash,'valveDetail_'.$dev,'pos:' . $valveDetail{$dev}[0] . ' calc:'.$valveShort{$dev}.
+            ( $valvesPriorityDeviceList =~ m/$dev/x ? '-priority' : '') .
+            ' time:' . $valveDetail{$dev}[1]);
+    }
+    readingsEndUpdate($hash, 0);
+    my $state;
+    for ( @sorted ) {
+        $state+=$valveShort{$_};
+    }
+    $state = ($state/($#sorted+1));
+    readingsBeginUpdate($hash);
+    my $changed = 0;
+    if(ReadingsVal($name,'state','err') ne $state){
+        readingsBulkUpdate($hash, 'valve_average', $state);
+        readingsBulkUpdate($hash, 'state', $state);
+        $changed = 1;
+    }
+    $state = 0;
+    for ( @raw_average ) {
+        $state += $_;
+    }
+    $state=($state/($#raw_average+1));
+    if ( ReadingsVal($name,'raw_average','err') ne $state ) {
+        readingsBulkUpdate($hash, 'raw_average', $state);
+        $changed = 1;
+    }
+    readingsEndUpdate($hash, $changed);
+
+    return;
+}
+
+sub _valvesAttribs {
+    #usage: _valvesAttribs("type","stmVarName")
+    # "keys" || "default" || "type" || "help"  ,<keyname>
+    my($type,$reqKey)=@_;
+    my %attribs = (
+        "valvesInitialDelay"=>[("61","int","Waiting time after FHEM start (or Define) before first calculation will be started","Zeitintervall nach FHEM-Start oder Dev.-Define bevor die Berechnung gestartet wird")],
+        "valvesPollInterval"=>[("10","int","Zeitintervall nach dem FHEM die Daten versucht zu aktualisieren","Zeitintervall nach dem FHEM die Daten versucht zu aktualisieren")],
+        "valvesDeviceList"=>[("none","string","Liste aller Heizungsthermostate mit Komma getrennt ohne Leerzeichen","Liste aller Heizungsthermostate mit Komma getrennt ohne Leerzeichen")],
+        "valvesDeviceReading"=>[("valveposition","string","Reading das die Ventilposition zeigt, default: valveposition","Reading das die Ventilposition zeigt, default: valveposition")],
+        "valvesIgnoreLowest"=>[("0","int","ignoriere die niedrigsten N Thermostate","ignoriere die niedrigsten N Thermostate")],
+        "valvesIgnoreHighest"=>[("0","int","ignoriere die höchsten N Thermostate","ignoriere die höchsten N Thermostate")],
+        "valvesIgnoreDeviceList"=>[("0","string","Ignoriere diese Devicenamen","Ignoriere diese Devicenamen")],
+        "valvesPriorityDeviceList"=>[("0","string","Thermostate in dieser Liste werden doppelt gezählt","Thermostate in dieser Liste werden doppelt gezählt")],
+        "valves<Devicename>Gewichtung"=>[("1","float",'Individual weighting factor for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system.',"Für jedes Thermostat kann ein individueller Gewichtungsfaktor multipliziert werden. So kann zB ein schlechter hydraulischer Abgleich berücksichtigt werden")],
+        "valves<Devicename>Weighting"=>[('1','float','Individual weighting factor for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system.',"Für jedes Thermostat kann ein individueller Gewichtungsfaktor multipliziert werden. So kann zB ein schlechter hydraulischer Abgleich berücksichtigt werden")],
+        disable => [("0","int",'Stop calculations and freeze values',"Berechnung anhalten und einfrieren")],
+    );
+    return keys %attribs if $type eq 'keys';
+    return $attribs{$reqKey}[0] if $type eq 'default';
+    return $attribs{$reqKey}[1] if $type eq 'type';
+    if ( $type eq 'description' ) {
+        return $attribs{$reqKey}[2] if AttrVal('global','language','EN') ne 'DE';
+        return $attribs{$reqKey}[3];
+    }
+    if ( $type eq 'help' ) {
+        return "attrHelp for ".$reqKey.":\n default:".$attribs{$reqKey}[0]." type:".$attribs{$reqKey}[1].
+            " \ndescription:".$attribs{$reqKey}[2];
+    }
+    return '_ attribs?';
+}
 
 
 1;
 
+__END__
+
+=pod
+=encoding utf8
+=item helper
+=item summary generate a virtual valve position based on multiple thermostat devices
+=item summary_DE Generiert eine virtuelle Ventilöffnung aus eine Mehrzahl von Heizungsventilen
+=begin html
+
+<a id="VALVES"></a>
+<h3>VALVES</h3>
+<ul>
+  <a id="VALVES-define"></a>
+  <h4>Define</h4>
+  <ul>
+    <code>define &lt;name&gt; VALVES</code><br>
+    <br>
+    Defines a virtual device for VALVES calculations based on multiple thermostat devices<br>
+  </ul>
+  <a id="VALVES-set"></a>
+  <h4>Set </h4>
+  <ul>
+    <a id="VALVES-set-reset"></a>
+    <li><b>reset</b></li>
+    deletes already calculated readings and starts from the scratch
+  </ul>
+  <a id="VALVES-get"></a>
+  <h4>Get</h4>
+  <ul>
+    <a id="VALVES-get-reading"></a>
+    <li><b>&lt;reading&gt;</b></li>
+    <code>get &lt;name&gt; &lt;reading&gt;</code><br>
+    Any of the actual reading values.<br><br>
+    <a id="VALVES-get-attrHelp"></a>
+    <li><b>attrHelp &lt;attribute&gt;</b></li>
+    <code>get &lt;name&gt; attrHelp &lt;attribute&gt;</code><br>
+    Get help text to named attribute.<br>
+  </ul>
+  <a id="VALVES-attr"></a>
+  <h4>Attributes</h4>
+  <ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <a id="VALVES-attr-valvesInitialDelay"></a>
+    <li><b>valvesInitialDelay &lt;delay&gt;</b></li>
+        Waiting time after FHEM start (or define) before first calculation will be started
+    <li><b>valvesPollInterval &lt;interval&gt;</b></li>
+        Polling interval (in seconds, between 1 to 900) between each attempt to update values
+    <li><b>valvesDeviceList &lt;deviceA,deviceB,[....]&gt;</b></li>
+        Comma separated list (no spaces allowed!) of all thermostate devices to make part of calculations
+    <li><b>valvesDeviceReading &lt;position&gt;</b></li>
+        Reading to base calculations upon, default: valveposition
+    <li><b>valvesIgnoreLowest &lt;number&gt;</b></li>
+        ignore the &lt;number&gt; of the thermostate devices with (actual) lowest valve values.
+    <li><b>valvesIgnoreHighest &lt;number&gt;</b></li>
+        ignore the &lt;number&gt; of the thermostate devices with (actual) highest valve values.
+    <li><b>valvesIgnoreDeviceList &lt;deviceA,deviceB,[....]&gt;</b></li>
+        ignore the listed thermostate devices (comma separated).
+    <li><b>valvesPriorityDeviceList &lt;regex&gt;</b></li>
+        Thermostates matching the regex will be doubled in the calculation process
+    <li><b>valves<Devicename>Weighting &lt;float value&gt;</b></li>
+        Individual weighting factor (lfoat value) for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system
+  </ul>
+</ul>
+
+=end html
