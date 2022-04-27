@@ -84,7 +84,7 @@ sub VALVES_Get {
     if ( $get eq 'attrHelp' ) { return _valvesAttribs('help',$arr[2]); }
 
     my @stmgets = keys %{$hash->{READINGS}};
-    $get = '?' if ! grep { m{$get}x } (@stmgets,'attrHelp','state','html');
+    $get = '?' if $get ne '?' && !(grep { m{$get}x } (@stmgets,'attrHelp','state','html'));
 
     if ( $get ne '?' ) {
         return $get.': '.ReadingsVal($name,$get, 'Unknown at line '.__LINE__);
@@ -127,7 +127,7 @@ sub VALVES_Attr {
                 #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
                 addToDevAttrList("$name","valves".$_."Weighting",'VALVES');
             }
-            VALVES_GetUpdate($hash);
+            VALVES_GetUpdate($hash) if $init_done;
         } else {
             Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
         }
@@ -137,9 +137,22 @@ sub VALVES_Attr {
     if ( $attrName eq 'valvesPollInterval' ) {
         if( $attrVal >= 1 && $attrVal <= 900 ) {
             Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
-            VALVES_GetUpdate($hash);
+            VALVES_GetUpdate($hash) if $init_done;
         } else {
             Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, use seconds >1 as float (max 900)");
+        }
+        return;
+    }
+    if ($attrName eq 'valvesDeviceReading') {
+        delete $hash->{helper}->{valvesDeviceReading};
+        if(length($attrVal)>2){
+            my ($unnamedParams, $namedParams) = parseParams($attrVal);
+            $hash->{helper}->{valvesDeviceReading} = $namedParams;
+            $hash->{helper}->{valvesDeviceReading}->{valvesDeviceReading} = $unnamedParams->[0] if defined $unnamedParams->[0];
+            Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
+            VALVES_GetUpdate($hash) if $init_done;
+        } else {
+            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
         }
         return;
     }
@@ -197,8 +210,9 @@ sub VALVES_GetUpdate {
         #check ignorelist
         next if $valvesIgnoreDeviceList =~ m/$dev/x;
         #get val
-        my ($unnamedParams, $namedParams) = parseParams(AttrVal($name,'valvesDeviceReading','valveposition'));
-        my $posRead = $namedParams->{InternalVal($dev,'TYPE','none')} // $unnamedParams->[0];
+        my $posRead = $hash->{helper}->{valvesDeviceReading}->{InternalVal($dev,'TYPE','none')} 
+                   // $hash->{helper}->{valvesDeviceReading}->{valvesDeviceReading}
+                   // 'valveposition';
         $pos = ReadingsVal($dev, $posRead,'err');
         if ( !defined $pos || $pos eq 'err' || $pos eq 'lime-protection' ) {
             Log3($name, 4, "VALVES $name ".$_." [$pos] DeviceReading not present");
@@ -362,8 +376,9 @@ __END__
         Polling interval (in seconds, between 1 to 900) between each attempt to update values
     <li><b>valvesDeviceList &lt;deviceA,deviceB,[....]&gt;</b></li>
         Comma separated list (no spaces allowed!) of all thermostate devices to make part of calculations
-    <li><b>valvesDeviceReading &lt;position&gt;</b></li>
-        Reading to base calculations upon, default: valveposition
+    <li><b>valvesDeviceReading [&lt;positionreading&gt]  ;</b></li>
+        Reading to base calculations upon, default: valveposition. You may set a key value list as follows as well with device-TYPE and reading name pairs like e.g.:<br>
+        <code>attr &lt;device&gt valvesDeviceReading CUL_HM=ValvePosition ZWave=reportedState</code>
     <li><b>valvesIgnoreLowest &lt;number&gt;</b></li>
         ignore the &lt;number&gt; of the thermostate devices with (actual) lowest valve values.
     <li><b>valvesIgnoreHighest &lt;number&gt;</b></li>
