@@ -224,7 +224,7 @@ sub VALVES_GetUpdate {
         #calc prio
         $prio = AttrVal($name,'valves'.$dev.'Weighting',AttrVal($name,'valves'.$dev.'Gewichtung',1));
         #fill hash
-        $valveDetail{$dev}=[($pos,ReadingsTimestamp($dev,AttrVal($name,'valvesDeviceReading','valveposition'),undef))];
+        $valveDetail{$dev}=[($pos,ReadingsTimestamp($dev,$posRead,0))];
         $valveShort{$dev}=$pos*$prio;
     }
     #ignore highest/lowest N values
