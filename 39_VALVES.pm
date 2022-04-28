@@ -1,4 +1,4 @@
-# $Id: 39_VALVES.pm 2022-04-27 Beta-User $
+# $Id: 39_VALVES.pm 2022-04-28 Beta-User $
 ####################################################################################################
 #
 #   39_VALVES.pm
@@ -67,6 +67,7 @@ sub VALVES_Define {
     readingsBulkUpdate($hash, 'busy', 0+gettimeofday()); #waiting for attr check
     readingsEndUpdate($hash, 1);
     InternalTimer(gettimeofday() + 61, 'VALVES_GetUpdate', $hash, 0);
+    notifyRegexpChanged($hash, 'global');
     return;
 }
 
@@ -123,7 +124,7 @@ sub VALVES_Attr {
     if ($attrName eq 'valvesDeviceList') {
         if(length($attrVal)>2){
             Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
-            for( split m{,}x,$attrVal ) {
+            for( devspec2array($attrVal) ) { # split m{,}x,$attrVal ) {
                 #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
                 addToDevAttrList("$name","valves".$_."Weighting",'VALVES');
             }
@@ -197,7 +198,7 @@ sub VALVES_GetUpdate {
     #check all attr at first loop
     if ( ReadingsVal($name,'busy','done') ne 'done'){       #"waiting for attr check"
         if ( (gettimeofday() - AttrVal($name,'valvesInitialDelay',61) ) > ReadingsVal($name, 'busy',0)){
-            for ( split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
+            for ( devspec2array(AttrVal($name,'valvesDeviceList','')) ) { # split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
                 #addToDevAttrList("$name",'valves'.$_.'Gewichtung','VALVES');
                 addToDevAttrList("$name",'valves'.$_.'Weighting','VALVES');
             }
@@ -206,7 +207,7 @@ sub VALVES_GetUpdate {
     }
     my(%valveDetail,%valveShort,@raw_average,$pos,$prio);
     my $valvesIgnoreDeviceList = AttrVal($name,'valvesIgnoreDeviceList','0');
-    for my $dev ( split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
+    for my $dev ( devspec2array(AttrVal($name,'valvesDeviceList','')) ) { # split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
         #check ignorelist
         next if $valvesIgnoreDeviceList =~ m/$dev/x;
         #get val
