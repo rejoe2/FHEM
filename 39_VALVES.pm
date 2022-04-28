@@ -66,8 +66,9 @@ sub VALVES_Define {
     #first run after 61 seconds, wait for other devices
     readingsBulkUpdate($hash, 'busy', 0+gettimeofday()); #waiting for attr check
     readingsEndUpdate($hash, 1);
-    InternalTimer(gettimeofday() + 61, 'VALVES_GetUpdate', $hash, 0);
-    notifyRegexpChanged($hash, 'global');
+    InternalTimer(gettimeofday() + AttrVal($name,'valvesInitialDelay',61), 'VALVES_GetUpdate', $hash, 0) if !$init_done;
+    notifyRegexpChanged($hash, 'global',1);
+    VALVES_GetUpdate($hash) if $init_done && !AttrVal($name,'disable',0);
     return;
 }
 
@@ -128,22 +129,25 @@ sub VALVES_Attr {
                 #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
                 addToDevAttrList("$name","valves".$_."Weighting",'VALVES');
             }
-            VALVES_GetUpdate($hash) if $init_done;
+            VALVES_GetUpdate($hash) if $init_done && !IsDisabled($name);
         } else {
             Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
         }
         return;
     }
+
     #validate special attr valvesPollInterval
     if ( $attrName eq 'valvesPollInterval' ) {
         if( $attrVal >= 1 && $attrVal <= 900 ) {
             Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
-            VALVES_GetUpdate($hash) if $init_done;
+            VALVES_GetUpdate($hash) if $init_done && !AttrVal($name,'disable',0);
         } else {
             Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, use seconds >1 as float (max 900)");
+            return "$attrVal is not a number or within allowed range!" if $init_done;
         }
         return;
     }
+
     if ($attrName eq 'valvesDeviceReading') {
         delete $hash->{helper}->{valvesDeviceReading};
         if(length($attrVal)>2){
@@ -157,6 +161,23 @@ sub VALVES_Attr {
         }
         return;
     }
+
+    if ($attrName eq 'disable') {
+        RemoveInternalTimer($hash) if $cmd ne 'del';
+        VALVES_GetUpdate($hash) if $cmd eq 'del' || !$attrVal && $init_done;
+        return;
+    }
+
+    if ($attrName eq 'valvesInitialDelay') {
+        RemoveInternalTimer($hash) if !$init_done;
+        return if AttrVal($name,'disable',0);
+        if (!looks_like_number($attrVal)) {
+            return "$attrVal is not a number!" if $init_done;
+            $attrVal = 61;
+        }
+        InternalTimer(gettimeofday() + $attrVal, 'VALVES_GetUpdate', $hash, 0) if !$init_done;
+    }
+
     #other attribs
     if ( $attrName =~ m{\Avalves\d+}x ) {
         if ( !defined $attrVal ){
@@ -187,12 +208,13 @@ sub VALVES_GetUpdate {
     if ( $valvesPollInterval ne 'off' ) {
         RemoveInternalTimer($hash);
         $valvesPollInterval = 10 if !looks_like_number($valvesPollInterval);
-        InternalTimer(gettimeofday() + $valvesPollInterval, 'VALVES_GetUpdate', $hash, 0);
+        InternalTimer(gettimeofday() + $valvesPollInterval, 'VALVES_GetUpdate', $hash, 0) if !AttrVal($name,'disable',0);
     }
     return if IsDisabled($name);
 
     if ( AttrVal($name,'valvesDeviceList','none') eq 'none'){
         readingsSingleUpdate($hash, 'state', 'missing attr valvesDeviceList', 1);
+        RemoveInternalTimer($hash);
         return;
     }
     #check all attr at first loop
@@ -347,6 +369,29 @@ __END__
     <br>
     Defines a virtual device for VALVES calculations based on multiple thermostat devices<br>
   </ul>
+  <ul>
+    How to use VALVES after define:
+    <li>First tell VALVES, which real valve devices shall be used for calculation as described in <a href="#VALVES-attr-valvesDeviceList">valvesDeviceList</a> (mandatory!).</li>
+    If that works you should be able to (optionally) set additional <a href="#VALVES-attr-valvesDevicenameWeighting">valves&lt;Devicename&gt;Weighting</a> values.
+    <li>Set appropriate <a href="#VALVES-attr-valvesDeviceReading">valvesDeviceReading</a> (most likely will be necessary)</li>
+    <li>(Optionally) exclude not needed devices using <a href="#VALVES-attr-valvesIgnoreDeviceList">valvesIgnoreDeviceList</a></li>
+    <li>(Optionally) set values in <a href="#VALVES-attr-valvesIgnoreLowest">valvesIgnoreLowest</a> and/or <a href="#VALVES-attr-valvesIgnoreHighest">valvesIgnoreHighest</a></li>
+    <li>(Optionally) set emphasis on single devices by setting individual <a href="#VALVES-attr-valvesDevicenameWeighting">valves&lt;Devicename&gt;Weighting</a> and/or including them in <a href="#VALVES-attr-valvesIgnoreLowest">valvesPriorityDeviceList</a> values</li>
+  </ul>
+  <a id="VALVES-readings"></a>
+  <ul>
+    How VALVE calculates and handles readings:
+    <li>After FHEM startup, VALVES will wait <a href="#VALVES-attr-valvesInitialDelay">valvesInitialDelay</a> and then will do a calculation every <a href="#VALVES-attr-valvesPollInterval">valvesPollInterval</a> seconds using the follwoing scheme:
+    <ul>
+      <li>Get a list of valve value and timestamp for each device (not ignored by name)</li>
+      <li>Delete lowest and highest valves/devices from this list</li>
+      <li>recalculate valve positions according to weighting settings</li>
+      <li>Double priority devices in the list</li>
+      <li>Derive readings (main and debug)</li>
+    </ul>
+    <li>Main readings (triggering when changed) are <i>valve_min</i>, <i>valve_max</i>, <i>valve_average</i>, <i>raw_average</i> and <i>state</i>.</li>
+    <li>Debug readings <i>valve&lt;Devicename&gt</i> shows the calculated virtual valve position, <i>valveDetail_&lt;Devicename&gt</i> the real and calculated position and the timestamp of the original reading.</li>
+  </ul>
   <a id="VALVES-set"></a>
   <h4>Set </h4>
   <ul>
@@ -371,25 +416,33 @@ __END__
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <a id="VALVES-attr-valvesInitialDelay"></a>
-    <li><b>valvesInitialDelay &lt;delay&gt;</b></li>
-        Waiting time after FHEM start (or define) before first calculation will be started
-    <li><b>valvesPollInterval &lt;interval&gt;</b></li>
-        Polling interval (in seconds, between 1 to 900) between each attempt to update values
-    <li><b>valvesDeviceList &lt;deviceA,deviceB,[....]&gt;</b></li>
-        Comma separated list (no spaces allowed!) of all thermostate devices to make part of calculations
-    <li><b>valvesDeviceReading [&lt;positionreading&gt]  ;</b></li>
+    <li><b>valvesInitialDelay &lt;delay&gt;</b><br>
+        Waiting time after FHEM start (or define) before first calculation will be started. Defaults to 61.</li>
+    <a id="VALVES-attr-valvesPollInterval"></a>
+    <li><b>valvesPollInterval &lt;interval&gt;</b><br>
+        Polling interval (in seconds, between 1 to 900) between each attempt to update values. Defaults for compability reasons to 10.</li>
+    <a id="VALVES-attr-valvesDeviceList"></a>
+    <li><b>valvesDeviceList &lt;devspec&gt;</b><br>
+        <a href="#devspec">devspec</a> is as usual, e.g. use a comma-separated list (no spaces allowed!) of all thermostate devices to make part of calculations</li>
+    <a id="VALVES-attr-valvesDeviceReading"></a>
+    <li><b>valvesDeviceReading [&lt;positionreading&gt]  ;</b><br>
         Reading to base calculations upon, default: valveposition. You may set a key value list as follows as well with device-TYPE and reading name pairs like e.g.:<br>
-        <code>attr &lt;device&gt valvesDeviceReading CUL_HM=ValvePosition ZWave=reportedState</code>
-    <li><b>valvesIgnoreLowest &lt;number&gt;</b></li>
-        ignore the &lt;number&gt; of the thermostate devices with (actual) lowest valve values.
-    <li><b>valvesIgnoreHighest &lt;number&gt;</b></li>
-        ignore the &lt;number&gt; of the thermostate devices with (actual) highest valve values.
-    <li><b>valvesIgnoreDeviceList &lt;deviceA,deviceB,[....]&gt;</b></li>
-        ignore the listed thermostate devices (comma separated).
-    <li><b>valvesPriorityDeviceList &lt;regex&gt;</b></li>
-        Thermostates matching the regex will be doubled in the calculation process
-    <li><b>valves<Devicename>Weighting &lt;float value&gt;</b></li>
-        Individual weighting factor (lfoat value) for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system
+        <code>attr &lt;device&gt valvesDeviceReading CUL_HM=ValvePosition ZWave=reportedState</code></li>
+    <a id="VALVES-attr-valvesIgnoreLowest"></a>
+    <li><b>valvesIgnoreLowest &lt;number&gt;</b><br>
+        ignore the &lt;number&gt; of the thermostate devices with (actual) lowest valve values.</li>
+    <a id="VALVES-attr-valvesIgnoreHighest"></a>
+    <li><b>valvesIgnoreHighest &lt;number&gt;</b><br>
+        ignore the &lt;number&gt; of the thermostate devices with (actual) highest valve values.</li>
+    <a id="VALVES-attr-valvesIgnoreDeviceList"></a>
+    <li><b>valvesIgnoreDeviceList &lt;deviceA,deviceB,[....]&gt;</b><br>
+        ignore the listed thermostate devices (comma separated).</li>
+    <a id="VALVES-attr-valvesPriorityDeviceList"></a>
+    <li><b>valvesPriorityDeviceList &lt;regex&gt;</b><br>
+        Thermostates matching the regex will be doubled in the calculation process</li>
+    <a id="VALVES-attr-valvesDevicenameWeighting" data-pattern="valves.*Weighting"></a>
+    <li><b>valves&lt;Devicename&gtWeighting &lt;float value&gt;</b><br>
+        Individual weighting factor (lfoat value) for each thermostate. May e.g. be used to compensate hydraulic problems in the heating system</li>
   </ul>
 </ul>
 
