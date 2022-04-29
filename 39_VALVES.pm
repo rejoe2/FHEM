@@ -34,23 +34,18 @@ package main;
 use strict;
 use warnings;
 
-#test values:
-#Heizg_Bad,Heizg_Buero,Heizg_Flur,Heizg_Kammer,Heizg_Kueche,Heizg_Lena,Heizg_Lisa,Heizg_Schlafzimmer,Heizg_WC_oben,Heizg_WC_unten,Heizg_Wohnzimmer1,Heizg_Wohnzimmer2
-#}
-
 sub VALVES_Initialize {
     my $hash = shift // return;
     $hash->{DefFn}      = "VALVES_Define";
     $hash->{UndefFn}    = "VALVES_Undefine";
     $hash->{SetFn}      = "VALVES_Set";
     $hash->{GetFn}      = "VALVES_Get";
-    $hash->{NotifyFn}   = "VALVES_Notify";
     $hash->{AttrFn}     = "VALVES_Attr";
-    my $attrList =" valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900".
+    my $attrList ="valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900".
         " valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList".
         " valvesPriorityDeviceList valvesInitialDelay";
     #my $i = 0;
-    $hash->{AttrList}   = "disable:0,1 ".$readingFnAttributes.$attrList;
+    $hash->{AttrList}   = "disable:0,1 disabledForIntervals $readingFnAttributes $attrList";
     return;
 }
 
@@ -131,7 +126,7 @@ sub VALVES_Attr {
             }
             VALVES_GetUpdate($hash) if $init_done && !IsDisabled($name);
         } else {
-            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
+            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2") if $attrVal;
         }
         return;
     }
@@ -157,14 +152,14 @@ sub VALVES_Attr {
             Log3($name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed");
             VALVES_GetUpdate($hash) if $init_done;
         } else {
-            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2");
+            Log3($name, 3, "VALVES $name attribute-value [$attrName] = $attrVal wrong, string min length 2") if $attrVal;
         }
         return;
     }
 
     if ($attrName eq 'disable') {
         RemoveInternalTimer($hash) if $cmd ne 'del';
-        VALVES_GetUpdate($hash) if $cmd eq 'del' || !$attrVal && $init_done;
+        InternalTimer(gettimeofday(), \&VALVES_GetUpdate, $hash, 0) if $cmd eq 'del' || !$attrVal && $init_done;
         return;
     }
 
@@ -186,17 +181,6 @@ sub VALVES_Attr {
         }
     } else {
         Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed") if $attrVal;
-    }
-    return;
-}
-
-sub VALVES_Notify{
-    my $hash     = shift // return;
-    my $dev      = shift // return;
-    my $name = $hash->{NAME};
-    if ( $dev->{NAME} eq 'global' && grep { m/^INITIALIZED|REREADCFG$/x } @{$dev->{CHANGED}} ){
-        Log3($name, 3, "VALVES $name initialized");
-        VALVES_GetUpdate($hash);
     }
     return;
 }
@@ -242,7 +226,7 @@ sub VALVES_GetUpdate {
             next;
         }
         #$pos =~ s/%//x;
-        $pos = $pos =~ /(-?\d+(\.\d+)?)/ ? $1 : $pos;
+        $pos = $pos =~ m{(-?\d+(\.\d+)?)}x ? $1 : -1;
         push @raw_average,$pos;
         #calc prio
         $prio = AttrVal($name,'valves'.$dev.'Weighting',AttrVal($name,'valves'.$dev.'Gewichtung',1));
@@ -273,13 +257,9 @@ sub VALVES_GetUpdate {
     }
     #set min and max from sorted
     readingsBeginUpdate($hash);
-    #if ( ReadingsVal($name,'valve_min','err') ne $valveShort{$sorted[0]} ) {
-        readingsBulkUpdateIfChanged($hash, 'valve_min', $valveShort{$sorted[0]},1);
-    #}
-    #@sorted = reverse @sorted;
-    #if ( ReadingsVal($name,'valve_max','err') ne $valveShort{$sorted[-1]} ) {
-        readingsBulkUpdateIfChanged($hash, 'valve_max', $valveShort{$sorted[-1]},1);
-    #}
+    readingsBulkUpdateIfChanged($hash, 'valve_min', $valveShort{$sorted[0]},1);
+    readingsBulkUpdateIfChanged($hash, 'valve_max', $valveShort{$sorted[-1]},1);
+
     my $valvesPriorityDeviceList = AttrVal($name,'valvesPriorityDeviceList','0');
     for my $dev ( keys %valveDetail ) {
         if ( !exists $valveShort{$dev} ) {
@@ -298,7 +278,7 @@ sub VALVES_GetUpdate {
     for ( @sorted ) {
         $state+=$valveShort{$_};
     }
-    $state = ($state/($#sorted+1));
+    $state = sprintf "%.0f",$state/@sorted;
     if(ReadingsVal($name,'state','err') ne $state){
         readingsBulkUpdate($hash, 'valve_average', $state,1);
         readingsBulkUpdate($hash, 'state', $state,1);
@@ -307,10 +287,9 @@ sub VALVES_GetUpdate {
     for ( @raw_average ) {
         $state += $_;
     }
-    $state=($state/($#raw_average+1));
-    if ( ReadingsVal($name,'raw_average','err') ne $state ) {
-        readingsBulkUpdate($hash, 'raw_average', $state,1);
-    }
+    $state = sprintf "%.0f", $state/@raw_average;
+    readingsBulkUpdateIfChanged($hash, 'raw_average', $state,1);
+    
     readingsEndUpdate($hash, 1);
 
     return;
@@ -362,6 +341,7 @@ __END__
 <a id="VALVES"></a>
 <h3>VALVES</h3>
 <ul>
+  German docu is available in <a href="http://www.fhemwiki.de/wiki/VALVES">FHEM Wiki</a>.<br>
   <a id="VALVES-define"></a>
   <h4>Define</h4>
   <ul>
