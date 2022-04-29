@@ -1,4 +1,4 @@
-# $Id: 39_VALVES.pm 2022-04-28 Beta-User $
+# $Id: 39_VALVES.pm 2022-04-29 Beta-User $
 ####################################################################################################
 #
 #   39_VALVES.pm
@@ -185,7 +185,7 @@ sub VALVES_Attr {
             Log3($name, 4, "VALVES $name: attribute [$attrName] deleted");
         }
     } else {
-        Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed");
+        Log3($name, 4, "VALVES $name: attribute-value [$attrName] = $attrVal changed") if $attrVal;
     }
     return;
 }
