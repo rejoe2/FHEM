@@ -1,4 +1,4 @@
-# $Id: 39_VALVES.pm 2022-04-29 Beta-User $
+# $Id: 39_VALVES.pm 2022-05-02 Beta-User $
 ####################################################################################################
 #
 #   39_VALVES.pm
@@ -36,11 +36,11 @@ use warnings;
 
 sub VALVES_Initialize {
     my $hash = shift // return;
-    $hash->{DefFn}      = "VALVES_Define";
-    $hash->{UndefFn}    = "VALVES_Undefine";
-    $hash->{SetFn}      = "VALVES_Set";
-    $hash->{GetFn}      = "VALVES_Get";
-    $hash->{AttrFn}     = "VALVES_Attr";
+    $hash->{DefFn}      = \&VALVES_Define;
+    $hash->{UndefFn}    = \&VALVES_Undefine;
+    $hash->{SetFn}      = \&VALVES_Set;
+    $hash->{GetFn}      = \&VALVES_Get;
+    $hash->{AttrFn}     = \&VALVES_Attr;
     my $attrList ="valvesPollInterval:1,2,3,4,5,6,7,8,9,10,11,15,20,25,30,45,60,90,120,240,480,900".
         " valvesDeviceList valvesDeviceReading valvesIgnoreLowest valvesIgnoreHighest valvesIgnoreDeviceList".
         " valvesPriorityDeviceList valvesInitialDelay";
@@ -211,9 +211,9 @@ sub VALVES_GetUpdate {
             CommandDeleteReading(undef,"$name busy")
         }
     }
-    my(%valveDetail,%valveShort,@raw_average,$pos,$prio);
+    my(%valveDetail,%valveShort,@raw_average,$pos,$prio,@prios);
     my $valvesIgnoreDeviceList = AttrVal($name,'valvesIgnoreDeviceList','0');
-    for my $dev ( devspec2array(AttrVal($name,'valvesDeviceList','')) ) { # split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
+    for my $dev ( devspec2array(AttrVal($name,'valvesDeviceList','')) ) {
         #check ignorelist
         next if $valvesIgnoreDeviceList =~ m/$dev/x;
         #get val
@@ -237,7 +237,7 @@ sub VALVES_GetUpdate {
     #ignore highest/lowest N values
     my @sorted = sort { $valveShort{$a} <=> $valveShort{$b} } keys %valveShort;
 
-    if ( $#sorted == -1 ){
+    if ( !@sorted ){
         readingsSingleUpdate($hash, 'state', 'attr valvesDeviceList is empty', 1);
         return;
     }
@@ -251,9 +251,13 @@ sub VALVES_GetUpdate {
         pop @sorted;
         $valvesIgnoreHighest--;
     }
+
+    return if !@sorted;
+
     #fill readings, bypass usual way to conserve valveposition timestamps
     for ( @sorted ){
         setReadingsVal($hash,'valve_'.$_,$valveShort{$_},$valveDetail{$_}[1]);
+        push @prios, AttrVal($name,'valves'.$_.'Weighting',AttrVal($name,'valves'.$_.'Gewichtung',1));
     }
     #set min and max from sorted
     readingsBeginUpdate($hash);
@@ -269,6 +273,7 @@ sub VALVES_GetUpdate {
         if ( $valvesPriorityDeviceList =~ m/$dev/x ) {
             $valveShort{$dev.'P'} = $valveShort{$dev};
             push @sorted, $dev . 'P';
+            push @prios, AttrVal($name,'valves'.$dev.'Weighting',AttrVal($name,'valves'.$dev.'Gewichtung',1));
         }
         readingsBulkUpdate($hash,'valveDetail_'.$dev,'pos:' . $valveDetail{$dev}[0] . ' calc:'.$valveShort{$dev}.
             ( $valvesPriorityDeviceList =~ m/$dev/x ? '-priority' : '') .
@@ -278,7 +283,8 @@ sub VALVES_GetUpdate {
     for ( @sorted ) {
         $state+=$valveShort{$_};
     }
-    $state = sprintf "%.0f",$state/@sorted;
+    my $corr = List::Util::sum(@prios)/@prios;
+    $state = sprintf "%.0f",$state/@sorted/$corr;
     if(ReadingsVal($name,'state','err') ne $state){
         readingsBulkUpdate($hash, 'valve_average', $state,1);
         readingsBulkUpdate($hash, 'state', $state,1);
