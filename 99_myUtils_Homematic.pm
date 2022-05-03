@@ -1,5 +1,5 @@
 ##############################################
-# $Id: myUtils_Homematic.pm weekprofile edition 2022-04-25 Beta-User $
+# $Id: myUtils_Homematic.pm weekprofile edition 2022-05-03 Beta-User $
 #
 
 package main;
@@ -16,14 +16,14 @@ myUtils_Homematic_Initialize
 # Enter you functions below _this_ line.
 
 sub myWinContactNotify {  #three parameters, last (timeout) is optional
-  my $window = shift;
+  my $window = shift // return;
   my $event  = shift // return;
   my $timeout = shift // 90;
-  my @virtuals = devspec2array("TYPE=CUL_HM:FILTER=model=VIRTUAL:FILTER=myRealFK=.*$window.*");
+  my @virtuals = devspec2array("TYPE=CUL_HM:FILTER=model=VIRTUAL:FILTER=myRealFK=.*$window.*,TYPE=WeekdayTimer:FILTER=WDT_delayedExecutionDevices=.*$window.*");
   for my $virtual (@virtuals) {
-    my $myreals = AttrVal($virtual,'myRealFK','');
-    if ($event =~ /open|tilted/) {
-	  $timeout = AttrVal($virtual,'myTimeout',$timeout) if $timeout == 90;
+    my $myreals = AttrVal($virtual,'myRealFK',AttrVal($virtual,'WDT_delayedExecutionDevices',''));
+    if ( $event =~ m{open|tilted}x ) {
+      $timeout = AttrVal($virtual,'myTimeout',$timeout) if $timeout == 90;
       my $checktime = gettimeofday()+$timeout;
       InternalTimer($checktime,'myTimeoutWinContact',$virtual);	
     } else {
@@ -33,7 +33,11 @@ sub myWinContactNotify {  #three parameters, last (timeout) is optional
         $openwc++ if (ReadingsVal($wc,'state','closed') ne 'closed');
         last if $openwc;
       }
-      CommandSet (undef,"$virtual geschlossen") if !$openwc;
+      my $typ = InternalVal($virtual,'TYPE','');
+      if ( !$openwc ) {
+        CommandSet (undef,"$virtual geschlossen")       if $typ eq 'CUL_HM';
+        CommandSet (undef,"$virtual WDT_Params single") if $typ eq 'WeekdayTimer' && !IsDisabled($virtual);
+      }
     }
   }
   return;
@@ -42,14 +46,21 @@ sub myWinContactNotify {  #three parameters, last (timeout) is optional
 sub myTimeoutWinContact {
   my $name = shift // return;
   return if !ReadingsVal('Heizperiode','state','off') eq 'on';
-  my $myreals = AttrVal($name,'myRealFK','');
+  my $myreals = AttrVal($name,'myRealFK',AttrVal($name,'WDT_delayedExecutionDevices',''));
   my @wcs = split(',',$myreals); 
   my $openwc = 0;
   for my $wc (@wcs) {
     $openwc++ if ReadingsVal($wc,'state','closed') ne 'closed';
     last if $openwc;
   }
-  CommandSet (undef,"$name offen") if $openwc;
+  if ( $openwc ) {
+    my $typ = InternalVal($name,'TYPE','');
+    CommandSet (undef,"$name offen") if $typ eq 'CUL_HM';
+    if ( $typ eq 'WeekdayTimer' && !IsDisabled($name) ) {
+        my $command = AttrVal($name,'myWinOpenCommand',undef) // return;
+        AnalyzeCommandChain( undef, $command );
+    }
+  }
   return;
 }
 
