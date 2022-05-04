@@ -1,5 +1,5 @@
 ##############################################
-# $Id: myUtils_Homematic.pm weekprofile edition 2022-05-03 Beta-User $
+# $Id: myUtils_Homematic.pm weekprofile edition 2022-05-04 Beta-User $
 #
 
 package main;
@@ -413,7 +413,7 @@ __END__
 =pod
 =begin html
 
-<a name="myUtils_Homematic"></a>
+<a id="myUtils_Homematic"></a>
 <h3>myUtils_Homematic</h3>
 <ul>
   <li><b>devStateIcon_Clima</b>
@@ -473,6 +473,15 @@ __END__
 
   </ul>
   </li>
+    <li><b>myWinContactNotify</b>
+  <br>
+  Use this e.g. in a notify reacting on window or door opening events to either post a "geschlossen" or (delayed) "offen" (mapped with eventMap) message on a virtualized window contact peered with thermostat devices or issue an arbitrary command from within WeekdayTimer devices.
+  <br>
+    NOTE: requires additional attributes (userattr) to be set ("myRealFK" for virtual contact device, "myWinOpenCommand" for WeekdayTimer (uses "WDT_delayedExecutionDevices" to derive contats info) to provide relevant relations between devices and command to be executed; setting "myTimeout" is optional for both TYPEs.<br>
+  Example:
+   <code>defmod n_FK_TK_notify notify window.*:open|window.*:closed|window.*:tilted|door.*:open|door.*:closed { myWinContactNotify ($NAME, $EVENT) }</code><br>
+  </li>
+
 </ul>
 =end html
 =cut

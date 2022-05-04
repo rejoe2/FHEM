@@ -375,6 +375,7 @@ __END__
       <li>Double priority devices in the list</li>
       <li>Derive readings (main and debug)</li>
     </ul>
+    </li>
     <li>Main readings (triggering when changed) are <i>valve_min</i>, <i>valve_max</i>, <i>valve_average</i>, <i>raw_average</i> and <i>state</i>.</li>
     <li>Debug readings <i>valve&lt;Devicename&gt</i> shows the calculated virtual valve position, <i>valveDetail_&lt;Devicename&gt</i> the real and calculated position and the timestamp of the original reading.</li>
   </ul>
