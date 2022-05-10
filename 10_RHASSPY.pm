@@ -1669,8 +1669,7 @@ sub _AnalyzeCommand {
     my $cmd    = shift // return;
 
     if ( defined $hash->{testline} ) {
-        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command: ${cmd}.";
-        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command: ${cmd}.";
+        push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command: ${cmd}";
         return;
     }
     # CMD ausführen
