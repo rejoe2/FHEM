@@ -1,6 +1,6 @@
-# Id ##########################################################################
-# $Id: 98_monitoring.pm 25912 2022-04-11 Beta-User $
-
+##########################################################################
+# $Id: 98_monitoring.pm 26029 2022-05-10 repair DeleteFn Beta-User $
+#
 # copyright ###################################################################
 #
 # 98_monitoring.pm
@@ -22,7 +22,7 @@
 # FHEM.  If not, see <http://www.gnu.org/licenses/>.
 
 # packages ####################################################################
-package monitoring; ##no critic qw(Package)
+package FHEM::Automation::monitoring; ##no critic qw(Package)
   use strict;
   use warnings;
   use Carp qw(carp);
@@ -41,7 +41,7 @@ BEGIN {
     readingsBeginUpdate
     readingsBulkUpdate
     readingsEndUpdate
-    Log3
+    Log3 fhem
     defs attr
     DAYSECONDS HOURSECONDS MINUTESECONDS
     init_done
@@ -59,7 +59,7 @@ BEGIN {
     EvalSpecials
     AnalyzePerlCommand
     perlSyntaxCheck
-    FmtDateTime
+    FmtDateTime time_str2num
     notifyRegexpChanged
     deviceEvents
   ) )
@@ -71,7 +71,6 @@ sub Initialize {
 
     $hash->{DefFn}       = \&Define;
     $hash->{UndefFn}     = \&Undefine;
-    $hash->{DeleteFn}    = \&Delete;
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{GetFn}       = \&Get;
@@ -140,7 +139,7 @@ sub Set {
     clear         => 'clear:all,error,warning',
     errorAdd      => 'errorAdd:textField',
     errorRemove   => 'errorRemove:'.
-                       join q{,}, ReadingsVal($SELF, 'error', ''),
+                       join( q{,}, ReadingsVal($SELF, 'error', '')),
     inactive      => 'inactive:noArg',
     warningAdd    => 'warningAdd:textField',
     warningRemove => 'warningRemove:'.
