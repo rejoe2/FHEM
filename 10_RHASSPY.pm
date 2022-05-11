@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26011 2022-05-11 test extended choice room + intentNotRecognized review Beta-User $
+# $Id: 10_RHASSPY.pm 26011 2022-05-11 test extended choice room + intentNotRecognized/dialogmanager review Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -293,7 +293,7 @@ my @topics = qw(
     hermes/intent/+
     hermes/dialogueManager/sessionStarted
     hermes/dialogueManager/sessionEnded
-    hermes/nlu/intentNotRecognized
+    hermes/dialogueManager/intentNotRecognized
     hermes/hotword/+/detected
     hermes/hotword/toggleOn
     hermes/hotword/toggleOff
@@ -2808,7 +2808,7 @@ sub Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', ReadingsVal($hash->{NAME}, 'IODev', InternalVal($hash->{NAME}, 'IODev', 'none')));
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected|hermes/hotword/toggleO[nf]+|hermes/tts/say};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/hotword/[^/]+/detected|hermes/hotword/toggleO[nf]+|hermes/tts/say};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
@@ -3546,7 +3546,8 @@ sub analyzeMQTTmessage {
         return \@updatedList;
     }
     
-    if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
+    #if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
+    if ($topic =~ m{\Ahermes/dialogueManager/intentNotRecognized}x && defined $siteId) {
         #return if !$hash->{siteId} || $siteId ne $hash->{siteId};
         return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline} && defined $hash->{siteId} && $siteId eq $hash->{siteId};
         return handleIntentNotRecognized($hash, $data);
@@ -6115,7 +6116,7 @@ attr rhasspyMQTT2 subscriptions setByTheProgram</code></p>
 </p>
 <p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected &lt;additional subscriptions for other MQTT-Modules&gt;
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/dialogueManager/intentNotRecognized hermes/hotword/+/detected &lt;additional subscriptions for other MQTT-Modules&gt;
 <p>define Rhasspy RHASSPY baseUrl=http://192.168.1.210:12101 defaultRoom="Büro Lisa" language=de devspec=genericDeviceType=.+,device_a1,device_xy handleHotword=1</code></p>
 </li>
 </ul>
@@ -6127,7 +6128,7 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 <p><code>hermes/intent/+<br>
 hermes/dialogueManager/sessionStarted<br>
 hermes/dialogueManager/sessionEnded<br>
-hermes/nlu/intentNotRecognized<br>
+hermes/dialogueManager/intentNotRecognized<br>
 hermes/hotword/+/detected</code></p>
 
 <p><b>Important</b>: After defining the RHASSPY module, you are supposed to manually set the attribute <i>IODev</i> to force a non-dynamic IO assignement. Use e.g. <code>attr &lt;deviceName&gt; IODev &lt;m2client&gt;</code>.</p>
