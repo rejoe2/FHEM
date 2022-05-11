@@ -5617,7 +5617,7 @@ sub handleIntentNotRecognized {
         return handleCustomIntent($hash, 'intentNotRecognized', $data) if defined $hash->{helper}{custom} && defined $hash->{helper}{custom}{intentNotRecognized};
         my $entry = qq([$data->{sessionId}] $data->{input});
         readingsSingleUpdate($hash, 'intentNotRecognized', $entry, 1);
-        return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
+        return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' )) if defined $data->{siteId}; # Beta-User: unfortunately, there seems to be no siteId included in $data in test cases
         return $hash->{NAME};
     }
     return; #Beta-User: End of recent changes...
