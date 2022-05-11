@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26011 2022-05-10 test extended choice room + intentNotRecognized review Beta-User $
+# $Id: 10_RHASSPY.pm 26011 2022-05-11 test extended choice room + intentNotRecognized review Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -5604,7 +5604,7 @@ sub handleIntentNotRecognized {
     my $siteId = $hash->{siteId};
     my $msgdev = (split m{_${siteId}_}x, $identity,3)[0];
 
-    if ($msgdev) {
+    if ($msgdev && $msgdev ne $identity) {
         $data->{text} = getResponse( $hash, 'NoIntentRecognized' );
         return handleTtsMsgDialog($hash,$data);
     }
