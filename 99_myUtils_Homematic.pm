@@ -1,5 +1,5 @@
 ##############################################
-# $Id: myUtils_Homematic.pm weekprofile edition 2022-05-04 Beta-User $
+# $Id: myUtils_Homematic.pm weekprofile edition 2022-05-16 Beta-User $
 #
 
 package main;
@@ -16,16 +16,17 @@ myUtils_Homematic_Initialize
 # Enter you functions below _this_ line.
 
 sub myWinContactNotify {  #three parameters, last (timeout) is optional
-  my $window = shift // return;
-  my $event  = shift // return;
-  my $timeout = shift // 90;
+  my $window   = shift // return;
+  my $event    = shift // return;
+  my $isActive = shift // 'Heizperiode';
+  my $timeout  = shift // 90;
   my @virtuals = devspec2array("TYPE=CUL_HM:FILTER=model=VIRTUAL:FILTER=myRealFK=.*$window.*,TYPE=WeekdayTimer:FILTER=WDT_delayedExecutionDevices=.*$window.*");
   for my $virtual (@virtuals) {
     my $myreals = AttrVal($virtual,'myRealFK',AttrVal($virtual,'WDT_delayedExecutionDevices',''));
     if ( $event =~ m{open|tilted}x ) {
       $timeout = AttrVal($virtual,'myTimeout',$timeout) if $timeout == 90;
       my $checktime = gettimeofday()+$timeout;
-      InternalTimer($checktime,'myTimeoutWinContact',$virtual);	
+      InternalTimer($checktime,'myTimeoutWinContact',"$virtual:$isActive");	
     } else {
       my @wcs = split(',',$myreals); 
       my $openwc = 0;
@@ -35,7 +36,8 @@ sub myWinContactNotify {  #three parameters, last (timeout) is optional
       }
       my $typ = InternalVal($virtual,'TYPE','');
       if ( !$openwc ) {
-        CommandSet (undef,"$virtual geschlossen")       if $typ eq 'CUL_HM';
+		#attr Virtueller_FK_Bad_OG devStateIcon .*open:fts_window_1w_open@red:postEvent+closed .*closed:fts_window_1w@green:postEvent+open
+        CommandSet (undef,"$virtual postEvent closed")  if $typ eq 'CUL_HM' && ReadingsVal($virtual,'state','') !~ m{postEvent.closed}xm;
         CommandSet (undef,"$virtual WDT_Params single") if $typ eq 'WeekdayTimer' && !IsDisabled($virtual);
       }
     }
@@ -44,8 +46,14 @@ sub myWinContactNotify {  #three parameters, last (timeout) is optional
 }
 
 sub myTimeoutWinContact {
-  my $name = shift // return;
-  return if !ReadingsVal('Heizperiode','state','off') eq 'on';
+  my $args = shift // return;
+  my ($name, $isActive, $read, $onval) = split $args, m{:}x;
+  $isActive //= 'Heizperiode';
+  $read     //= 'state';
+  $onval    //= 'on';
+
+  return if ReadingsVal($isActive, $read, 'on') ne $onval;
+
   my $myreals = AttrVal($name,'myRealFK',AttrVal($name,'WDT_delayedExecutionDevices',''));
   my @wcs = split(',',$myreals); 
   my $openwc = 0;
@@ -55,7 +63,7 @@ sub myTimeoutWinContact {
   }
   if ( $openwc ) {
     my $typ = InternalVal($name,'TYPE','');
-    CommandSet (undef,"$name offen") if $typ eq 'CUL_HM';
+    return CommandSet (undef,"$name postEvent open") if $typ eq 'CUL_HM';
     if ( $typ eq 'WeekdayTimer' && !IsDisabled($name) ) {
         my $command = AttrVal($name,'myWinOpenCommand',undef) // return;
         AnalyzeCommandChain( undef, $command );
@@ -475,11 +483,13 @@ __END__
   </li>
     <li><b>myWinContactNotify</b>
   <br>
-  Use this e.g. in a notify reacting on window or door opening events to either post a "geschlossen" or (delayed) "offen" (mapped with eventMap) message on a virtualized window contact peered with thermostat devices or issue an arbitrary command from within WeekdayTimer devices.
+  Use this e.g. in a notify reacting on window or door opening events to either issue a "postEvent closed" or (delayed) "postEvent open" (do not use any eventMap!) message on a virtualized window contact peered with thermostat devices or issue an arbitrary command from within WeekdayTimer devices. You may hand over the device-name (or device:reading[:value]) to point to a device indicating wheather your heating system is on. Only if state (or reading) is "on" (or equals provided value), open events will be posted. You may hand over a specific timeout (in seconds) as well, default is 90 seconds.
   <br>
     NOTE: requires additional attributes (userattr) to be set ("myRealFK" for virtual contact device, "myWinOpenCommand" for WeekdayTimer (uses "WDT_delayedExecutionDevices" to derive contats info) to provide relevant relations between devices and command to be executed; setting "myTimeout" is optional for both TYPEs.<br>
-  Example:
+  Examples:
    <code>defmod n_FK_TK_notify notify window.*:open|window.*:closed|window.*:tilted|door.*:open|door.*:closed { myWinContactNotify ($NAME, $EVENT) }</code><br>
+   <code>defmod n_FK_TK_notify notify window.*:open|window.*:closed|window.*:tilted|door.*:open|door.*:closed { myWinContactNotify ($NAME, $EVENT, 'Heizperiode', 60 ) }</code><br>
+   <code>defmod n_FK_TK_notify notify window.*:open|window.*:closed|window.*:tilted|door.*:open|door.*:closed { myWinContactNotify ($NAME, $EVENT, 'heating:active:yes' ) }</code><br>
   </li>
 
 </ul>
