@@ -31,7 +31,7 @@ BEGIN {
           CommandSet
           CommandSetReading
           defs
-		  round
+          round
           )
     );
 }
@@ -48,26 +48,26 @@ sub Initialize {
 
 sub toggle_indirect {
   my $name = shift // return;
-  my $Target_Devices = AttrVal($name,"Target_Device","devStrich0");
+  my $Target_Devices = AttrVal($name,'Target_Device','devStrich0');
   my $dimmLevel;
   my $hash;
   for my $setdevice (split (/,/x,$Target_Devices)) {
     $hash = $defs{$setdevice};
-    if(lc(ReadingsVal($setdevice,"state","off")) eq "off") {
+    if(lc(ReadingsVal($setdevice,'state','off')) eq 'off') {
       CommandSet(undef, "$setdevice on");
-      readingsSingleUpdate($hash,"myLastShort","1", 0);
+      readingsSingleUpdate($hash,'myLastShort','1', 0);
       AnalyzeCommandChain(undef, "sleep 1; set $setdevice brightness 220");
-    } elsif (ReadingsAge($setdevice,"myLastShort","100") < 3) {
-       my $lastToggle = ReadingsNum($setdevice, "myLastShort","0");
+    } elsif (ReadingsAge($setdevice,'myLastShort','100') < 3) {
+       my $lastToggle = ReadingsNum($setdevice, 'myLastShort',0);
        if ($lastToggle == 1) {
-         readingsSingleUpdate($hash,"myLastShort","2",0);
+         readingsSingleUpdate($hash,'myLastShort','2',0);
          $dimmLevel = 110;
        } else {
          $dimmLevel = 45;
        }
        CommandSet(undef, "$setdevice brightness $dimmLevel");
     } else {
-       readingsSingleUpdate($hash,"myLastShort","0",0);
+       readingsSingleUpdate($hash,'myLastShort','0',0);
        CommandSet(undef, "$setdevice off");
     }
   }
@@ -77,9 +77,9 @@ sub toggle_indirect {
 sub dimm_indirect {
   my $name  = shift;
   my $event = shift // return;
-  my $Target_Devices = AttrVal($name,"Target_Device","devStrich0");
+  my $Target_Devices = AttrVal($name,'Target_Device','devStrich0');
   for my $setdevice (split (/,/x,$Target_Devices)) {
-    if ($event =~ m/LongRelease/) {
+    if ( $event =~ m{LongRelease}x ) {
       CommandDeleteReading(undef,"-q $setdevice myLastdimmLevel");
     } else {
       dimm($setdevice);
@@ -90,23 +90,23 @@ sub dimm_indirect {
 
 sub dimm {
   my $Target_Device = shift // return;
-  my $dimmDir = ReadingsVal($Target_Device,"myDimmDir","up");
-  my $dimmLevel = ReadingsVal($Target_Device,"myLastdimmLevel",ReadingsNum($Target_Device,"brightness","255"));
-  if ($dimmDir ne "up") { 
+  my $dimmDir = ReadingsVal($Target_Device,'myDimmDir','up');
+  my $dimmLevel = ReadingsVal($Target_Device,'myLastdimmLevel',ReadingsNum($Target_Device,'brightness','255'));
+  if ($dimmDir ne 'up') { 
     if ($dimmLevel < 4) { 
-      readingsSingleUpdate($defs{$Target_Device}, "myDimmDir", "up", 0);
+      readingsSingleUpdate($defs{$Target_Device}, 'myDimmDir', 'up', 0);
     } else {
       $dimmLevel -= $dimmLevel < 30 ? 3 : $dimmLevel < 70 ? 5 : $dimmLevel < 120 ? 7 : 15;
     }
   } else {
     if ($dimmLevel > 244) {
-      readingsSingleUpdate($defs{$Target_Device}, "myDimmDir", "down", 0);
+      readingsSingleUpdate($defs{$Target_Device}, 'myDimmDir', 'down', 0);
     } else {
       $dimmLevel += $dimmLevel < 30 ?  3 : $dimmLevel < 70 ? 5 : $dimmLevel < 120 ? 7 : 15;
     }
   }
   CommandSet(undef, "$Target_Device brightness $dimmLevel");
-  readingsSingleUpdate($defs{$Target_Device}, "myLastdimmLevel",$dimmLevel, 0);
+  readingsSingleUpdate($defs{$Target_Device}, 'myLastdimmLevel',$dimmLevel, 0);
   return;
 }
 
@@ -119,40 +119,40 @@ sub FUT_to_RGBW {
   if (defined $rets->{state} && $rets->{state} =~ m{on|off}ixms) { 
     my $newState = lc($rets->{state});
     CommandSet(undef, "$name $newState");      
-    return { "CommandSet" => "$name $newState" };
+    return { CommandSet => "$name $newState" };
   }
   if (defined $rets->{brightness}) {
-    my $bri = InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice" ? "bri" : "brightness";
+    my $bri = InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice' ? 'bri' : 'brightness';
     CommandSet(undef, "$name $bri $rets->{brightness}");
-    return { "CommandSet" => "$name $bri $rets->{brightness}" };
+    return { CommandSet => "$name $bri $rets->{brightness}" };
   }
   if (defined $rets->{hue}) {
     CommandSet(undef, "$name hue $rets->{hue}");
-    return { "CommandSet" => "$name hue $rets->{hue}" };
+    return { CommandSet => "$name hue $rets->{hue}" };
   }
   if (defined $rets->{command}) {
     if  ($rets->{command} =~ m{white}ixms) {
        CommandSet(undef, "$name command Weiss");
-       return { "CommandSet" => "$name command Weiss" };
+       return { CommandSet => "$name command Weiss" };
     }
-    return { "CommandSet" => "$rets->{command} not assigned" };
+    return { CommandSet => "$rets->{command} not assigned" };
   }
   if (defined $rets->{saturation}) {
-    if (InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice") { 
+    if ( InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice' ) { 
       my $sat = int($rets->{saturation}*2.54);
       CommandSet(undef, "$name sat $sat");
-      return { "CommandSet" => "$name sat $sat" };
+      return { CommandSet => "$name sat $sat" };
     } else {
        CommandSet(undef, "$name saturation $rets->{saturation}");
-       return { "CommandSet" => "$name saturation $rets->{saturation}" };
+       return { CommandSet => "$name saturation $rets->{saturation}" };
     }
   }
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
-  return { "CommandSet" => "$name FUT_to_RGBW not assigned: $ret" };
+  return { CommandSet => "$name FUT_to_RGBW not assigned: $ret" };
 }
 
 sub FUT_to_HUE {
@@ -166,51 +166,53 @@ sub FUT_to_HUE {
   if (defined $rets->{state} && $rets->{state} =~ m{on|off}ixms) { 
     my $newState = lc($rets->{state});
     CommandSet(undef, "$name $newState");      
-    return { "CommandSet" => "$name $newState" };
+    return { CommandSet => "$name $newState" };
   }
   if (defined $rets->{brightness}) {
-    my $bri = InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice" ? "bri" : "brightness";
+    my $bri = InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice' ? 'bri' : 'brightness';
     CommandSet(undef, "$name $bri $rets->{brightness}");
-    return { "CommandSet" => "$name $bri $rets->{brightness}" };
+    return { CommandSet => "$name $bri $rets->{brightness}" };
   }
   if (defined $rets->{hue}) {
-    if (InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice") { 
-      my $rgb = Color::hsv2hex($rets->{hue},ReadingsVal($name,"sat",100)/100,sprintf("%.2f",ReadingsVal($name,"bri",255)/255));
-      CommandSet(undef, "$name rgb $rgb");
-      return { "CommandSet" => "$name rgb $rgb" };
+    if (InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice') {
+      my $allset = getAllSets($name);
+      return { CommandSet => "$name does not support hue" } if $allset !~ m{\bhue:[^\s\d]+,(?<min>[0-9.]+),(?<step>[0-9.]+),(?<max>[0-9.]+)\b}xms;
+      my $rgb = $rets->{hue}/360*($+{max} - $+{min});
+      CommandSet(undef, "$name hue $rgb");
+      return { CommandSet => "$name hue $rgb" };
     } else {
       CommandSet(undef, "$name hue $rets->{hue}");
-      return { "CommandSet" => "$name hue $rets->{hue}" };
+      return { CommandSet => "$name hue $rets->{hue}" };
     }
   }
   if (defined $rets->{command}) {
     if  ($rets->{command} =~ m{white}ixms) {
-      if (InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice") {
+      if (InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice') {
         CommandSet(undef, "$name rgb $whitecol");
-        return { "CommandSet" => "$name rgb $whitecol" };
+        return { CommandSet => "$name rgb $whitecol" };
       } else { 
         CommandSet(undef, "$name command Weiss");
-        return { "CommandSet" => "$name command Weiss" };
+        return { CommandSet => "$name command Weiss" };
       }
     }
-    return { "CommandSet" => "$rets->{command} not assigned" };
+    return { CommandSet => "$rets->{command} not assigned" };
   }
   if (defined $rets->{saturation}) {
-    if (InternalVal($name,"TYPE","MQTT2_DEVICE") eq "HUEDevice") { 
+    if (InternalVal($name,'TYPE','MQTT2_DEVICE') eq 'HUEDevice') { 
       my $sat = int($rets->{saturation}*2.54);
       CommandSet(undef, "$name sat $sat");
-      return { "CommandSet" => "$name sat $sat" };
+      return { CommandSet => "$name sat $sat" };
     } else {
        CommandSet(undef, "$name saturation $rets->{saturation}");
-       return { "CommandSet" => "$name saturation $rets->{saturation}" };
+       return { CommandSet => "$name saturation $rets->{saturation}" };
     }
   }
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
-  return { "CommandSet" => "$name FUT_to_HUE not assigned: $ret" };
+  return { CommandSet => "$name FUT_to_HUE not assigned: $ret" };
 }
 
 
@@ -218,13 +220,13 @@ sub MPDcontrol {
   my $name  = shift;
   my $event = shift // return;
   my $avrname  = shift // $name;
-  return {"CommandSet" => "$name not present, no command issued" } if ReadingsVal($name,"presence","absent") eq "absent";
+  return { CommandSet => "$name not present, no command issued" } if ReadingsVal($name,'presence','absent') eq 'absent';
   
   my $rets = json2nameValue($event);
   
   if (defined $rets->{state} && $rets->{state} =~ m{on}ixms) { 
     CommandSetReading(undef, "$avrname CommandSet not on, $avrname not set to volume 25" ) if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
-	if (ReadingsVal($name,"state","play") =~ m{pause|stop}ixms) {
+    if (ReadingsVal($name,"state","play") =~ m{pause|stop}ixms) {
       CommandSet(undef, "$name play");      
       return { "CommandSet" => "$name play" };
     } else { 
@@ -243,14 +245,14 @@ sub MPDcontrol {
   }
   if (defined $rets->{color_temp}) {
     my $avrVol = 100 - int(($rets->{color_temp}-153)/2.17);
-	return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
-	CommandSet(undef, "$avrname volume $avrVol");
+    return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
+    CommandSet(undef, "$avrname volume $avrVol");
     return { "CommandSet" => "$avrname volume $avrVol" };
   }
   if (defined $rets->{saturation}) {
     my $avrVol = 100 - $rets->{saturation};
-	return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
-	CommandSet(undef, "$avrname volume $avrVol");
+    return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
+    CommandSet(undef, "$avrname volume $avrVol");
     return { "CommandSet" => "$avrname volume $avrVol" };
   }
     if (defined $rets->{command}) {
@@ -280,7 +282,7 @@ sub MPDcontrol {
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
   return { "CommandSet" => "$name MPDcontrol not assigned: $ret" };
 }
@@ -348,7 +350,7 @@ sub shuttercontrol {
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
   return { "CommandSet" => "$name shuttercontrol not assigned: $ret" };
 }
@@ -392,7 +394,7 @@ sub four_Lights_matrix {
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
   return { "CommandSet" => "four_Lights_matrix not assigned: $ret" };
 }
@@ -407,10 +409,10 @@ sub Show_keyValue {
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
-	$ret .= "$k $rets->{$k}";
+    $ret .= "$k $rets->{$k}";
   }
-  return { "CommandSet" => "$name Key->Value is $ret" } if defined $name;
-  return { "CommandSet" => "Key->Value is $ret" };
+  return { CommandSet => "$name Key->Value is $ret" } if defined $name;
+  return { CommandSet => "Key->Value is $ret" };
 }
 
 

@@ -5615,7 +5615,7 @@ sub handleIntentNotRecognized {
 
     if ( !defined $data_old ) {
         return handleCustomIntent($hash, 'intentNotRecognized', $data) if defined $hash->{helper}{custom} && defined $hash->{helper}{custom}{intentNotRecognized};
-        my $entry = qq([$data->{siteId} $data->{sessionId}] $data->{input});
+        my $entry = qq([$data->{siteId}] $data->{input});
         readingsSingleUpdate($hash, 'intentNotRecognized', $entry, 1);
         $data->{requestType} = 'text';
         return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
