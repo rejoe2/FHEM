@@ -47,7 +47,7 @@ sub myWinContactNotify {  #three parameters, last (timeout) is optional
 
 sub myTimeoutWinContact {
   my $args = shift // return;
-  my ($name, $isActive, $read, $onval) = split $args, m{:}x;
+  my ($name, $isActive, $read, $onval) = split m{:}x, $args;
   $isActive //= 'Heizperiode';
   $read     //= 'state';
   $onval    //= 'on';
