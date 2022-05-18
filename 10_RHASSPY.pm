@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26011 2022-05-16 test extended choice room + intentNotRecognized review Beta-User $
+# $Id: 10_RHASSPY.pm 26011 2022-05-18 test extended choice room + intentNotRecognized review Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1981,11 +1981,12 @@ sub getRoomName {
 
 # Gerät über Raum und Namen suchen.
 sub getDeviceByName {
-    my $hash  = shift // return;
-    my $room  = shift;
-    my $name  = shift; #either of the two required
-    my $droom = shift; #oiginally included in $data?
-    my $type  = shift; #for priority outside room
+    my $hash   = shift // return;
+    my $room   = shift;
+    my $name   = shift; #either of the two required
+    my $droom  = shift; #oiginally included in $data?
+    my $type   = shift; #for priority outside room
+    my $intent = shift; #for checking if device can execute desired action
 
     return if !$room && !$name;
 
@@ -2013,7 +2014,13 @@ sub getDeviceByName {
                   && defined $hash->{helper}{devicemap}{devices}{$dev}->{prio} 
                   && defined $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom}
                   && $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom} =~ m{\b$type\b}xms;
-            push @maybees, $dev;
+            if ( $intent 
+                 && defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
+                 && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent} ) {
+                push @maybees, $dev;
+            } else { 
+                push @maybees, $dev;
+            }
         }
     }
     @maybees = uniq(@maybees);
@@ -2034,8 +2041,6 @@ sub getDeviceByName {
         unshift @maybees, $response;
         unshift @maybees, $maybees[1];
         return \@maybees;
-        #Log3($hash->{NAME}, 3, "[$hash->{NAME}] Too many matches for >>$name<< found (provide room info may help)");
-        #return;
     }
     $room = $room ? "especially not in room >>$room<< (also not outside)!" : 'room not provided!';
     Log3($hash->{NAME}, 1, "No device for >>$name<< found, $room");
@@ -2464,8 +2469,6 @@ sub getNeedsClarification {
     return respond( $hash, $data, 'code problem in getNeedsClarification!') if !defined $re;
     Log3( $hash, 5, "[$hash->{NAME}] getNeedsClarification called, regex is $re" );
 
-#    return respond( $hash, $data, getExtrapolatedResponse($hash, $identifier, $problems, 'hint') );
-
     my $response = getExtrapolatedResponse($hash, $identifier, $problems, 'hint');
     my $response2 = getExtrapolatedResponse($hash, $identifier, $problems, 'confirm');
 
@@ -2473,7 +2476,7 @@ sub getNeedsClarification {
     for (split m{,}x, $todelete) {
         delete $data->{$_};
     }
-    setDialogTimeout($hash, $data, $timeout, "$response $response2");
+    setDialogTimeout($hash, $data, $timeout, "$response $response2", [qw(Choice CancelAction)]);
     return $hash->{NAME};
 }
 
@@ -2749,7 +2752,7 @@ sub parseJSONPayload {
     my $hash = shift;
     my $json = shift // return;
     my $data;
-    my $cp = $hash->{encoding} // q{UTF-8};
+    #my $cp = $hash->{encoding} // q{UTF-8};
 
     # JSON Decode und Fehlerüberprüfung
     my $decoded;
@@ -2781,6 +2784,11 @@ sub parseJSONPayload {
 
     for (keys %{ $data }) {
         my $value = $data->{$_};
+        #custom converter equivalent
+        if ( $_ eq 'Value' ) {
+            my $match = $value =~ s{\A\s*(\d+)\s+[.,]\s+(\d+)\s*\z}{$1.$2}xm;
+            $data->{$_} = $value if $match;
+        }
         Log3($hash->{NAME}, 5, "Parsed value: $value for key: $_") if defined $value;
     }
 
@@ -2802,6 +2810,7 @@ sub Parse {
     return q{[NEXT]} if !grep( { m{\A$shorttopic}x } @topics);
 
     my @instances = devspec2array('TYPE=RHASSPY');
+    my $data;
 
     for my $dev (@instances) {
         my $hash = $defs{$dev};
@@ -2812,8 +2821,10 @@ sub Parse {
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
+        $data //= parseJSONPayload($hash, $value); #Beta-User: Calling parseJSONPayload() only once should be ok, as there's no code-page dependency any longer
 
-        my $fret = analyzeMQTTmessage($hash, $topic, $value);
+        #my $fret = analyzeMQTTmessage($hash, $topic, $value);
+        my $fret = analyzeMQTTmessage($hash, $topic, $value, $data);
         next if !defined $fret;
         if( ref $fret eq 'ARRAY' ) {
           push (@ret, @{$fret});
@@ -3437,8 +3448,9 @@ sub analyzeMQTTmessage {
     my $hash    = shift;# // return;
     my $topic   = shift;# // carp q[No topic provided!]   && return;
     my $message = shift;# // carp q[No message provided!] && return;;
-
-    my $data    = parseJSONPayload($hash, $message);
+    my $data    = shift;# // carp q[No message provided!] && return;;
+    
+    #my $data    = parseJSONPayload($hash, $message);
     my $fhemId  = $hash->{fhemId};
 
     my $input = $data->{input};
@@ -4288,7 +4300,7 @@ sub handleIntentSetOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -4404,7 +4416,7 @@ sub handleIntentSetTimedOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
@@ -4666,7 +4678,7 @@ sub handleIntentSetNumeric {
 
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
     if ( !defined $device && exists $data->{Device} ) {
-        $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, $subType);
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $subType, 'SetNumeric' );
     } elsif ( defined $type && $type eq 'volume' ) {
         $device = 
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
@@ -5050,7 +5062,7 @@ sub handleIntentMediaControls {
 
     # Search for matching device
     if (exists $data->{Device}) {
-        $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'MediaControls') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
         return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     } else {
@@ -5091,7 +5103,7 @@ sub handleIntentSetScene{
 
     my $room = getRoomName($hash, $data);
     my $scene = $data->{Scene};
-    my $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'SetScene') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetScene','SetScene' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -5190,7 +5202,7 @@ sub handleIntentMediaChannels {
 
     # Passendes Gerät suchen
     my $device = exists $data->{Device}
-        ? getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'MediaChannels')
+        ? getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaChannels', 'MediaChannels' )
         : getDeviceByMediaChannel($hash, $room, $channel);
     return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') ) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
@@ -5234,7 +5246,7 @@ sub handleIntentSetColor {
     my $color = $data->{Color} // q{};
 
     # Search for matching device and command
-    $device = getDeviceByName($hash, $room, $data->{Device}, $data->{Room}, 'SetColor') if !defined $device;
+    $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetColor', 'SetColor' ) if !defined $device;
     return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
