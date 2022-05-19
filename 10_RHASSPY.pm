@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26011 2022-05-18 test extended choice room + intentNotRecognized review Beta-User $
+# $Id: 10_RHASSPY.pm 26057 2022-05-19 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2014,10 +2014,15 @@ sub getDeviceByName {
                   && defined $hash->{helper}{devicemap}{devices}{$dev}->{prio} 
                   && defined $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom}
                   && $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom} =~ m{\b$type\b}xms;
-            if ( $intent 
-                 && defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
-                 && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent} ) {
-                push @maybees, $dev;
+            if ( $intent ) {
+                if ( $type ) {
+                    push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
+                        && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}
+                        && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$type};
+                } else {
+                    push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
+                        && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent};
+                }
             } else { 
                 push @maybees, $dev;
             }
@@ -2431,7 +2436,7 @@ sub getNeedsConfirmation {
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                   : getResponse($hash, 'DefaultConfirmationRequestRawInput');
         my $words = $hash->{helper}{devicemap}{devices}{$device}->{confirmValueMap} // $hash->{helper}{lng}->{words} // {};
-        $Value    = $words->{$data->{Value}} // $Value;
+        $Value  = $words->{$data->{Value}} if defined $data->{Value};
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level, response is $response" );
         $data->{'.DevName'} = $device;
@@ -5621,7 +5626,7 @@ sub handleIntentNotRecognized {
         return handleTtsMsgDialog($hash,$data);
     }
 
-    return $hash->{NAME} if !$hash->{experimental};
+    #return $hash->{NAME} if !$hash->{experimental};
 
     my $data_old = $hash->{helper}{'.delayed'}->{$identity};
 
@@ -5732,13 +5737,14 @@ sub handleIntentConfirmAction {
     $data_old->{Confirmation} = 1;
 
     my $intent = $data_old->{intent};
+    delete $hash->{helper}{'.delayed'}{$identity};
     my $device = $hash->{NAME};
 
     # Passenden Intent-Handler aufrufen
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    delete $hash->{helper}{'.delayed'}{$identity};
+    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5767,7 +5773,7 @@ sub handleIntentChoice {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    delete $hash->{helper}{'.delayed'}{$identity};
+    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -6693,15 +6699,15 @@ yellow=rgb FFFF00</code></p>
   <li>GetTime</li>
   <li>GetDate</li>
   <li>Timer</li> Timer info as described in <i>SetTimedOnOff</i> is mandatory, {Room} and/or {Label} are optional to distinguish between different timers. {CancelTimer} key will force RHASSPY to try to remove a running timer (using optional {Room} and/or {Label} key to identify the respective timer), {GetTimer} key will be treated as request if there's a timer running (optionally also identified by {Room} and/or {Label} keys).
+  <li>SetTimer</li> (Outdated, use generic "Timer" instead!) Set a timer, required info as mentionned in <i>Timer</i>
   Required tags to set a timer: at least one of {Hour}, {Hourabs}, {Min} or {Sec}. {Label} and {Room} are optional to distinguish between different timers. If {Hourabs} is provided, all timer info will be regarded as absolute time of day info, otherwise everything is calculated using a "from now" logic.
-  <li>SetTimer</li> Set a timer, required info as mentionned in <i>Timer</i>
-  <li>GetTimer</li> Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
+  <li>GetTimer</li> (Outdated, use generic "Timer" instead!) Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
   <li>ConfirmAction</li>
   {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
   <li>CancelAction</li>{Mode} is recommended.
   <li>Choice</li>One or more of {Room}, {Device} or {Scene}
-  <li>ChoiceRoom</li>{Room}
-  <li>ChoiceDevice</li>{Device}
+  <li>ChoiceRoom</li> {Room} NOTE: Useage of generic "Choice" intent instead is highly recommended!
+  <li>ChoiceDevice</li> {Device} NOTE: Useage of generic "Choice" intent instead is highly recommended!
   <li>ReSpeak</li>
 </ul>
 
