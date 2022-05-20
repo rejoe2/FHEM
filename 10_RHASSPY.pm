@@ -5693,7 +5693,6 @@ sub handleIntentConfirmAction {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5722,7 +5721,6 @@ sub handleIntentChoice {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5732,7 +5730,7 @@ sub handleIntentChoiceRoom {
     my $hash = shift // return;
     my $data = shift // return;
 
-    Log3($hash->{NAME}, 5, 'handleIntentChoiceRoom called');
+    Log3($hash->{NAME}, 2, 'handleIntentChoiceRoom called, better use generic "Choice" intent now!');
 
     return handleIntentChoice($hash, $data);
 }
@@ -5741,7 +5739,7 @@ sub handleIntentChoiceDevice {
     my $hash = shift // return;
     my $data = shift // return;
 
-    Log3($hash->{NAME}, 5, 'handleIntentChoiceDevice called');
+    Log3($hash->{NAME}, 2, 'handleIntentChoiceDevice called, better use generic "Choice" intent now!');
 
     return handleIntentChoice($hash, $data);
 }
