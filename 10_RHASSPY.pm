@@ -3241,6 +3241,7 @@ sub msgDialog_progress {
     #Log3($hash, 5, 'msgDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
+    $msgtext = _replaceDecimalPoint($hash,$msgtext);
 
     my $sendData =  { 
         input        => $msgtext,
@@ -3390,7 +3391,7 @@ sub SpeechDialog_progress {
     Log3($hash, 5, 'SpeechDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
-
+    $msgtext = _replaceDecimalPoint($hash,$msgtext);
     my $sendData =  { 
         input        => $msgtext,
         sessionId    => $data->{sessionId},
