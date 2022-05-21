@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26074 2022-05-21 10:36:30Z Beta-User $
+# $Id: 10_RHASSPY.pm 26076 2022-05-21 decimal point Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3030,6 +3030,7 @@ sub testmode_next {
 
     if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
         my @ca_strings = split m{,}x, ReadingsVal($hash->{NAME},'intents','');
+        $line = _replaceDecimalPoint($hash,$line);
         my $sendData =  { 
             input        => $line,
             sessionId    => "$hash->{siteId}_$hash->{testline}_testmode",
@@ -4607,8 +4608,6 @@ sub handleIntentSetNumericGroup {
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !keys %{$devices}; 
 
-    my $value = $data->{Value};
-
     my $updatedList;
     my $init_delay = 0;
     my $delaysum = 0;
@@ -4699,7 +4698,7 @@ sub handleIntentSetNumeric {
            return respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
         }
     }
-
+    
     # Mapping and device found -> execute command
     my $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
     my $part    = $mapping->{part};
@@ -4729,6 +4728,8 @@ sub handleIntentSetNumeric {
         my @tokens = split m{\s+}x, $oldVal;
         $oldVal = $tokens[$part] if @tokens >= $part;
     }
+    
+    $oldVal = $oldVal =~ m{(-?\d+(\.\d+)?)}x ? $1 : $oldVal;
 
     # Neuen Wert bestimmen
     my $newVal;
@@ -4771,10 +4772,12 @@ sub handleIntentSetNumeric {
     # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
-    $data->{Value} //= $newVal;
-    $data->{Type}  //= $type;
-    delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
-
+    
+    if ( !defined $data->{'.inBulk'} ) {
+        $data->{Value} //= $newVal;
+        $data->{Type}  //= $type;
+        delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
+    }
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
@@ -4850,9 +4853,6 @@ sub handleIntentGetNumeric {
       my @tokens = split m{\s+}x, $value;
       $value = $tokens[$part] if @tokens >= $part;
     }
-    
-    $value = ($value =~ m{(-?\d+(\.\d+)?)}x ? $1 : $value);
-    
     $value = _round($value * ($maxVal - $minVal) / 100 + $minVal) if $forcePercent;
 
     my $isNumber = looks_like_number($value);
@@ -5992,6 +5992,20 @@ sub _array2andString {
     my $text = join q{, }, @all;
     $text .=  " $and $fin";
     return $text;
+}
+
+sub _replaceDecimalPoint {
+    my $hash = shift // return;
+    my $line = shift // return;
+    my $point = 'point';
+    if ( $hash->{helper}{lng}->{commaconversion} ) {
+        $point = $hash->{helper}{lng}{words}->{comma} // 'komma';   
+        $line =~ s{(\d+)[,](\d+)}{$1 $point $2};  
+    } else {
+        $point = $hash->{helper}{lng}{words}->{point} // $point;
+        $line =~ s{(\d+)[.](\d+)}{$1 $point $2};  
+    }
+    return $line;
 }
 
 1;
