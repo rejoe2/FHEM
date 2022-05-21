@@ -4850,6 +4850,9 @@ sub handleIntentGetNumeric {
       my @tokens = split m{\s+}x, $value;
       $value = $tokens[$part] if @tokens >= $part;
     }
+    
+    $value = ($value =~ m{(-?\d+(\.\d+)?)}x ? $1 : $value);
+    
     $value = _round($value * ($maxVal - $minVal) / 100 + $minVal) if $forcePercent;
 
     my $isNumber = looks_like_number($value);
