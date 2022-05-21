@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26073 2022-05-21 10:06:27Z Beta-User $
+# $Id: 10_RHASSPY.pm 26074 2022-05-21 10:36:30Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -6629,7 +6629,7 @@ yellow=rgb FFFF00</code></p>
   <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
   Dependend on the specific surrounding informations, a combination of {Device}, {Value} (nummeric value), {Change} and/or {Type} are sufficient, {Room} is optional. Additional optional field is {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored). 
-  Alternatively to {Unit:percent} you may combine {Value} with {Factor} (nummeric value) to increase or reduce the stepwidth of the desired change (both values will be multiplied). {Change} can be with one of ({Type})
+  {Change} can be with one of ({Type})
   <ul>
     <li>lightUp, lightDown (brightness)</li>
     <li>volUp, volDown (volume)</li>
@@ -6637,7 +6637,7 @@ yellow=rgb FFFF00</code></p>
     <li>setUp, setDown (setTarget)</li>
     <li>cmdStop (applies only for blinds)</li>
   </ul>
-  allowing to decide on calculation scheme and to guess for the proper device and/or answer.
+  allowing to decide on calculation scheme and to guess for the appropiate device and/or answer. Optionally you may combine {Change} with {Factor} (nummeric value) to increase or reduce the stepwidth (typically derived from device, if {Value} is not provided) of the desired change (both values will be multiplied).
   <a href="#RHASSPY-multicommand"><b>experimental multicommand</b></a> feature should work also with this intent (switching intent to SetNumericGroup).
   <li>SetNumericGroup</li>
     (as SetNumeric, except for {Group} instead of {Device}).
