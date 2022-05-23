@@ -2288,8 +2288,30 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
+    if ( $hash->{experimental} ) {
+        my $intent = $data->{intent} // return;
+        $intent =~ s{Group\z}{}x;
+        my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent ) // return;
+        my $spcls = $hash->{helper}{devicemap}{devices}{$single}{group_specials};
+        $devices->{$single} = { delay => 0, prio => 0 };
+    }
+
     return keys %{$devices} if $getVirt;
     return $devices;
+}
+
+
+sub getGroupReplacesDevice {
+    my $hash    = shift // return;
+    my $data    = shift // return;
+
+    Log3($hash->{NAME}, 3, 'getGroupReplacesDevice called');
+
+    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !$hash->{experimental};
+    $data->{Group} = $data->{Device};
+    my $isvirt = getIsVirtualGroup($hash,$data);
+    return $isvirt if $isvirt;
+    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
 }
 
 sub getIsVirtualGroup {
