@@ -2293,6 +2293,7 @@ sub getDevicesByGroup {
         $intent =~ s{Group\z}{}x;
         my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent );
         return if !$single || ref $single eq 'ARRAY';
+        Log3($hash->{NAME}, 3, "Device selected using Group key instead Device key: $single");
         $devices->{$single} = { delay => 0, prio => 0 };
     }
 
@@ -2305,12 +2306,14 @@ sub getGroupReplacesDevice {
     my $hash    = shift // return;
     my $data    = shift // return;
 
-    Log3($hash->{NAME}, 3, 'getGroupReplacesDevice called');
-
     return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !$hash->{experimental};
     $data->{Group} = $data->{Device};
     my $isvirt = getIsVirtualGroup($hash,$data);
-    return $isvirt if $isvirt;
+    if ( $isvirt ) {
+        Log3($hash->{NAME}, 3, "Group selected using Device key instead Group key: $isvirt");
+        return $isvirt;
+    }
+
     return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
 }
 
