@@ -2291,8 +2291,7 @@ sub getDevicesByGroup {
     if ( $hash->{experimental} ) {
         my $intent = $data->{intent} // return;
         $intent =~ s{Group\z}{}x;
-        my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent ) // return;
-        my $spcls = $hash->{helper}{devicemap}{devices}{$single}{group_specials};
+        my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent );return if !$single || ref $single eq 'ARRAY';
         $devices->{$single} = { delay => 0, prio => 0 };
     }
 
