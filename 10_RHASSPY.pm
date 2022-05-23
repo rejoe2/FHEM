@@ -6041,6 +6041,7 @@ sub _replaceDecimalPoint {
         $point = $hash->{helper}{lng}{words}->{point} // $point;
         $line =~ s{(\d+)[.](\d+)}{$1 $point $2};  
     }
+    $line =~ s{(\s*\d+)[:](\d+)\s+(\w+)}{$1 $3 $2 }g; #Beta-User: Zeitangaben
     return $line;
 }
 
