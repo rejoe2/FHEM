@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26076 2022-05-21 decimal point Beta-User $
+# $Id: 10_RHASSPY.pm 26079 2022-05-22 redicections for group and device Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3030,6 +3030,7 @@ sub testmode_next {
 
     if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
         my @ca_strings = split m{,}x, ReadingsVal($hash->{NAME},'intents','');
+        $line = (split m{[#]}x,$line)[0]; #ignore comments
         $line = _replaceDecimalPoint($hash,$line);
         my $sendData =  { 
             input        => $line,
@@ -3069,7 +3070,9 @@ sub testmode_end {
             my $line = $rawresult->{$resu};
             if ( defined $line->[1] ) {
                 my $single = $line->[0];
-                push @{$aresult}, qq(   [RHASSPY] Input:      $single);
+                my @tokens = split m{[#]}x, $single, 2; 
+                push @{$aresult}, qq(   [RHASSPY] Input:      $tokens[0]);
+                push @{$aresult}, qq(                Id:      $tokens[1]) if defined $tokens[1];
                 for ( 1..@{$line}-1) {
                     $single = $line->[$_];
                     push @{$aresult}, qq(             $single);
@@ -3722,6 +3725,8 @@ sub sendTextCommand {
     my $hash = shift // return;
     my $text = shift // return;
     
+    $text = _replaceDecimalPoint($hash,$text);
+
     my $data = {
          input => $text,
          sessionId => "$hash->{fhemId}.textCommand" #,
@@ -4302,7 +4307,9 @@ sub handleIntentSetOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff' );
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
+
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -4416,7 +4423,8 @@ sub handleIntentSetTimedOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff');
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
@@ -4676,6 +4684,7 @@ sub handleIntentSetNumeric {
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
     if ( !defined $device && exists $data->{Device} ) {
         $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $subType, 'SetNumeric' );
+        return getGroupReplacesDevice($hash, $data) if !defined $device;
     } elsif ( defined $type && $type eq 'volume' ) {
         $device = 
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
@@ -5028,7 +5037,8 @@ sub handleIntentMediaControls {
 
     # Search for matching device
     if (exists $data->{Device}) {
-        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' );
+        return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
         return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     } else {
@@ -5213,7 +5223,7 @@ sub handleIntentSetColor {
 
     # Search for matching device and command
     $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetColor', 'SetColor' ) if !defined $device;
-    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !defined $device;
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
