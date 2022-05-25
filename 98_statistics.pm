@@ -1,5 +1,5 @@
 ﻿##############################################
-# $Id: 98_statistics.pm 20819 2021-11-17 Beta-User dst trial III $
+# $Id: 98_statistics.pm 20819 2022-05-25 Beta-User dst trial III + commandref$
 #
 #  98_statistic.pm
 # 
@@ -1167,13 +1167,18 @@ sub statistics_UpdateDevReading($$$$)
 
 1;
 
+__END__
+
+
 =pod
+
+=encoding utf8
 =item summary Calculates statistical values and adds them to the devices.
 =item summary_DE Berechnet statistische Werte und fügt sie dem Gerät hinzu.
 =item helper
 =begin html
 
-<a name="statistics"></a>
+<a id="statistics"></a>
 <h3>statistics</h3>
 <div>
 <ul>
@@ -1247,7 +1252,7 @@ sub statistics_UpdateDevReading($$$$)
   </ul>
 
   <br>
-  <a name="statisticsattr"></a>
+  <a id="statistics-attr"></a>
    <b>Attributes</b>
    <ul>
       <br>
@@ -1340,7 +1345,7 @@ sub statistics_UpdateDevReading($$$$)
 
 =begin html_DE
 
-<a name="statistics"></a>
+<a id="statistics"></a>
 <h3>statistics</h3>
 <div>
 <ul>
@@ -1413,7 +1418,7 @@ sub statistics_UpdateDevReading($$$$)
   </ul>
   <br>
 
-  <a name="statisticsattr"></a>
+  <a id="statistics-attr"></a>
    <b>Attributes</b>
    <ul>
       <br>
