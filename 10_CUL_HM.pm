@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-02-10 frank $
+# $Id: 10_CUL_HM.pm 25298 2022-02-10 frank + Beta-User "uninitialized" 2022-05-24 $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
@@ -11461,7 +11461,7 @@ sub CUL_HM_cleanShadowReg($){
   # the reading does not exist. 
   # return dirty "1" if some shadowregs still remain active
   my ($name) = @_;
-  my $hash = $defs{$name};
+  my $hash = $defs{$name} // return 0; #Beta-User: forum https://forum.fhem.de/index.php/topic,127772.msg1222611.html#msg1222611
   my $dirty = 0;
   foreach my $rLn (keys %{$hash->{helper}{shadowReg}}){ 
     my $rLnP = ($hash->{helper}{expert}{raw} ? "" : ".").$rLn;

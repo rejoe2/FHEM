@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26079 2022-05-22 redicections for group and device Beta-User $
+# $Id: 10_RHASSPY.pm 26079 2022-05-25 changeover for group and device Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -334,7 +334,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble|autoTraining)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|noChangeover|experimental|Babble|autoTraining)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -355,7 +355,7 @@ sub Define {
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{autoTraining} = $h->{autoTraining} // 60;
 
-    for my $key (qw( experimental handleHotword sessionTimeout Babble )) {
+    for my $key (qw( experimental handleHotword sessionTimeout noChangeover Babble )) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -2048,7 +2048,7 @@ sub getDeviceByName {
         return \@maybees;
     }
     $room = $room ? "especially not in room >>$room<< (also not outside)!" : 'room not provided!';
-    Log3($hash->{NAME}, 1, "No device for >>$name<< found, $room");
+    Log3($hash->{NAME}, $hash->{noChangeover} ? 1 : 5, "No device for >>$name<< found, $room");
     return;
 }
 
@@ -2288,9 +2288,10 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
-    if ( $hash->{experimental} ) {
+    if ( !$isVirt && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
         my $intent = $data->{intent} // return;
         $intent =~ s{Group\z}{}x;
+
         my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent );
         return if !$single || ref $single eq 'ARRAY';
         Log3($hash->{NAME}, 3, "Device selected using Group key instead Device key: $single");
@@ -2306,11 +2307,11 @@ sub getGroupReplacesDevice {
     my $hash    = shift // return;
     my $data    = shift // return;
 
-    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !$hash->{experimental};
+    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if $hash->{noChangeover};
     $data->{Group} = $data->{Device};
-    my $isvirt = getIsVirtualGroup($hash,$data);
+    my $isvirt = getIsVirtualGroup($hash,$data, undef, 1);
     if ( $isvirt ) {
-        Log3($hash->{NAME}, 3, "Group selected using Device key instead Group key: $isvirt");
+        Log3($hash->{NAME}, 3, "Group $data->{Device} selected using Device key instead Group key. Finally addressed: $isvirt");
         return $isvirt;
     }
 
@@ -2321,6 +2322,7 @@ sub getIsVirtualGroup {
     my $hash    = shift // return;
     my $data    = shift // return;
     my $getVirt = shift;
+    my $frmChOv = shift;
 
     return if defined $data->{'.virtualGroup'};
 
@@ -2337,6 +2339,7 @@ sub getIsVirtualGroup {
     for ( keys %{$data} ) {
         $restdata->{$_} = $data->{$_} if $_ !~ m{\A(?:Room|Group|Device|intent)}x;
     }
+    @devs = () if $frmChOv;
 
     my $intent = $data->{intent} // return;
     $intent =~ s{Group\z}{}x;
@@ -2350,7 +2353,7 @@ sub getIsVirtualGroup {
 
     for my $room ( @rooms ) {
         for my $dev ( @devs ) {
-        my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev}, $room eq 'noneInData' ? undef : $data->{$room}, $intent);
+            my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev}, $room eq 'noneInData' ? undef : $data->{$room}, $intent);
             next if ref $single eq 'ARRAY';
             if ( defined $single && $single ne '0' ) {
                 $maynotbe_in_room->{$dev} = $room if !defined $cleared_in_room->{$dev};
@@ -2366,6 +2369,7 @@ sub getIsVirtualGroup {
             my $checkdata = $restdata;
             $checkdata->{Group}  = $data->{$grp};
             $checkdata->{Room}   = $data->{$room} if $room ne 'noneInData' ;
+            $checkdata->{intent} = $grpIntent;
             @devlist = ( @devlist, getDevicesByGroup($hash, $checkdata, 1) );
             $needsConfirmation //= getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
         }
@@ -2373,8 +2377,9 @@ sub getIsVirtualGroup {
 
     return if !@devlist;
     @devlist = uniq(@devlist);
+    Log3( $hash, 5, "[$hash->{NAME}] getIsVirtualGroup identified @devlist" );
 
-    if (!$needsConfirmation) {
+    if ( !$needsConfirmation && !$frmChOv ) {
         my $checkdata = $restdata;
         $checkdata->{Group}  = 'virtualGroup';
         $needsConfirmation = getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
@@ -6122,6 +6127,8 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
       <li><code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
     </ul>
   </li>
+  <a id="RHASSPY-noChangeover"></a>
+  <li><b>noChangeover</b>: By default, RHASSPY will first try to execute the intent as handed over by Rhasspy. In case there's no strict match, RHASSPY then will do a check, if the single device intent could be executed as group intent (vice versa; to do this, the {Group} key value will be used as {Device} key). Setting this key to '1' will completely prevent this check, '2' will stop changeover from single device intent to respective group intent, but allow to switch from group to single device.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>

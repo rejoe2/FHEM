@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_HMinfo.pm 25293 2022-01-17 Beta-User $
+# $Id: 98_HMinfo.pm 25978 2022-04-18 + Beta-User "uninitialized" 2022-05-24  $
 package main;
 use strict;
 use warnings;
@@ -130,7 +130,6 @@ sub HMinfo_Attr(@) {###########################################################
     my $sec = $h*3600+$m*60;
     return "give at least one minute" if ($sec < 60);
     $hash->{helper}{autoUpdate} = $sec;
-    RemoveInternalTimer("sUpdt:$name"); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125342.msg1199568.html#msg1199568
     InternalTimer(gettimeofday()+$sec,"HMinfo_autoUpdate","sUpdt:".$name,0);
   }
   elsif($attrName eq "hmAutoReadScan"){# 00:00 hh:mm
@@ -274,7 +273,6 @@ sub HMinfo_init($){############################################################
       my ($hm) = devspec2array("TYPE=HMinfo");
       Log3($hm,5,"debug: HMinfo_init");
       foreach my $attrName (keys %{$attr{$hm}}){
-        #Log 1," update HM attributes  - will update CUL_HM settings ocationally";
         HMinfo_Attr("set",$hm, $attrName,$attr{$hm}{$attrName});
       }
 
@@ -426,7 +424,7 @@ sub HMinfo_status($){##########################################################
 
   push @updates,"C_sumDefined:"."entities:$nbrE,device:$nbrD,channel:$nbrC,virtual:$nbrV";
   # ------- display status of action detector ------
-  push @updates,"I_actTotal:".join",",(split" ",$modules{CUL_HM}{defptr}{"000000"}{STATE});
+  push @updates,"I_actTotal:".join",",(split" ",$modules{CUL_HM}{defptr}{"000000"}{STATE}) if defined $modules{CUL_HM}{defptr}{"000000"}{STATE};
   
   # ------- what about IO devices??? ------
   push @IOdev,split ",",AttrVal($_,"IOList","")foreach (keys %IOccu);
@@ -1267,7 +1265,7 @@ sub HMinfo_getCfgDefere($){####################################################
 sub HMinfo_startBlocking(@){###################################################
   my ($name,$fkt,$param) = @_;
   my $hash = $defs{$name};
-  Log3 $hash,5,"HMinfo $name start blocking:$fkt";
+  Log3 $hash,4,"HMinfo $name start blocking:$fkt";
   my $id = ++$hash->{nb}{cnt};
   my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME},$param", 
                         "HMinfo_bpPost", 30, 
@@ -1793,7 +1791,7 @@ sub HMinfo_GetFn($@) {#########################################################
         $tfnm = $cv->GV->NAME if ($cv);
       }
        if (!defined($ats->{TRIGGERTIME})) { #noansi: just for debugging
-        Log3 $hash,0,'HMinfo '.$name.' showTimer undefined TRIGGERTIME:'
+        Log3 $hash,2,'HMinfo '.$name.' showTimer undefined TRIGGERTIME:'
                      .(defined($ats->{atNr})?' atNr:'.$ats->{atNr}:'')
                      .' FN:'.$tfnm
                      .' ARG:'.$ats->{ARG};
@@ -1815,7 +1813,7 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "showChilds"){
     my ($type) = @a;
     $type = "all" if(!$type);
-    if ($type eq "all"){
+    if ($type ne "all"){
       $ret = "BlockingCalls:\n".join("\nnext:----------\n",
               map {(my $foo = $_) =~ s/(Pid:|Fn:|Arg:|Timeout:|ConnectedVia:)/\n   $1/g; $foo;}
               grep /(CUL_HM|HMinfo)/,BlockingInfo(undef,undef));
@@ -2046,7 +2044,7 @@ sub HMinfo_SetFn($@) {#########################################################
     CUL_HM_assignIO($defs{$simName});
     my $id = $HMConfig::culHmModel2Id{$model};
 
-    Log 1,"testdevice my $id, $model";
+    Log 4,"testdevice my $id, $model";
 
     CUL_HM_Parse($defs{ioPCB},"A00018400${hmId}00000010${id}4D592D434F464645453612060100"."::::");
     CUL_HM_Set($defs{$simName},$simName,"clear","msgEvents");
@@ -2432,7 +2430,7 @@ sub HMinfo_loadConfig($$@) {###################################################
       }
     }
   }
-  Log3 $hash,4,"HMinfo load config file:$fName"
+  Log3 $hash,5,"HMinfo load config file:$fName"
                ."\n     templateReDefinition:$cntTStart"
                ."\n     templateDef:$cntDef"
                ."\n     templateSet:$cntSet"
@@ -3692,7 +3690,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>entities</B> comma separated list of entities which refers to the temp lists following.
            The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
-         <li><B>simDev -model-</B> simulate a device</li>
+         <li><a id="HMinfo-simDev"><B>simDev -model-</B></a> simulate a device</li>
          </ul>
          <i>tempListG</i> (for all devices)
          <br>
