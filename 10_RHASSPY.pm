@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26079 2022-05-25 changeover for group and device Beta-User $
+# $Id: 10_RHASSPY.pm 26079 2022-05-30 changeover for group and device Beta-User; replace getActiveDevice $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2055,11 +2055,12 @@ sub getDeviceByName {
 
 # returns lists of "might be relevant" devices via room, intent and (optional) Type info
 sub getDevicesByIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift; #Beta-User: any necessary parameters...?
+    my $hash    = shift // return;
+    my $room    = shift;
+    my $intent  = shift;
+    my $type    = shift; #Beta-User: any necessary parameters...?
     my $subType = shift // $type;
+    my $onlyOn  = shift;
 
     my @matchesInRoom; my @matchesOutsideRoom;
 
@@ -2070,14 +2071,13 @@ sub getDevicesByIntentAndType {
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # get lists of devices that may fit to requirements
-        if ( !defined $type ) {
+        if ( !defined $type || defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix) {
+            if ($onlyOn ) {
+                my $mapon = getMapping($hash, $devs, 'GetOnOff', undef, 1) // next;
+                next if !_getOnOffState($hash, $devs, $mapon);
+            }
             $rooms =~ m{\b$room\b}ix
             ? push @matchesInRoom, $devs 
-            : push @matchesOutsideRoom, $devs;
-        }
-        elsif ( defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix ) {
-            $rooms =~ m{\b$room\b}ix
-            ? push @matchesInRoom, $devs
             : push @matchesOutsideRoom, $devs;
         }
     }
@@ -2086,17 +2086,18 @@ sub getDevicesByIntentAndType {
 
 # Identify single device via room, intent and (optional) Type info
 sub getDeviceByIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift; #Beta-User: any necessary parameters...?
+    my $hash    = shift // return;
+    my $room    = shift;
+    my $intent  = shift;
+    my $type    = shift; #Beta-User: any necessary parameters...?
     my $subType = shift // $type;
+    my $onlyOn  = shift;
 
     #rem. Beta-User: atm function is only called by GetNumeric!
     my $device;
 
     # Devices sammeln
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType, $onlyOn);
     Log3($hash->{NAME}, 5, "matches in room: @{$matchesInRoom}, matches outside: @{$matchesOutsideRoom}");
     my ($response, $last_item, $first_items);
 
@@ -2174,50 +2175,8 @@ sub getDeviceByIntentAndType {
             }
         }
     }
-    #$device = (@{$matchesInRoom}) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
 
     Log3($hash->{NAME}, 5, "Device selected: ". defined $response ? 'more than one' : $device ? $device : "none");
-
-    return $device;
-}
-
-
-# Eingeschaltetes Gerät mit bestimmten Intent und optional Type suchen
-sub getActiveDeviceForIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift;
-    my $subType = shift // $type;
-
-    my $device;
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
-
-    # Anonyme Funktion zum finden des aktiven Geräts
-    my $activeDevice = sub ($$) {
-        my $subhash = shift;
-        my $devices = shift // return;
-        my $match;
-
-        for (@{$devices}) {
-            my $mapping = getMapping($subhash, $_, 'GetOnOff', undef, 1);
-            if ( defined $mapping ) {
-                # Gerät ein- oder ausgeschaltet?
-                my $value = _getOnOffState($subhash, $_, $mapping);
-                if ( $value ) {
-                    $match = $_;
-                    last;
-                }
-            }
-        }
-        return $match;
-    };
-
-    # Gerät finden, erst im aktuellen Raum, sonst in den restlichen
-    $device = $activeDevice->($hash, $matchesInRoom);
-    $device //= $activeDevice->($hash, $matchesOutsideRoom);
-
-    Log3($hash->{NAME}, 5, "Device selected: $device");
 
     return $device;
 }
@@ -2251,6 +2210,7 @@ sub getDeviceByMediaChannel {
     Log3($hash->{NAME}, 1, "No device for >>$channel<< found, especially not in room >>$room<< (also not outside)!");
     return;
 }
+
 
 sub getDevicesByGroup {
     my $hash    = shift // return;
@@ -4717,7 +4677,7 @@ sub handleIntentSetNumeric {
         return getGroupReplacesDevice($hash, $data) if !defined $device;
     } elsif ( defined $type && $type eq 'volume' ) {
         $device = 
-            getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
+            getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $type, 1) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
     } elsif ( !defined $data->{'.DevName'} ) {
         $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $subType);
@@ -5070,11 +5030,11 @@ sub handleIntentMediaControls {
         $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' );
         return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
-        return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     } else {
-        $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef) 
+        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', undef, 1) 
         // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
+    return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
 
     my $mapping = getMapping($hash, $device, 'MediaControls') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
