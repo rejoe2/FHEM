@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use IO::Socket;
 
-my $host = '127.0.0.1';
+my $host = '192.168.2.91';
 my $port = '6600'; #default
 my $timeout = 2;
 my $password = '';
@@ -21,7 +21,7 @@ my $sock = IO::Socket::INET->new(
     );
 
 printf("started\n");
-return $! if !$sock;
+die $! if !$sock;
 
 printf("sock ok\n");
 
@@ -30,7 +30,7 @@ while (<$sock>)  # MPD rede mit mir , egal was ;)
 
 chomp $_;
 
-return  "not a valid mpd server, welcome string was: $_." if $_ !~ m{\AOK MPD (.+)\z};
+die  "not a valid mpd server, welcome string was: $_." if $_ !~ m{\AOK MPD (.+)\z};
 
 if ($password ne '') {
   # lets try to authenticate with a password
@@ -42,7 +42,7 @@ if ($password ne '') {
   if ( $_ !~ m{\AOK\z} ) {
     print $sock "close\n";
     close($sock);
-    return "password auth failed : $_." ;
+    die "password auth failed : $_." ;
   }
 }
 
@@ -51,17 +51,17 @@ my ($artists, $artist, @playlists);
 #start playlist request
 print $sock "listplaylists\r\n";
 while (<$sock>) {
-  return  "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
+  die  "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
   last if $_ =~ m/^OK/;    # end of output.
 
   if ( $_ =~ m{\A(?:playlist[:]\s)(.+)} ) {
-    push @playlists, $_;
+    push @playlists, $1;
   }
 }
 
 print $sock "list album group albumartist\r\n";
 while (<$sock>) {
-  return  "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
+  die "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
   last if $_ =~ m/^OK/;    # end of output.
 
   if ( $_ =~ m{\A(?:AlbumArtist[:]\s)(.*)} ) {
@@ -92,15 +92,17 @@ my @artlist = sort {
         }  keys %{$artists};
 
 printf("Artists section \n\n") if @artlist;
+my $albums;
 for my $i (0..$maxartists-1) {
     printf("( ( %s ):%s )\n", $artlist[$i], $artlist[$i]);
+    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
+        $albums->{$alb} = 1;
+    };
 }
 
 printf("\nAlbums section \n\n") if @artlist;
-for my $i (0..$maxartists-1) {
-    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
-        printf("( ( %s ):%s )\n", $alb, $alb);
-    };
+for my $alb (sort keys %{$albums}) {
+    printf("( ( %s ):%s )\n", $alb, $alb);
 }
 
 1;
