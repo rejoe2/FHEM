@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 my ($artists, $artist, @playlists);
-my $maxartists = 10;
+my $maxartists = 50;
 
 while ( my $l = <> ) {
 
@@ -73,6 +73,7 @@ sub cleanup {
     $text =~ s{[+]}{ plus }g;
     $text =~ s{[&]}{ and }g;
     $text =~ s{[\(\),.:_`´/!<>?\[\]\{\}]}{ }g;
+    $text =~ s{\A\s*The}{[The]}i;
 
     return $text;
 }
@@ -108,8 +109,7 @@ printf("\nAlbums +artist section \n\n") if @artlist;
 for my $i (0..$maxartists-1) {
     my $lcart = $artists->{$artlist[$i]}->{clean};
     for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
-        
-        printf("( ( %s ):%s ) <by> ( ( %s ):%s )\n", $albums->{$alb}, $alb, $lcart, $artlist[$i])
+        printf("( ( %s ):%s ){Album} <by> ( ( %s ):%s ){AlbumArtist}\n", $albums->{$alb}, $alb, $lcart, $artlist[$i])
     }
 }
 

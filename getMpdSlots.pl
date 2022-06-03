@@ -117,12 +117,14 @@ sub cleanup {
             }
         } else {
             if ( $text =~ m{(?:\s+)([IXV0-9]+)\z} && defined $trfrm->{$1} ) {
-                $text =~ s{(.*\s+)([IXV0-9]+)\z}{${1}$trfrm->{$3}};
+                $text =~ s{(.*\s+)([IXV0-9]+)\z}{${1}$trfrm->{$2}};
             }
         }
     }
-
-    $text =~ s{[\[\()]\{}.:_]}{ }g;
+    $text =~ s{[+]}{ plus }g;
+    $text =~ s{[&]}{ and }g;
+    $text =~ s{[\(\),.:_`´/!<>?\[\]\{\}]}{ }g;
+    $text =~ s{\A\s*The}{[The]}i;
 
     return $text;
 }
@@ -150,17 +152,18 @@ for my $alb ( sort keys %{$albums} ) {
 
 printf("\nAlbums section \n\n") if @artlist;
 
-#for my $i (0..$maxartists-1) {
-#    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
-#        printf("( ( %s ):%s )\n", $alb, $alb);
-#    };
-
-
 for my $alb (sort keys %{$albums}) {
     printf("( ( %s ):%s )\n", $albums->{$alb}, $alb);
 }
 
-1;
+printf("\nAlbums +artist section \n\n") if @artlist;
+for my $i (0..$maxartists-1) {
+    my $lcart = $artists->{$artlist[$i]}->{clean};
+    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
+        printf("( ( %s ):%s ){Album} <by> ( ( %s ):%s ){AlbumArtist}\n", $albums->{$alb}, $alb, $lcart, $artlist[$i])
+    }
+}
+
 
 __END__
 
