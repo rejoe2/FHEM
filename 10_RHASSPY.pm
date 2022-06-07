@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26102 2022-05-31 14:22:24Z Beta-User $
+# $Id: 10_RHASSPY.pm 26102 2022-06-07 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1396,7 +1396,7 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => {
-            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist'},
+            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist', cmdPlaySelected => 'playSelection', cmdAddSelected => 'addSelection'},
         GetState => {
             update => 'reread|update|reload' },
         SetScene => {
@@ -2018,7 +2018,9 @@ sub getDeviceByName {
                 if ( $type ) {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}
-                        && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$type};
+                        && ( defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$type} || 
+                            defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$intent}
+                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$intent}->{$type}); #Beta-User: e.g. MediaControls/MediaControls/cmdPlaylist
                 } else {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent};
@@ -2530,7 +2532,7 @@ sub getMapping {
 
     my $matchedMapping;
 
-    $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if  defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
+    $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
     return $matchedMapping if $matchedMapping;
 
     for (sort keys %{$hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}}) {
@@ -5027,11 +5029,11 @@ sub handleIntentMediaControls {
 
     # Search for matching device
     if (exists $data->{Device}) {
-        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' );
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $command, 'MediaControls' );
         return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     } else {
-        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', undef, 1) 
+        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', 'MediaControls', $command, 1) 
         // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -5045,6 +5047,22 @@ sub handleIntentMediaControls {
     my $cmd = $mapping->{$command};
 
     $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
+
+    if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
+        $cmd .= $command eq 'cmdPlaySelected' ? ' playSelection' : ' addSelection';
+        my $newfilter; my $several;
+        for my $arg ( qw( ArtistId AlbumId Album Artist Albumartist Title Genre Name ) ) {
+            next if !defined $data->{$arg};
+            my $arg1 = lc $arg;
+            "musicbrainz_$arg1" if $arg eq 'ArtistId' || $arg eq 'AlbumId';
+            $newfilter .= ' AND ' if $several;
+            $several++;
+            $newfilter .= qq(($arg1 =~ '$data->{$arg}'));
+        }
+        $newfilter = "($newfilter)" if $several > 1;
+        $cmd .= " $newfilter";
+    }
+
     # Execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd);
     # Define voice response

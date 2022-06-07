@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2021-03-06 18:18:14Z Wzut $
+#  $Id: 73_MPD.pm 23900 2022-06-07 Beta-User $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -48,7 +48,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use URI::Escape;
-use POSIX;
+#use POSIX;
 use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 use IO::Socket;
 use Getopt::Std;
@@ -235,7 +235,7 @@ sub MPD_updateConfig($)
 	{ 
 	#   Playlisten und Musik Dir laden ?
         #   nicht bei Player mopidy, listall wird von ihm nicht unterstützt !
-	    if ((AttrVal($name, "loadMusic", "1") eq "1") && !$error && ($hash->{".player"} ne "mopidy"))
+	    if ((AttrVal($name, 'loadMusic', '0') eq '1') && !$error && ($hash->{'.player'} ne 'mopidy')) # Beta-User: listall is deprecated on the MPD side, see docu at https://mpd.readthedocs.io/en/latest/protocol.html#the-music-database
 	    { 
 		$error = mpd_cmd($hash, "i|listall|music");
 		Log3 $name,3,"$name, error loading music -> $error" if ($error);
@@ -895,6 +895,25 @@ sub MPD_Set($@)
     readingsSingleUpdate($hash,'playlistname','',1);
     my $filtercmd = join q{ }, @a;
     $hash->{'.music'}    = $filtercmd; # interne Song Verwaltung
+
+    if ( $filtercmd !~ m{\A\(.*\)\z}x ) { #already packed?
+        my($unnamed, $named) = parseParams($filtercmd);
+        my $newfilter; my $several;
+        for my $arg ( keys %{$named} ) {
+            $newfilter .= ' AND ' if $several;
+            $several++;
+            $named->{$arg} =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
+            $newfilter .= qq(($arg =~ '$named->{$arg}'));
+        }
+        if ( @{$unnamed} ) {
+            $newfilter .= ' AND ' if $several;
+            my $artist = join q{.}, @{$unnamed};
+            $artist =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
+            $newfilter .= qq((artist =~ '$artist'));
+            $several++;
+        }
+        $newfilter = "($newfilter)" if $several > 1;
+    }
 
     $ret = $cmd eq 'playSelection' ?
         mpd_cmd($hash, clb."stop\nclear\nfindadd \"$filtercmd\"\nplay\n".cle)
@@ -2245,13 +2264,17 @@ sub MPD_SaveBookmark($)
 
 1;
 
+__END__
+
 =pod
+
+=encoding utf8
 =item device
 =item summary  controls MPD or Mopidy music server
 =item summary_DE steuert den MPD oder Mopidy Musik Server
 =begin html
 
-<a name="MPD"></a>
+<a id="MPD"></a>
 <h3>MPD</h3>
  FHEM module to control a MPD (or Mopidy) like the MPC (MPC =  Music Player Command, the command line interface to the <a href='http://en.wikipedia.org/wiki/Music_Player_Daemon'>Music Player Daemon</a> )<br>
 To install a MPD on a Raspberry Pi you will find a lot of documentation at the web e.g. http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi  in german<br>
@@ -2259,8 +2282,8 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
 Modul requires JSON -> sudo apt-get install libjson-perl <br>
 If you are using Mopidy with Spotify support you may also need LWP::UserAgent -> sudo apt-get install libwww-perl<br>
 <ul>
- <a name="MPDdefine"></a>
-  <b>Define</b>
+ <a id="MPD-define"></a>
+  <h4>Define</h4>
   <ul>
   define &lt;name&gt; MPD &lt;IP MPD Server | default localhost&gt; &lt;Port  MPD Server | default 6600&gt;<br>
   Example:<br>
@@ -2273,8 +2296,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
   </pre>
   </ul>
   <br>
-  <a name="MPDset"></a>
-  <b>Set</b><ul>
+  <a id="MPD-set"></a>
+  <h4>Set</h4><ul>
     <code>set &lt;name&gt; &lt;what&gt;</code>
     <br>&nbsp;<br>
     Currently, the following commands are defined.<br>
@@ -2310,8 +2333,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     load_bookmark <name> => resumes the previously saved state of the currently loaded playlist and jumps to the associated tracknumber and position inside the track<br>
    </ul>
   <br>
-  <a name="MPDget"></a>
-  <b>Get</b><ul>
+  <a id="MPD-get"></a>
+  <h4>Get</h4><ul>
     <code>get &lt;name&gt; &lt;what&gt;</code>
     <br>&nbsp;<br>
     Currently, the following commands are defined.<br>
@@ -2329,41 +2352,63 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     bookmarks => list all stored bookmarks<br>
   </ul>
   <br>
-  <a name="MPDattr"></a>
-  <b>Attributes</b>
+  <a id="MPD-attr"></a>
+  <h4>Attributes</h4>
   <ul>
+      <a id="MPD-attr-password"></a>
       <li>password <pwd>,  if password in mpd.conf is set</li>
-      <li>loadMusic 1|0 => load titles from MPD database at startup (not supported by modipy)</li>
+      <a id="MPD-attr-loadMusic"></a>
+      <li>loadMusic 1|0 => load titles from MPD database at startup (not supported by modipy, no longer recommended for activation!)</li>
+      <a id="MPD-attr-loadPlaylists"></a>
       <li>loadPlaylists 1|0 => load playlist names from MPD database at startup</li>
+      <a id="MPD-attr-volumeStep"></a>
       <li>volumeStep 1|2|5|10 =>  Step size for Volume +/- (default 5)</li>
+      <a id="MPD-attr-titleSplit"></a>
       <li>titleSplit 1|0 => split title to artist and title if no artist is given in songinfo (e.g. radio-stream default 1)</li>
+      <a id="MPD-attr-timeout"></a>
       <li>timeout (default 1) => timeout in seconds for TCP connection timeout</li>
+      <a id="MPD-attr-waits"></a>
       <li>waits (default 60) => if idle process ends with error, seconds to wait</li>
+      <a id="MPD-attr-stateMusic"></a>
       <li>stateMusic 1|0 => show Music DropDown box in web frontend</li>
+      <a id="MPD-attr-statePlaylists"></a>
       <li>statePlaylists 1|0 => show Playlists DropDown box in web frontend</li>
+      <a id="MPD-attr-player"></a>
       <li>player  mpd|mopidy|forked-daapd => which player is controlled by the module</li>
       <li>Cover Art functions from <a href="http://www.last.fm/"><b>Last.fm</b></a> :</li>
+      <a id="MPD-attr-image_size"></a>
       <li>image_size -1|0|1|2|3  (default -1 = don't use artist images and album cover from Last.fm)<br>
       Last.fm is using diffrent image sizes :<br>
       0 = 32x32 , 1 = 64x64 , 2 = 174x174 , 3 = 300x300</li>
+      <a id="MPD-attr-artist_content"></a>
       <li>artist_content 0|1 => store artist informations in Reading artist_content</li>
-      <li>artist_summary 0|1 => stote more artist informations in Reading artist_summary<br>
+      <a id="MPD-attr-artist_summary"></a>
+      <li>artist_summary 0|1 => store more artist informations in Reading artist_summary<br>
       Example with readingsGroup :<br>
       <pre>
        define rg_artist readingsGroup &ltMPD name&gt:artist,artist_image_html,artist_summary
       attr rg_artist room MPD
      </pre></li>
+      <a id="MPD-attr-cache"></a>
       <li>cache (default lfm => /fhem/www/lfm) store artist image and album cover in a local directory</li>
+      <a id="MPD-attr-unknown_artist_image"></a>
       <li>unknown_artist_image => show this image if no other image is avalible (default : /fhem/icons/1px-spacer)</li>
+      <a id="MPD-attr-bookmarkDir"></a>
       <li>bookmarkDir => set a writeable directory here to enable saving and restoring of playlist states using the set bookmark and get bookmark commands</li>
+      <a id="MPD-attr-autoBookmark"></a>
       <li>autoBookmark => set this to 1 to enable automatic loading and saving of playlist states whenever the playlist is changed using this module</li>
+      <a id="MPD-attr-seekStep"></a>
       <li>seekStep => set this to define how far the forward and rewind commands jump in the current track. Defaults to 7 if not set</li>
+      <a id="MPD-attr-seekStepSmall"></a>
       <li>seekStepSmall (default 1) => set this on top of seekStep to define a smaller step size, if the current playing position is below seekStepThreshold percent. This is useful to skip intro music, e.g. in radio plays or audiobooks.</li>
+      <a id="MPD-attr-seekStepSmallThreshold"></a>
       <li>seekStepSmallThreshold (default 0) => used to define when seekStep or seekStepSmall is applied. Defaults to 0. If set e.g. to 10, then during the first 10% of a track, forward and rewind are using the seekStepSmall value.</li>
+      <a id="MPD-attr-no_playlistcollection"></a>
       <li>no_playlistcollection (default 0) => if set to 1 , dont create reading playlistcollection</li>
   </ul>
   <br>
-  <b>Readings</b>
+  <a id="MPD-readings"></a>
+  <h4>Readings</h4>
   <ul>
     all MPD internal values<br>
     artist_image : (if using Last.fm)<br>
@@ -2385,7 +2430,7 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
 
 =begin html_DE
 
-<a name="MPD"></a>
+<a id="MPD"></a>
 <h3>MPD</h3>
 <ul>
   FHEM Modul zur Steuerung des MPD (oder Mopidy) &auml;hnlich dem MPC (MPC =  Music Player Command, das Kommando Zeilen Interface f&uuml;r den 
@@ -2394,8 +2439,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
   z.B. <a href="http://www.forum-raspberrypi.de/Thread-tutorial-music-player-daemon-mpd-und-mpc-auf-dem-raspberry-pi"><b>hier</b></a><br>
   Thread im FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f&uuml;r MPD</a><br>
   Das Modul ben&ouml;tigt zwingend JSON, installation z.B. mit <i>sudo apt-get install libjson-perl</i><br>
-  <a name="MPDdefine"></a>
-  <b>Define</b>
+  <a id="MPD-define"></a>
+  <h4>Define</h4>
   <ul>
     define &lt;name&gt; MPD &lt;IP MPD Server | default localhost&gt; &lt;Port  MPD Server | default 6600&gt;<br>
     Beispiel :<br>
@@ -2409,8 +2454,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     </ul>
   </ul>
   <br>
-  <a name="MPDset"></a>
-  <b>Set</b><ul>
+  <a id="MPD-set"></a>
+  <h4>Set</h4><ul>
     <code>set &lt;name&gt; &lt;was&gt;</code>
     <br>&nbsp;<br>
     z.Z. unterst&uuml;tzte Kommandos<br>
@@ -2448,8 +2493,8 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     wird <name> zusätzlich mit übergeben wird zuvor die entsprechend Playliste geladen<br>
    </ul>
   <br>
-  <a name="MPDget"></a>
-  <b>Get</b><ul>
+  <a id="MPD-get"></a>
+  <h4>Get</h4><ul>
     <code>get &lt;name&gt; &lt;was&gt;</code>
     <br>&nbsp;<br>
     z.Z. unterst&uuml;tzte Kommandos<br>
@@ -2467,48 +2512,70 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
     bookmarks => zeigt eine Liste aller bisher gespeicherten Bookmarks<br>
   </ul>
   <br>
-  <a name="MPDattr"></a>
-  <b>Attribute</b>
+  <a id="MPD-attr"></a>
+  <h4>Attribute</h4>
   <ul> 
+    <a id="MPD-attr-password"></a>
     <li>password <pwd> => Password falls in der mpd.conf definiert</li>
-    <li>loadMusic 1|0  => lade die MPD Titel beim FHEM Start :  mpd.conf - music_directory</li>
+    <a id="MPD-attr-loadMusic"></a>
+    <li>loadMusic 1|0  => lade die MPD Titel beim FHEM Start :  mpd.conf - music_directory. Achtung: funktioniert nicht mit modipy und ist allgemein nicht mehr zu empfehlen!</li>
+    <a id="MPD-attr-loadPlaylists"></a>
     <li>loadPlaylists 1|0 => lade die MPD Playlisten beim FHEM Start : mpd.conf - playlist_directory</li>
+    <a id="MPD-attr-volumeStep"></a>
     <li>volumeStep x => Schrittweite f&uuml;r Volume +/-</li>
+    <a id="MPD-attr-titleSplit"></a>
     <li>titleSplit 1|0 => zerlegt die aktuelle Titelangabe am ersten Vorkommen von - (BlankMinusBlank) in die zwei Felder Artist und Titel,<br>
     wenn im abgespielten Titel die Interpreten Information nicht verf&uuml;gbar ist (sehr oft bei Radio-Streams default 1)<br>
     Liegen keine Titelangaben vor wird die Ausgabe durch den Namen der Radiostation ersetzt</li>
+    <a id="MPD-attr-timeout"></a>
     <li>timeout (default 1) => Timeoutwert in Sekunden für die Verbindung fhem-mpd</li>
+    <a id="MPD-attr-waits"></a>
     <li>waits (default 60) => &Uuml;berwachungszeit in Sekunden f&uuml;r den Idle Prozess. In Verbindung mit refresh_song der Aktualisierungs Intervall für die aktuellen Songparamter,<br>
        (z.B. um den Fortschrittsbalken bei TabletUI aktuell zu halten) </li>
+    <a id="MPD-attr-stateMusic"></a>
     <li>stateMusic 1|0 => zeige Musikliste als DropDown im Webfrontend</li>
+    <a id="MPD-attr-statePlaylists"></a>
     <li>statePlaylists 1|0 => zeige Playlisten als DropDown im Webfrontend</li>
+    <a id="MPD-attr-player"></a>
     <li>player  mpd|mopidy|forked-daapd (default mpd) => welcher Player wird gesteuert<br>
     <b>ACHTUNG</b> : Mopidy unterst&uuml;tzt nicht alle Kommandos des echten MPD ! (siehe <a href="https://docs.mopidy.com/en/latest/ext/mpd/">Mopidy Dokumentation</a>)</li>
     <li>Cover Art Funktionen von <a href="http://www.last.fm/"><b>last.fm</b></a> :</li>
+    <a id="MPD-attr-image_size"></a>
     <li>image_size -1|0|1|2|3  (default -1 = keine Interpretenbilder und Infos von last.fm verwenden)<br>
     last.fm stellt verschiedene Bildgroessen zur Verfügung :<br>
      0 = 32x32 , 1 = 64x64 , 2 = 174x174 , 3 = 300x300</li>
+   <a id="MPD-attr-artist_content"></a>
    <li>artist_content 0|1 => stellt Interpreteninformation im Reading artist_content zur Verf&uuml;gung</li>
+   <a id="MPD-attr-artist_summary"></a>
    <li>artist_summary 0|1 => stellt weitere Interpreteninformation im Reading artist_summary zur Verf&uuml;gung<br>
     Beispiel Anzeige mittels readingsGroup :<br>
     <pre>
       define rg_artist readingsGroup &ltMPD name&gt:artist,artist_image_html,artist_summary
       attr rg_artist room MPD
     </pre></li>
+   <a id="MPD-attr-cache"></a>
    <li>cache (default lfm => /fhem/www/lfm) Zwischenspeicher für die JSON und PNG Dateien<br>
    <b>Wichtig</b> : Der User unter dem der fhem Prozess ausgef&uuml;hrt wird (default fhem) muss Lese und Schreibrechte in diesem Verzeichniss haben !<br>
    Das Verzeichnis sollte auch unterhalb von www liegen, damit der fhem Webserver direkten Zugriff auf die Bilder hat.</li>
+   <a id="MPD-attr-unknown_artist_image"></a>
    <li>unknown_artist_image => Ersatzimage wenn kein anderes Image zur Verf&uuml;gung steht (default : /fhem/icons/1px-spacer)</li>
+   <a id="MPD-attr-bookmarkDir"></a>
    <li>bookmarkDir => ein vom FHEM User les- und beschreibbares Verzeichnis. Wennn dieses definiert wird, ist das Speichern und Wiederherstellen von Playlistzust&auml;nden mit Hilfe von set/get bookmark m&ouml;glich</li>
+   <a id="MPD-attr-autoBookmark"></a>
    <li>autoBookmark => wenn dies auf 1 gesetzt wird, dann werden automatisch Playlistenzust&auml;nde geladen und gespeichert, immer wenn die Playliste mit diesem Modul gewechselt wird</li>
+   <a id="MPD-attr-seekStep"></a>
    <li>seekStep => wenn definiert, wird dadurch die Sprungweite von forward und rewind gesetzt. Der Wert gilt als Prozentwert. default: 7</li>
+   <a id="MPD-attr-seekStepSmall"></a>
    <li>seekStepSmall => Wenn diesem Attribut kann für den Anfang eines Tracks innerhalb der ersten per seekStepSmall definierten Prozent eine kleinere Sprungweite definiert werden,<br>
    um so z.B. die Intromusik von H&ouml;rspielen oder H&ouml;rb&uuml;chern &uuml;berspringen zu k&ouml;nnen. default: 1</li>
+   <a id="MPD-attr-seekStepSmallThreshold"></a>
    <li>seekStepSmallThreshold => unterhalb dieses Wertes wird seekStepSmall benutzt, oberhalb seekStep default: 0 (ohne Funktion)</li>
+   <a id="MPD-attr-no_playlistcollection"></a>
    <li>no_playlistcollection (default 0) => wenn auf 1 gesetzt wird das Reading playlistcollection nicht erzeugt</li> 
    </ul>
   <br>
-  <b>Readings</b>
+  <a id="MPD-readings"></a>
+  <h4>Readings</h4>
   <ul>
     - alle MPD internen Werte<br>
     - vom Modul direkt erzeugte Readings :<br>
@@ -2534,7 +2601,4 @@ If you are using Mopidy with Spotify support you may also need LWP::UserAgent ->
 =end html_DE
 
 =cut
-
-
-
 
