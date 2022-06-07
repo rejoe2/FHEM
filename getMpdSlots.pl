@@ -5,13 +5,24 @@
 use strict;
 use warnings;
 use IO::Socket;
+use Scalar::Util qw(looks_like_number);
 
-my $host = '192.168.2.91';
+my $host = '127.0.0.10';
 my $port = '6600'; #default
 my $timeout = 2;
 my $password = '';
 
+my $md;
+
+if ( @ARGV ) {
+  $md = shift @ARGV if looks_like_number($ARGV[0]);
+}
+
+my $mode = $md // 0; # 0 = print all, 1 = playlist, 2 = genres, 3 = artists 4 = albums 5 = artists+albums
+
 my $maxartists = 10;
+my $ignArtists = qr{De.Vision}mi;
+my $ignAlbums = qr{\d\d\d\d-\d\d-\d\d|\d\d-\d\d-\d\d\d\d}m;
 
 my $sock = IO::Socket::INET->new(
     PeerHost => $host,
@@ -20,10 +31,10 @@ my $sock = IO::Socket::INET->new(
     Timeout  => $timeout
     );
 
-printf("started\n");
+printf("started\n") if !$mode;
 die $! if !$sock;
 
-printf("sock ok\n");
+printf("sock ok\n")  if !$mode;
 
 while (<$sock>)  # MPD rede mit mir , egal was ;)
  { last if $_ ; } # end of output.
@@ -46,11 +57,12 @@ if ($password ne '') {
   }
 }
 
-my ($artists, $artist, @playlists);
+my ($artists, $artist, @playlists, @genres);
 
 #start playlist request
-print $sock "listplaylists\r\n";
+print $sock "listplaylists\r\n"  if !$mode;
 while (<$sock>) {
+  last if $mode > 1;
   die  "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
   last if $_ =~ m/^OK/;    # end of output.
 
@@ -59,19 +71,59 @@ while (<$sock>) {
   }
 }
 
-print $sock "list album group albumartist\r\n";
+
+#start genre request
+print $sock "list genre\r\n"  if !$mode || $mode == 1;
+while (<$sock>) {
+  last if $mode > 1;
+  die  "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
+  last if $_ =~ m/^OK/;    # end of output
+
+  if ( $_ =~ m{\A(?:Genre[:]\s)(.+)} ) {
+    my $gre = $1;
+    $gre = undef if $gre && $gre =~ m{\A\s*\(*\d+\)*\s*\z}x;
+    $gre = undef if $gre && length($gre)<4;
+    $gre = undef if $gre && $gre eq '<unknown>';
+    push @genres, $gre if $gre;
+  }
+}
+
+
+print $sock "list album group albumartist group musicbrainz_albumid group musicbrainz_albumartistid\r\n"  if !$mode || $mode > 1;
+
+my $albm;
+
 while (<$sock>) {
   die "ACK ERROR $_" if $_ =~ s/^ACK //; # oops - error.
   last if $_ =~ m/^OK/;    # end of output.
 
   if ( $_ =~ m{\A(?:AlbumArtist[:]\s)(.*)} ) {
     $artist = $1;
+    $artist = undef if $artist =~ $ignArtists;
   }
   if ( $_ =~ m{\A(?:Album[:]\s)(.*)} ) {
     next if !$artist || !$1 || $artist eq "Various Artists";
-    $artists->{$artist}->{cnt}++;
-    push @{$artists->{$artist}->{albums}}, $1;
+    $albm = $1;
+    $albm = undef if $albm =~ $ignAlbums;
+
+    if ( $albm ) {
+        $artists->{$artist}->{cnt}++;
+        push @{$artists->{$artist}->{albums}}, $albm;
+    }
   }
+  if ( $_ =~ m{\A(?:MUSICBRAINZ_ALBUMID[:]\s)(.*)} ) {
+    next if !$artist || !$1 || $artist eq "Various Artists";
+    next if !$albm;
+    $artists->{$artist}->{mbid}->{$albm} = $1;
+    $albm = undef;
+    
+  }
+  if ( $_ =~ m{\A(?:MUSICBRAINZ_ALBUMARTISTID[:]\s)(.*)} ) {
+    next if !$artist || !$1 || $artist eq "Various Artists";
+    next if !$albm;
+    $artists->{$artist}->{mbaid}->{$albm} = $1;
+  }
+
 }
 
 #got all data?
@@ -79,10 +131,29 @@ while (<$sock>) {
  close($sock); 
 
 
-printf("Playlists section \n\n") if @playlists;
+printf("Playlists section \n\n") if @playlists && !$mode;
 for ( @playlists ) {
-    printf("( ( %s ):%s )\n", $_, $_);
+    last if $mode && $mode > 1;
+    printf("( ( %s ):(%s) )\n", $_, $_);
 }
+
+#die if $mode && $mode == 1;
+exit(0) if $mode && $mode == 1;
+
+printf("Genre section \n\n") if @playlists && ( !$mode || $mode == 2 );
+for ( @genres ) {
+    last if $mode && $mode > 2;
+    my $genr = $_;
+    my $genr1 = $_;
+    $genr =~ s{[\(\),.:_`´ /!<>?\[\]\{\}&+']}{ }g;
+    $genr1 =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
+    printf("( ( %s ):(%s) )\n", $genr, $genr1);
+}
+printf("\n") if @genres && !$mode;
+
+
+exit(0) if $mode && $mode == 2;
+
 
 my $albums;
 
@@ -123,47 +194,88 @@ sub cleanup {
     }
     $text =~ s{[+]}{ plus }g;
     $text =~ s{[&]}{ and }g;
-    $text =~ s{[\(\),.:_`´/!<>?\[\]\{\}]}{ }g;
-    $text =~ s{\A\s*The}{[The]}i;
+    $text =~ s{[\(\),.:_`´"/!<>?\[\]\{\}]}{ }g;
+    if ( $isalb  ) {
+        $text =~ s{\s+[']\s+}{};
+        $text =~ s{\s+[-]\s+}{ };
+        $text =~ s{\s+[']n\s+}{ and };
+        $text =~ s{(\d{2,4})-(\d{2,4})}{$1 <to> $1};
+    }
+    $text =~ s{\A\s*The\s+}{[The] }i;
 
     return $text;
 }
 
-printf("\n") if @playlists;
+sub cleanup2 {
+    my $text  = shift // return;
+    $text =~ s{[\(\),.:_`´ /!<>?\[\]\{\}&+"']}{.}g;
+    return $text;
+}
+
+printf("\n") if @playlists && !$mode;
+
 my @artlist = sort {
         $artists->{$b}{cnt} <=> $artists->{$a}{cnt}
         or
         $artists->{$a} <=> $artists->{$b}
         }  keys %{$artists};
 
-printf("Artists section \n\n") if @artlist;
+printf("Artists section \n\n") if @artlist && !$mode;
+
 for my $i (0..$maxartists-1) {
     my $lcart = cleanup($artlist[$i]);
     $artists->{$artlist[$i]}->{clean} = $lcart;
-    printf("( ( %s ):%s )\n", $lcart, $artlist[$i]);
+    $lcart = cleanup2($artlist[$i]);
+    $artists->{$artlist[$i]}->{regex} = $lcart;
+    printf("( ( %s ):(%s) )\n", $lcart, $artlist[$i]) if !$mode || $mode == 2;
     for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
-        $albums->{$alb} = $alb;
+        my $id = $artists->{$artlist[$i]}->{mbid}->{$alb} // $alb;
+        $albums->{$alb} = $id;
     };
 }
+
+die if $mode && $mode == 3; 
+
+my $ids;
 for my $alb ( sort keys %{$albums} ) {
-        $albums->{$alb} = cleanup($alb, 1);
-    };
+    $ids->{$alb} = $albums->{$alb} if $albums->{$alb} ne $alb;
+    $albums->{$alb} = cleanup($alb, 1);
+};
 
 
-printf("\nAlbums section \n\n") if @artlist;
+printf("\nAlbums section \n\n") if @artlist && !$mode;
 
 for my $alb (sort keys %{$albums}) {
-    printf("( ( %s ):%s )\n", $albums->{$alb}, $alb);
-}
-
-printf("\nAlbums +artist section \n\n") if @artlist;
-for my $i (0..$maxartists-1) {
-    my $lcart = $artists->{$artlist[$i]}->{clean};
-    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
-        printf("( ( %s ):%s ){Album} <by> ( ( %s ):%s ){AlbumArtist}\n", $albums->{$alb}, $alb, $lcart, $artlist[$i])
+    last if $mode && $mode ne '3';
+    if ( defined $ids->{$alb} ) {
+        printf("( ( %s ):(%s) ){AlbumId}\n", $albums->{$alb}, $ids->{$alb});
+    } else {
+        my $cleaned = cleanup2($alb);
+        printf("( ( %s ):(%s) ){Album}\n", $albums->{$alb}, $cleaned);
     }
 }
 
+die if $mode && $mode == 4; 
+
+printf("\nAlbums +artist section \n\n") if @artlist && !$mode;
+for my $i (0..$maxartists-1) {
+    my $lcart = $artists->{$artlist[$i]}->{clean};
+    for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
+        if ( defined $artists->{$artlist[$i]}->{mbid} && defined $artists->{$artlist[$i]}->{mbid}->{$alb} ) {
+            my $id = $artists->{$artlist[$i]}->{mbid}->{$alb};
+            if (defined $artists->{$artlist[$i]}->{mbaid} && defined $artists->{$artlist[$i]}->{mbaid}->{$alb}) {
+                printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtistId}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{mbaid}->{$alb});
+            } else {
+                printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{regex});
+            }
+        } else {
+            my $cleaned = cleanup2($alb);
+            printf("( ( %s ):(%s) ){Album} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $cleaned,  $lcart, $artists->{$artlist[$i]}->{regex})
+        }
+    }
+}
+
+exit(0);
 
 __END__
 
