@@ -12,13 +12,10 @@ my $port = '6600'; #default
 my $timeout = 2;
 my $password = '';
 
-my $md;
+my $mode = shift @ARGV;
+# 0 = print all, 1 = playlist, 2 = genres, 3 = artists 4 = albums 5 = artists+albums
 
-if ( @ARGV ) {
-  $md = shift @ARGV if looks_like_number($ARGV[0]);
-}
-
-my $mode = $md // 0; # 0 = print all, 1 = playlist, 2 = genres, 3 = artists 4 = albums 5 = artists+albums
+$mode = 0 if !defined $mode || !looks_like_number($mode);
 
 my $maxartists = 10;
 my $ignArtists = qr{De.Vision}mi;
