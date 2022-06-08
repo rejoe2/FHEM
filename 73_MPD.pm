@@ -101,8 +101,8 @@ my %sets = (
 	"load_bookmark"         => "",
 	"active:noArg" 	        => "",
 	"inactive:noArg"        => "",
-    playSelection           => '',
-    addSelection            => ''
+    #playSelection           => '',
+    #addSelection            => ''
          );
 
 use constant clb => "command_list_begin\n";

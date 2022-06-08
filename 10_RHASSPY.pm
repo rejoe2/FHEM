@@ -1323,6 +1323,9 @@ sub _analyze_genDevType {
             };
 
         $currentMapping = _analyze_genDevType_setter( $hash, $device, $allset, $currentMapping );
+        if ( InternalVal($device, 'TYPE', 'unknown') eq 'MPD' ) {
+            $currentMapping->{MediaControls}->{MediaControls}->{cmdPlaySelected} = 'playSelection'; $currentMapping->{MediaControls}->{MediaControls}->{cmdAddSelected} = 'addSelection';
+        }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
@@ -1396,7 +1399,7 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => {
-            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist', cmdPlaySelected => 'playSelection', cmdAddSelected => 'addSelection'},
+        cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist' },# , cmdPlaySelected => 'playSelection', cmdAddSelected => 'addSelection'},
         GetState => {
             update => 'reread|update|reload' },
         SetScene => {
@@ -2660,20 +2663,18 @@ sub analyzeAndRunCmd {
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         if ( defined $hash->{testline} ) {
             push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command(s): $cmd";
-            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command(s): $cmd";
             return;
         }
         $error = AnalyzeCommandChain($hash, $cmd);
         $returnVal = (split m{\s+}x, $cmd)[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
-    elsif ($cmd =~ m{:}x) {
+    elsif ($cmd =~ m{:}x && $cmd !~ m{\bmpdCMD\b}x) {
     $cmd   =~ s{:}{ }x;
         $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         if ( defined $hash->{testline} ) {
             push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Redirected command: $cmd";
-            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Redirected command: $cmd";
             return;
         }
         $error = AnalyzeCommand($hash, "set $cmd");
@@ -5044,11 +5045,12 @@ sub handleIntentMediaControls {
 
     #check if confirmation is required
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
-    my $cmd = $mapping->{$command};
 
+    my $cmd = $mapping->{$command};
     $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
 
     if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
+        return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if InternalVal($device, 'TYPE', 'unknown') ne 'MPD';
         my $newfilter; my $several;
         for my $arg ( qw( ArtistId AlbumId Album Artist Albumartist Title Genre Name ) ) {
             next if !defined $data->{$arg};
@@ -5059,7 +5061,19 @@ sub handleIntentMediaControls {
             $newfilter .= qq(($arg1 =~ '$data->{$arg}'));
         }
         $newfilter = "($newfilter)" if $several > 1;
-        $cmd .= " $newfilter";
+        $cmd = "$newfilter";
+        if ( defined $data->{Window} ) {
+            if ( looks_like_number($data->{Window}) ) {
+                $data->{Window} = "0:$data->{Window}";
+                $cmd .= " window $data->{Window}" ;
+            }
+        } 
+        if ( defined $data->{AlbumId} || defined $data->{Album} ) {
+            $cmd .= ' sort track';
+        }
+        $cmd = "findadd $cmd\n";
+        $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
+        $cmd = "mpdCMD $cmd";
     }
 
     # Execute Cmd
