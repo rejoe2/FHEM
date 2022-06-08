@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26102 2022-06-07 Beta-User $
+# $Id: 10_RHASSPY.pm 26102 2022-06-08 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2250,7 +2250,7 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
-    if ( !$isVirt && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
+    if ( !$isVirt && !keys %{$devices} && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
         my $intent = $data->{intent} // return;
         $intent =~ s{Group\z}{}x;
 
