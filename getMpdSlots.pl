@@ -7,6 +7,8 @@ use warnings;
 use IO::Socket;
 use Scalar::Util qw(looks_like_number);
 
+$| = 1; #https://stackoverflow.com/questions/50688298/how-to-redirect-this-perl-scripts-output-to-file#
+
 my $host = '127.0.0.10';
 my $port = '6600'; #default
 my $timeout = 2;
@@ -28,6 +30,7 @@ my $sock = IO::Socket::INET->new(
     Timeout  => $timeout
     );
 
+#printf("started in mode $mode\n") if $mode;
 printf("started\n") if !$mode;
 die $! if !$sock;
 

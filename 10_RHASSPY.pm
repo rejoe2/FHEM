@@ -1321,6 +1321,10 @@ sub _analyze_genDevType {
             SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'} },
             GetNumeric => { 'volume' => {currentVal => 'volume', type => 'volume' } }
             };
+        if ( $allset !~ m{\b(on)([\b:\s]|\Z)}xmsi ) {
+            delete $currentMapping->{GetOnOff};
+            delete $currentMapping->{SetOnOff};
+        }
 
         $currentMapping = _analyze_genDevType_setter( $hash, $device, $allset, $currentMapping );
         if ( InternalVal($device, 'TYPE', 'unknown') eq 'MPD' ) {
@@ -1399,7 +1403,7 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => {
-        cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist' },# , cmdPlaySelected => 'playSelection', cmdAddSelected => 'addSelection'},
+        cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist' },
         GetState => {
             update => 'reread|update|reload' },
         SetScene => {
