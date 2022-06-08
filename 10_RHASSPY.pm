@@ -5049,12 +5049,11 @@ sub handleIntentMediaControls {
     $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
 
     if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
-        $cmd .= $command eq 'cmdPlaySelected' ? ' playSelection' : ' addSelection';
         my $newfilter; my $several;
         for my $arg ( qw( ArtistId AlbumId Album Artist Albumartist Title Genre Name ) ) {
             next if !defined $data->{$arg};
             my $arg1 = lc $arg;
-            "musicbrainz_$arg1" if $arg eq 'ArtistId' || $arg eq 'AlbumId';
+            $arg1 = "musicbrainz_$arg1" if $arg eq 'ArtistId' || $arg eq 'AlbumId';
             $newfilter .= ' AND ' if $several;
             $several++;
             $newfilter .= qq(($arg1 =~ '$data->{$arg}'));

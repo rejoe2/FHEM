@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-07 Beta-User $
+#  $Id: 73_MPD.pm 23900 2022-06-08 Beta-User $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -893,6 +893,8 @@ sub MPD_Set($@)
 
     $hash->{'.playlist'} = '';
     readingsSingleUpdate($hash,'playlistname','',1);
+    #shift @a; shift @a;
+
     my $filtercmd = join q{ }, @a;
     $hash->{'.music'}    = $filtercmd; # interne Song Verwaltung
 
@@ -912,8 +914,10 @@ sub MPD_Set($@)
             $newfilter .= qq((artist =~ '$artist'));
             $several++;
         }
-        $newfilter = "($newfilter)" if $several > 1;
+        $filtercmd = "($newfilter)" if $several > 1;
     }
+
+    Log3($name, 3, "$name called with $cmd, filter is $filtercmd!");
 
     $ret = $cmd eq 'playSelection' ?
         mpd_cmd($hash, clb."stop\nclear\nfindadd \"$filtercmd\"\nplay\n".cle)
