@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use IO::Socket;
 use Scalar::Util qw(looks_like_number);
+use feature 'say';
 
 $| = 1; #https://stackoverflow.com/questions/50688298/how-to-redirect-this-perl-scripts-output-to-file#
 
@@ -31,10 +32,12 @@ my $sock = IO::Socket::INET->new(
     );
 
 #printf("started in mode $mode\n") if $mode;
-printf("started\n") if !$mode;
+#printf("started\n") if !$mode;
+say 'started' if !$mode;
 die $! if !$sock;
 
-printf("sock ok\n")  if !$mode;
+#printf("sock ok\n")  if !$mode;
+say 'sock ok' if !$mode;
 
 while (<$sock>)  # MPD rede mit mir , egal was ;)
  { last if $_ ; } # end of output.
@@ -127,14 +130,17 @@ while (<$sock>) {
 }
 
 #got all data?
- print $sock "close\n";
- close($sock); 
+print $sock "close\n";
+close($sock); 
 
 
-printf("Playlists section \n\n") if @playlists && !$mode;
+#printf("Playlists section \n\n") if @playlists && !$mode;
+say 'Playlists section \n' if @playlists && !$mode;
+
 for ( @playlists ) {
     last if $mode && $mode > 1;
-    printf("( ( %s ):(%s) )\n", $_, $_);
+    #printf("( ( %s ):(%s) )\n", $_, $_);
+    say "( ( $_ ):($_) )";
 }
 
 #die if $mode && $mode == 1;
@@ -146,14 +152,14 @@ for ( @genres ) {
     my $genr = $_;
     my $genr1 = $_;
     $genr =~ s{[\(\),.:_`´ /!<>?\[\]\{\}&+']}{ }g;
-    $genr1 =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
-    printf("( ( %s ):(%s) )\n", $genr, $genr1);
+    $genr1 =~ s{[\(\),:_`´/!<>?\[\]\{\}&+']}{.}g;
+    $genr1 =~ s{[- ]}{.*}g;
+    #printf("( ( %s ):(%s) )\n", $genr, $genr1);
+    say "( ( $genr ):($genr1) )";
 }
 printf("\n") if @genres && !$mode;
 
-
 exit(0) if $mode && $mode == 2;
-
 
 my $albums;
 
@@ -220,14 +226,16 @@ my @artlist = sort {
         $artists->{$a} <=> $artists->{$b}
         }  keys %{$artists};
 
-printf("Artists section \n\n") if @artlist && !$mode;
+#printf("Artists section \n\n") if @artlist && !$mode;
+say 'Artists section\n' if @artlist && !$mode;
 
 for my $i (0..$maxartists-1) {
     my $lcart = cleanup($artlist[$i]);
     $artists->{$artlist[$i]}->{clean} = $lcart;
     $lcart = cleanup2($artlist[$i]);
     $artists->{$artlist[$i]}->{regex} = $lcart;
-    printf("( ( %s ):(%s) )\n", $lcart, $artlist[$i]) if !$mode || $mode == 2;
+    #printf("( ( %s ):(%s) )\n", $lcart, $artlist[$i]) if !$mode || $mode == 2;
+    say "( ( $lcart ):($artlist[$i]) )" if !$mode || $mode == 2;
     for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
         my $id = $artists->{$artlist[$i]}->{mbid}->{$alb} // $alb;
         $albums->{$alb} = $id;
@@ -242,35 +250,42 @@ for my $alb ( sort keys %{$albums} ) {
     $albums->{$alb} = cleanup($alb, 1);
 };
 
-
-printf("\nAlbums section \n\n") if @artlist && !$mode;
+#printf("\nAlbums section \n\n") if @artlist && !$mode;
+say '\nAlbums section \n' if @artlist && !$mode;
 
 for my $alb (sort keys %{$albums}) {
     last if $mode && $mode ne '3';
     if ( defined $ids->{$alb} ) {
-        printf("( ( %s ):(%s) ){AlbumId}\n", $albums->{$alb}, $ids->{$alb});
+        #printf("( ( %s ):(%s) ){AlbumId}\n", $albums->{$alb}, $ids->{$alb});
+        say "( ( $albums->{$alb} ):($ids->{$alb}) ){AlbumId})" if !$mode || $mode == 2;
     } else {
         my $cleaned = cleanup2($alb);
-        printf("( ( %s ):(%s) ){Album}\n", $albums->{$alb}, $cleaned);
+        #printf("( ( %s ):(%s) ){Album}\n", $albums->{$alb}, $cleaned);
+        say "( ( $albums->{$alb} ):($cleaned) ){Album}";
     }
 }
 
 die if $mode && $mode == 4; 
 
-printf("\nAlbums +artist section \n\n") if @artlist && !$mode;
+#printf("\nAlbums +artist section \n\n") if @artlist && !$mode;
+say '\nAlbums +artist section \n' if @artlist && !$mode;
+
 for my $i (0..$maxartists-1) {
     my $lcart = $artists->{$artlist[$i]}->{clean};
     for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
         if ( defined $artists->{$artlist[$i]}->{mbid} && defined $artists->{$artlist[$i]}->{mbid}->{$alb} ) {
             my $id = $artists->{$artlist[$i]}->{mbid}->{$alb};
             if (defined $artists->{$artlist[$i]}->{mbaid} && defined $artists->{$artlist[$i]}->{mbaid}->{$alb}) {
-                printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtistId}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{mbaid}->{$alb});
+                #printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtistId}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{mbaid}->{$alb});
+                say "( ( $albums->{$alb} ):($id) ){AlbumId} [<by> ( ( $lcart ):($artists->{$artlist[$i]}->{mbaid}->{$alb}) ){AlbumArtistId}]";
             } else {
-                printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{regex});
+                #printf("( ( %s ):(%s) ){AlbumId} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $id,  $lcart, $artists->{$artlist[$i]}->{regex});
+                say "( ( $albums->{$alb} ):($id) ){AlbumId} [<by> ( ( $lcart ):($artists->{$artlist[$i]}->{regex}) ){AlbumArtist}]";
             }
         } else {
             my $cleaned = cleanup2($alb);
-            printf("( ( %s ):(%s) ){Album} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $cleaned,  $lcart, $artists->{$artlist[$i]}->{regex})
+            #printf("( ( %s ):(%s) ){Album} [<by> ( ( %s ):(%s) ){AlbumArtist}]\n",$albums->{$alb}, $cleaned,  $lcart, $artists->{$artlist[$i]}->{regex});
+            say "( ( $albums->{$alb} ):($cleaned) ){Album} [<by> ( ( $lcart ):($artists->{$artlist[$i]}->{regex}) ){AlbumArtist}]";
         }
     }
 }
