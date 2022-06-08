@@ -10,7 +10,7 @@ use feature 'say';
 
 $| = 1; #https://stackoverflow.com/questions/50688298/how-to-redirect-this-perl-scripts-output-to-file#
 
-my $host = '127.0.0.10';
+my $host = '192.168.2.91';
 my $port = '6600'; #default
 my $timeout = 2;
 my $password = '';
@@ -22,7 +22,7 @@ $mode = 0 if !defined $mode || !looks_like_number($mode);
 
 my $maxartists = 10;
 my $ignArtists = qr{De.Vision}mi;
-my $ignAlbums = qr{\d\d\d\d-\d\d-\d\d|\d\d-\d\d-\d\d\d\d}m;
+my $ignAlbums = qr{\d\d\d\d-\d\d-\d\d|\d\d-\d\d-\d\d\d\d|The.Twelve.Inch}m;
 
 my $sock = IO::Socket::INET->new(
     PeerHost => $host,
@@ -133,9 +133,7 @@ while (<$sock>) {
 print $sock "close\n";
 close($sock); 
 
-
-#printf("Playlists section \n\n") if @playlists && !$mode;
-say 'Playlists section \n' if @playlists && !$mode;
+say 'Playlists section' if @playlists && !$mode;
 
 for ( @playlists ) {
     last if $mode && $mode > 1;
@@ -143,22 +141,21 @@ for ( @playlists ) {
     say "( ( $_ ):($_) )";
 }
 
-#die if $mode && $mode == 1;
 exit(0) if $mode && $mode == 1;
 
-printf("Genre section \n\n") if @playlists && ( !$mode || $mode == 2 );
+say 'Genre section' if @playlists && ( !$mode || $mode == 2 );
 for ( @genres ) {
     last if $mode && $mode > 2;
     my $genr = $_;
     my $genr1 = $_;
     $genr =~ s{[\(\),.:_`´ /!<>?\[\]\{\}&+']}{ }g;
-    $genr1 =~ s{[\(\),:_`´/!<>?\[\]\{\}&+']}{.}g;
     $genr1 =~ s{[- ]}{.*}g;
+    $genr1 =~ s{[\(\),:_`´/!<>?\[\]\{\}&+']}{.}g;
     #printf("( ( %s ):(%s) )\n", $genr, $genr1);
     say "( ( $genr ):($genr1) )";
 }
-printf("\n") if @genres && !$mode;
 
+say '' if @genres && !$mode;
 exit(0) if $mode && $mode == 2;
 
 my $albums;
@@ -218,7 +215,7 @@ sub cleanup2 {
     return $text;
 }
 
-printf("\n") if @playlists && !$mode;
+say '' if @playlists && !$mode;
 
 my @artlist = sort {
         $artists->{$b}{cnt} <=> $artists->{$a}{cnt}
@@ -226,8 +223,7 @@ my @artlist = sort {
         $artists->{$a} <=> $artists->{$b}
         }  keys %{$artists};
 
-#printf("Artists section \n\n") if @artlist && !$mode;
-say 'Artists section\n' if @artlist && !$mode;
+say 'Artists section' if @artlist && !$mode;
 
 for my $i (0..$maxartists-1) {
     my $lcart = cleanup($artlist[$i]);
@@ -235,7 +231,7 @@ for my $i (0..$maxartists-1) {
     $lcart = cleanup2($artlist[$i]);
     $artists->{$artlist[$i]}->{regex} = $lcart;
     #printf("( ( %s ):(%s) )\n", $lcart, $artlist[$i]) if !$mode || $mode == 2;
-    say "( ( $lcart ):($artlist[$i]) )" if !$mode || $mode == 2;
+    say "( ( $artists->{$artlist[$i]}->{clean} ):($lcart) )" if !$mode || $mode == 2;
     for my $alb ( @{$artists->{$artlist[$i]}->{albums}} ) {
         my $id = $artists->{$artlist[$i]}->{mbid}->{$alb} // $alb;
         $albums->{$alb} = $id;
@@ -251,24 +247,24 @@ for my $alb ( sort keys %{$albums} ) {
 };
 
 #printf("\nAlbums section \n\n") if @artlist && !$mode;
-say '\nAlbums section \n' if @artlist && !$mode;
+say 'Albums section' if @artlist && !$mode;
 
 for my $alb (sort keys %{$albums}) {
     last if $mode && $mode ne '3';
-    if ( defined $ids->{$alb} ) {
+    #if ( defined $ids->{$alb} ) {
         #printf("( ( %s ):(%s) ){AlbumId}\n", $albums->{$alb}, $ids->{$alb});
-        say "( ( $albums->{$alb} ):($ids->{$alb}) ){AlbumId})" if !$mode || $mode == 2;
-    } else {
+    #    say "( ( $albums->{$alb} ):($ids->{$alb}) ){AlbumId})" if !$mode || $mode == 2;
+    #} else {
         my $cleaned = cleanup2($alb);
         #printf("( ( %s ):(%s) ){Album}\n", $albums->{$alb}, $cleaned);
         say "( ( $albums->{$alb} ):($cleaned) ){Album}";
-    }
+    #}
 }
 
 die if $mode && $mode == 4; 
 
 #printf("\nAlbums +artist section \n\n") if @artlist && !$mode;
-say '\nAlbums +artist section \n' if @artlist && !$mode;
+say 'Albums +artist section' if @artlist && !$mode;
 
 for my $i (0..$maxartists-1) {
     my $lcart = $artists->{$artlist[$i]}->{clean};
