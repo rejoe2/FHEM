@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26102 2022-06-08 Beta-User $
+# $Id: 10_RHASSPY.pm 26102 2022-06-09 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -5065,6 +5065,9 @@ sub handleIntentMediaControls {
             $several++;
             $newfilter .= qq(($arg1 =~ '$data->{$arg}'));
         }
+
+        return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !$newfilter;
+
         $newfilter = "($newfilter)" if $several > 1;
         $cmd = "$newfilter";
         if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
