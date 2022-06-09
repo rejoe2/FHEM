@@ -5067,13 +5067,13 @@ sub handleIntentMediaControls {
         }
         $newfilter = "($newfilter)" if $several > 1;
         $cmd = "$newfilter";
-        if ( defined $data->{Window} && looks_like_number($data->{Window}) ) {
+        if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
             #Beta-User: needs review, as mpd will sort automatically.
             # we will first have to find out "count", (MPD-mdpCMD-request)
             # then have to decide which one to play first, and then 
             # set a timer to add all the others...
             my $counts = 100;
-            my $min = min($counts, $data->{Window});
+            my $min = min($counts, $data->{RandomNr});
             my @rands = map { int rand($counts + 1) } 1..$min;
             my $first = shift @rands;
             if (!defined $hash->{testline} ) {
