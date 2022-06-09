@@ -6745,7 +6745,9 @@ yellow=rgb FFFF00</code></p>
   <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
   By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
-  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i> or <i>cmdBack</i>
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available).<br>
+  If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
+  {ArtistId}, {AlbumId}, {Album}, {Artist}, {Albumartist}, {Title}, {Genre}, and {Name}. The first two will be treated as <i>musicbrainz_artistid</i> or <i>musicbrainz_albumid</i> respecively and (lower case) transfered to filter arguments as described in <a href="https://mpd.readthedocs.io/en/latest/protocol.html#filters">MPD documentation</a>. Additionally you may use {RandomNr} to shuffle the result and limit the songs added to the given number.
   <li>MediaChannels</li> (as configured by the user)
   <li>SetColor</li> 
   {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
