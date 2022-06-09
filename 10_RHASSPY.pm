@@ -5074,7 +5074,7 @@ sub handleIntentMediaControls {
             # set a timer to add all the others...
             my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
             Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
-            $err =~ m{COUNT:.(\d+)}xms;
+            $err =~ m{Songs:.(\d+)}xms;
             my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
             my $min = min($counts, $data->{RandomNr})-1;
             my @rands = shuffle(0..$counts-1);
