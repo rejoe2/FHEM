@@ -6172,7 +6172,7 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
   <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering.</li>
-  <li><b>autoTraining</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
+  <li><b>autoTraining</b>: deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
@@ -6532,7 +6532,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </ul>
   </li>
   <p><b>Remarks on rhasspySpeechDialog and Babble:</b><br><a id="RHASSPY-experimental"></a>
-    Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
+    Interaction with Babble and AMAD.*-Devices is not approved to be properly working yet. Further tests
     may be needed and functionality may be subject to changes!
   </p>
   <li>
@@ -6746,7 +6746,7 @@ yellow=rgb FFFF00</code></p>
   By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
   {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available).<br>
-  If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
   {ArtistId}, {AlbumId}, {Album}, {Artist}, {Albumartist}, {Title}, {Genre}, and {Name}. The first two will be treated as <i>musicbrainz_artistid</i> or <i>musicbrainz_albumid</i> respecively and (lower case) transfered to filter arguments as described in <a href="https://mpd.readthedocs.io/en/latest/protocol.html#filters">MPD documentation</a>. Additionally you may use {RandomNr} to shuffle the result and limit the songs added to the given number.
   <li>MediaChannels</li> (as configured by the user)
   <li>SetColor</li> 
