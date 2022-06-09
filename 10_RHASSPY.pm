@@ -269,6 +269,7 @@ BEGIN {
     setVolume
     AnalyzeCommandChain
     AnalyzeCommand
+    CommandSet
     CommandDefMod
     CommandDelete
     EvalSpecials
@@ -5066,15 +5067,29 @@ sub handleIntentMediaControls {
         }
         $newfilter = "($newfilter)" if $several > 1;
         $cmd = "$newfilter";
-        if ( defined $data->{Window} ) {
-            if ( looks_like_number($data->{Window}) ) {
-                $data->{Window} = "0:$data->{Window}";
-                $cmd .= " window $data->{Window}" ;
+        if ( defined $data->{Window} && looks_like_number($data->{Window}) ) {
+            #Beta-User: needs review, as mpd will sort automatically.
+            # we will first have to find out "count", (MPD-mdpCMD-request)
+            # then have to decide which one to play first, and then 
+            # set a timer to add all the others...
+            my $counts = 100;
+            my $min = min($counts, $data->{Window});
+            my @rands = map { int rand($counts + 1) } 1..$min;
+            my $first = shift @rands;
+            if (!defined $hash->{testline} ) {
+                my $fnHash = resetRegIntTimer( $device, time, \&delayedMpdCommands, $hash, 0);
+                $fnHash->{enqueue} = join q{:},@rands;
+                $fnHash->{command} = 'findadd';
+                $fnHash->{filter}  = $cmd;
             }
+            my $ends = $first+1;
+            #$data->{Window} = "$first:$data->{Window}";
+            $cmd .= " window $first:$ends" ;
+            #Log3( $hash, 3, "[$hash->{NAME}] random array is @rands" );
         } 
-        if ( defined $data->{AlbumId} || defined $data->{Album} ) {
-            $cmd .= ' sort track';
-        }
+        #if ( defined $data->{AlbumId} || defined $data->{Album} ) {
+        #    $cmd .= ' sort track';
+        #}
         $cmd = "findadd $cmd\n";
         $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
         $cmd = "mpdCMD $cmd";
@@ -6045,6 +6060,26 @@ sub _replaceDecimalPoint {
     }
     $line =~ s{(\s*\d+)[:](\d+)\s+(\w+)}{$1 $3 $2 }g; #Beta-User: Zeitangaben
     return $line;
+}
+
+
+sub delayedMpdCommands {
+    my $fnHash = shift // return;
+
+    my $device = $fnHash->{MODIFIER};
+    my $cmd    = $fnHash->{command};
+    my $filter = $fnHash->{filter};
+    my @rands  = split m{:}x, $fnHash->{enqueue};
+    my $todo = "$device mpdCMD $cmd $filter window";
+
+    while ( @rands ) {
+        my $single = shift @rands;
+        my $sand1 = $single+1;
+        CommandSet(undef, "$todo $single:$sand1\n");
+        #Log3( $fnHash->{HASH}, 3, "[RHASSPY] $todo $single:$sand1" );
+    }
+
+    return;
 }
 
 1;
