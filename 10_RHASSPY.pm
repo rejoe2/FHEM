@@ -37,7 +37,7 @@ use JSON ();
 use Encode;
 use HttpUtils;
 use utf8;
-use List::Util 1.45 qw(max min uniq);
+use List::Util 1.45 qw(max min uniq shuffle);
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
@@ -5072,10 +5072,16 @@ sub handleIntentMediaControls {
             # we will first have to find out "count", (MPD-mdpCMD-request)
             # then have to decide which one to play first, and then 
             # set a timer to add all the others...
-            my $counts = 100;
-            my $min = min($counts, $data->{RandomNr});
-            my @rands = map { int rand($counts + 1) } 1..$min;
+            my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
+            Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
+            $err =~ m{COUNT:.(\d+)}xms;
+            my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
+            my $min = min($counts, $data->{RandomNr})-1;
+            my @rands = shuffle(0..$counts-1);
             my $first = shift @rands;
+            while  ( @rands > $min ) {
+                pop @rands;
+            }
             if (!defined $hash->{testline} ) {
                 my $fnHash = resetRegIntTimer( $device, time, \&delayedMpdCommands, $hash, 0);
                 $fnHash->{enqueue} = join q{:},@rands;
@@ -6075,8 +6081,9 @@ sub delayedMpdCommands {
     while ( @rands ) {
         my $single = shift @rands;
         my $sand1 = $single+1;
-        CommandSet(undef, "$todo $single:$sand1\n");
-        #Log3( $fnHash->{HASH}, 3, "[RHASSPY] $todo $single:$sand1" );
+        my $err = CommandSet(undef, "$todo $single:$sand1\n");
+        Log3( $fnHash->{HASH}, 3, "[RHASSPY] $todo $single:$sand1, error is $err" );
+        last if $err && $err =~ m{$device.*Ein.Verbindungsversuch.ist.fehlgeschlagen}xms;
     }
 
     return;
