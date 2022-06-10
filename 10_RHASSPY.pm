@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26102 2022-06-09 Beta-User $
+# $Id: 10_RHASSPY.pm 26102 2022-06-10 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -5071,14 +5071,11 @@ sub handleIntentMediaControls {
         $newfilter = "($newfilter)" if $several > 1;
         $cmd = "$newfilter";
         if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
-            #Beta-User: needs review, as mpd will sort automatically.
-            # we will first have to find out "count", (MPD-mdpCMD-request)
-            # then have to decide which one to play first, and then 
-            # set a timer to add all the others...
             my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
-            Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
-            $err =~ m{Songs:.(\d+)}xms;
+            #Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
+            $err =~ m{songs:.(\d+)}xms;
             my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
+            return respond( $hash, $data, 'No songs could be identified' ) if !$counts;
             my $min = min($counts, $data->{RandomNr})-1;
             my @rands = shuffle(0..$counts-1);
             my $first = shift @rands;
@@ -5092,13 +5089,8 @@ sub handleIntentMediaControls {
                 $fnHash->{filter}  = $cmd;
             }
             my $ends = $first+1;
-            #$data->{Window} = "$first:$data->{Window}";
             $cmd .= " window $first:$ends" ;
-            #Log3( $hash, 3, "[$hash->{NAME}] random array is @rands" );
-        } 
-        #if ( defined $data->{AlbumId} || defined $data->{Album} ) {
-        #    $cmd .= ' sort track';
-        #}
+        }
         $cmd = "findadd $cmd\n";
         $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
         $cmd = "mpdCMD $cmd";
@@ -6086,7 +6078,7 @@ sub delayedMpdCommands {
         my $sand1 = $single+1;
         my $err = CommandSet(undef, "$todo $single:$sand1\n");
         Log3( $fnHash->{HASH}, 3, "[RHASSPY] $todo $single:$sand1, error is $err" );
-        last if $err && $err =~ m{$device.*Ein.Verbindungsversuch.ist.fehlgeschlagen}xms;
+        last if $err && $err =~ m{$device.*Ein.Verbindungsversuch.ist.fehlgeschlagen|mpd_Msg.ACK.ERROR.}xms;
     }
 
     return;
