@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-08 Beta-User $
+#  $Id: 73_MPD.pm 23900 2022-06-13 Beta-User $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -101,8 +101,6 @@ my %sets = (
 	"load_bookmark"         => "",
 	"active:noArg" 	        => "",
 	"inactive:noArg"        => "",
-    #playSelection           => '',
-    #addSelection            => ''
          );
 
 use constant clb => "command_list_begin\n";
@@ -163,7 +161,7 @@ sub MPD_updateConfig($)
         $hash->{helper}{playlistcollection}{val} = -1;
 
 	$hash->{".password"} = AttrVal($name, "password", "");
-	$hash->{TIMEOUT}     = AttrVal($name, "timeout", 2);
+    $hash->{TIMEOUT}     = AttrVal($name, 'timeout', 0.5);
 	$hash->{".sMusicL"}  = AttrVal($name, "stateMusic", 1);
 	$hash->{".sPlayL"}   = AttrVal($name, "statePlaylists", 1);
         $hash->{".apikey"}   = AttrVal($name, "lastfm_api_key", "f3a26c7c8b4c4306bc382557d5c04ad5");
@@ -883,47 +881,6 @@ sub MPD_Set($@)
    
    MPD_Outputs_Status($hash);
   }
-  
-
-  if ( $cmd eq 'playSelection' || $cmd eq 'addSelection' ) {
-    #findadd {FILTER} [sort {TYPE}] [window {START:END}] [position POS] # https://mpd.readthedocs.io/en/latest/protocol.html
-    return "$name, no Filter specified !" if !$subcmd;
-
-    MPD_ClearReadings($hash);
-
-    $hash->{'.playlist'} = '';
-    readingsSingleUpdate($hash,'playlistname','',1);
-    #shift @a; shift @a;
-
-    my $filtercmd = join q{ }, @a;
-    $hash->{'.music'}    = $filtercmd; # interne Song Verwaltung
-
-    if ( $filtercmd !~ m{\A\(.*\)\z}x ) { #already packed?
-        my($unnamed, $named) = parseParams($filtercmd);
-        my $newfilter; my $several;
-        for my $arg ( keys %{$named} ) {
-            $newfilter .= ' AND ' if $several;
-            $several++;
-            $named->{$arg} =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
-            $newfilter .= qq(($arg =~ '$named->{$arg}'));
-        }
-        if ( @{$unnamed} ) {
-            $newfilter .= ' AND ' if $several;
-            my $artist = join q{.}, @{$unnamed};
-            $artist =~ s{[-\(\),:_`´ /!<>?\[\]\{\}&+']}{.}g;
-            $newfilter .= qq((artist =~ '$artist'));
-            $several++;
-        }
-        $filtercmd = "($newfilter)" if $several > 1;
-    }
-
-    Log3($name, 3, "$name called with $cmd, filter is $filtercmd!");
-
-    $ret = $cmd eq 'playSelection' ?
-        mpd_cmd($hash, clb."stop\nclear\nfindadd \"$filtercmd\"\nplay\n".cle)
-      : mpd_cmd($hash, clb."findadd \"$filtercmd\"\n".cle);
- }
-
   return $ret;
 }
 
@@ -1364,8 +1321,7 @@ sub MPD_statusRequest($)
 
 sub MPD_IdleDone($)
 {
-  my ($string) = @_;
-  return unless(defined($string));
+  my $string = shift // return;
 
   my @r = split("\\|",$string);
   my $hash = $defs{$r[0]};

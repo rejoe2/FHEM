@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26102 2022-06-10 Beta-User $
+# $Id: 10_RHASSPY.pm 26144 2022-06-13 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2078,6 +2078,10 @@ sub getDevicesByIntentAndType {
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $mapping = getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1) // next;
         my $mappingType = $mapping->{type};
+        if ( $intent eq 'MediaControls' && defined $mapping->{$subType} ) {
+            $mappingType = $subType;
+            $type = $subType;
+        }
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # get lists of devices that may fit to requirements
@@ -5039,7 +5043,7 @@ sub handleIntentMediaControls {
         return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     } else {
-        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', 'MediaControls', $command, 1) 
+        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls' , 'MediaControls', $command) #, 1)
         // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -5052,7 +5056,10 @@ sub handleIntentMediaControls {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
 
     my $cmd = $mapping->{$command};
-    $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
+    if ( $command eq 'cmdPlaylist') {
+        return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Playlist};
+        $cmd .= " $data->{Playlist}";
+    }
 
     if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
         return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if InternalVal($device, 'TYPE', 'unknown') ne 'MPD';
@@ -5069,10 +5076,11 @@ sub handleIntentMediaControls {
         return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !$newfilter;
 
         $newfilter = "($newfilter)" if $several > 1;
+        $newfilter = qq("$newfilter"); 
         $cmd = "$newfilter";
         if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
-            my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
-            #Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
+            my $err = CommandSet(undef, "$device mpdCMD count $newfilter");
+            #Log3( $hash, 3, "[$hash->{NAME}] count request answer is $err" );
             $err =~ m{songs:.(\d+)}xms;
             my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
             return respond( $hash, $data, 'No songs could be identified' ) if !$counts;
@@ -5092,7 +5100,8 @@ sub handleIntentMediaControls {
             $cmd .= " window $first:$ends" ;
         }
         $cmd = "findadd $cmd\n";
-        $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
+        $cmd = "stop\nclear\n$cmd\n" if $command eq 'cmdPlaySelected';
+        $cmd .= "play\n";
         $cmd = "mpdCMD $cmd";
     }
 
@@ -6740,7 +6749,7 @@ yellow=rgb FFFF00</code></p>
   <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
   By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
-  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available).<br>
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available, requires additional {Playlist} field).<br>
   <a href="#RHASSPY-experimental"><b>experimental!</b></a> If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
   {ArtistId}, {AlbumId}, {Album}, {Artist}, {Albumartist}, {Title}, {Genre}, and {Name}. The first two will be treated as <i>musicbrainz_artistid</i> or <i>musicbrainz_albumid</i> respecively and (lower case) transfered to filter arguments as described in <a href="https://mpd.readthedocs.io/en/latest/protocol.html#filters">MPD documentation</a>. Additionally you may use {RandomNr} to shuffle the result and limit the songs added to the given number.
   <li>MediaChannels</li> (as configured by the user)
