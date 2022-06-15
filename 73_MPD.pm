@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-13 Beta-User $
+#  $Id: 73_MPD.pm 23900 2022-06-15 Beta-User $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -973,6 +973,7 @@ sub MPD_Outputs_Status($)
  foreach (@outp)
  {
    my @val = split(": " , $_);
+   next if !defined $val[1];
    Log3  $name, 4 ,"$name, MPD_Outputs_Status -> $val[0] = $val[1]";
    $outpid = ($val[0] eq "outputid") ? $val[1] : $outpid;
    readingsBulkUpdate($hash,$val[0].$outpid,$val[1]) if ($val[0] ne "outputid");
@@ -1321,7 +1322,8 @@ sub MPD_statusRequest($)
 
 sub MPD_IdleDone($)
 {
-  my $string = shift // return;
+  my ($string) = @_;
+  return unless(defined($string));
 
   my @r = split("\\|",$string);
   my $hash = $defs{$r[0]};

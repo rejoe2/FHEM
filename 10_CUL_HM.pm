@@ -1,13 +1,15 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-02-10 frank + Beta-User "uninitialized" 2022-05-24 $
+# $Id: 10_CUL_HM.pm 25298 2022-04-03 frank + Beta-User "uninitialized" 2022-06-15 $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
 # https://forum.fhem.de/index.php/topic,124090.msg1186368.html#msg1186368
 # https://forum.fhem.de/index.php/topic,121139.msg1182503.html#msg1182503
 # https://forum.fhem.de/index.php/topic,126118.msg1207202.html#msg1207202
+# https://forum.fhem.de/index.php/topic,126197.0.html
+
 
 package main;
 
@@ -466,9 +468,17 @@ sub CUL_HM_updateConfig($){##########################
         $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
         CUL_HM_hmInitMsg($hash);
       }
-      if (CUL_HM_getRxType($hash)&0x02){#burst dev must restrict retries!
-                                        # set rxType and mId
+      my $rxt = CUL_HM_getRxType($hash);# set rxType and mId
+      if($rxt & 0x02){#burst dev must restrict retries!
         $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
+      }
+      elsif($rxt & 0x80){# frank: init conditional burst dev
+        if($attr{$name}{burstAccess}){
+          CUL_HM_Attr("set",$name,"burstAccess",$attr{$name}{burstAccess});
+        }
+        else{
+          CUL_HM_Attr("del",$name,"burstAccess");
+        }
       }
     }
     if ($attr{$name}{expert}){
@@ -573,7 +583,7 @@ sub CUL_HM_updateConfig($){##########################
 }
 
 sub CUL_HM_startQueues() { #frank, https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
-  Log3('global',4,'CUL_HM start Queues'); #Beta-User: changed verbose level
+  Log3('global',3,'CUL_HM start Queues'); #Beta-User: changed verbose level
   for my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     CUL_HM_qStateUpdatIfEnab($name) if($defs{$name}->{helper}{role}{dev});
   }
@@ -1568,12 +1578,18 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
                                  ?2:0;
   $hash->{helper}{io}{p} = \@p;
   my $wu = $hash->{helper}{io}{flgs} ? ($hash->{helper}{io}{flgs} & 0x02) : 0;
+#  Log(1,"----- CUL_HM_hmInitMsg-$hash->{NAME}-01 ----- => wu:$wu "# frank
+#	  .Dumper($hash->{helper}{io}{flgs},$hash->{helper}{prt},$hash->{helper}{q},$hash->{cmdStack},$hash->{protCondBurst})) 
+#    if($hash->{DEF} eq '1C4E25' || $hash->{DEF} eq '20DFE1');
   CUL_HM_hmInitMsgUpdt($hash, $wu);
 }
 sub CUL_HM_hmInitMsgUpdt($;$){ #update device init msg for HMLAN
   my ($hash, $wakeupPrep)=@_;
   return if (  $hash->{helper}{role}{vrt}
              ||!defined $hash->{helper}{io}{p});
+#  Log(1,"----- CUL_HM_hmInitMsgUpdt-$hash->{NAME}-00 ----- => "# frank
+#	  .Dumper($hash->{helper}{io}{flgs},$hash->{helper}{prt},$hash->{helper}{q},$hash->{cmdStack},$hash->{protCondBurst})) 
+#    if($hash->{DEF} eq '1C4E25' || $hash->{DEF} eq '20DFE1');
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = @{$hash->{helper}{io}{p}}; # local copy of basic setting
   # General todo
@@ -2047,7 +2063,9 @@ sub CUL_HM_Parse($$) {#########################################################
           $mh{devH}->{helper}{aesCommRq}{challenge} = $challenge;
           $mh{devH}->{helper}{aesCommRq}{kNo} = $kNo;
 
-          my $cmd = $mh{mNo}.($mh{devH}->{helper}{io}{sendWu}?'A1':'A0')."02$mh{dst}$mh{src}04${challenge}".sprintf("%02X", $kNo*2);
+          #my $cmd = $mh{mNo}.($mh{devH}->{helper}{io}{sendWu}?'A1':'A0').'02'.$mh{dst}.$mh{src}.'04'.$challenge.sprintf("%02X", $kNo*2); #noansi: wakeup for CUL AES
+          #my $cmd = $mh{mNo}.($mh{devH}->{helper}{io}{sendWu}?'A1':'A0')."02$mh{dst}$mh{src}04${challenge}".sprintf("%02X", $kNo*2);
+          my $cmd = $mh{mNo}.($mh{devH}->{helper}{io}{sendWu}?'A1':'A0')."02$mh{dst}$mh{src}04$challenge".sprintf("%02X", $kNo*2);
           $cmd = sprintf("As%02X%s", length($cmd)/2, $cmd);
           IOWrite($mh{devH}, "", $cmd);
           $mh{msgStat}="AESpending";
@@ -2162,7 +2180,7 @@ sub CUL_HM_Parse($$) {#########################################################
                      && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
                          || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
             $flr = sprintf("%02X", hex($flr)|0x01);
-            #$m =~ s/^(..)../$1$flr/s; #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+            #$m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement
           }
           CUL_HM_SndCmd($h, $m);
         }
@@ -3019,7 +3037,7 @@ sub CUL_HM_Parse($$) {#########################################################
           delete $mh{devH}->{cmdStack};
           delete $mh{devH}->{cmdStacAESPend};
           delete $mh{devH}->{helper}{prt}{rspWait};
-          delete $mh{devH}->{helper}{prt}{rspWaitSec};
+          #delete $mh{devH}->{helper}{prt}{rspWaitSec};# frank:
           delete $mh{devH}->{helper}{prt}{mmcA};
           delete $mh{devH}->{helper}{prt}{mmcS};
           delete $mh{devH}->{lastMsg};
@@ -3485,7 +3503,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,"SDunknownMsg:$mh{p}"] if(!@evtEt);
     }
 
-    if($ioId eq $mh{dst} && ($mh{mFlgH}&0x20)){  # Send Ack/Nack #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+    if($ioId eq $mh{dst} && ($mh{mFlgH}&0x20)){  # Send Ack/Nack
       #push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}.($mh{mFlg}.$mh{mTp} eq "A001" ? "80":"00");
       if ($mh{mFlg}.$mh{mTp} eq 'A001') {
         push @ack,$mh{shash},$mh{mNo}.'8002'.$ioId.$mh{src}.'80';
@@ -3493,7 +3511,7 @@ sub CUL_HM_Parse($$) {#########################################################
       else {
         push @ack,$mh{shash},$mh{mNo}.'8002'.$ioId.$mh{src}.'00'  #noansi: additional CUL ACK
             if (   $ioId eq $mh{dst}
-                && !$mh{wakupAck} #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+                && !$mh{wakupAck} #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983 not if wakeup is sent
                 && !$mh{devH}->{IODev}->{helper}{VTS_ACK} # for TSCUL VTS0.17 up
                 && $mh{devH}->{IODev}->{TYPE} !~ m/^(?:HMLAN|HMUARTLGW)$/s ); #noansi: additional CUL ACK 
       }
@@ -3525,7 +3543,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )];
       push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."00"
         if (   $ioId eq $mh{dst}
-            && !$mh{wakupAck} #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+            && !$mh{wakupAck} #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983 not if wakeup is sent
             && !$mh{devH}->{IODev}->{helper}{VTS_ACK}
             && $mh{devH}->{IODev}->{TYPE} !~ m/^(HMLAN|HMUARTLGW)$/); #noansi: additional CUL ACK 
     }
@@ -3684,8 +3702,9 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($ioId eq $mh{dst}){# if fhem is destination check if we need to react
     if(   $mh{mTp} =~ m/^4./    #Push Button event
        && !$mh{AckDone}          #noansi: allready done device specific
-       && ($mh{mFlgH} & 0x20)    #response required Flag
-       && !$mh{wakupAck}){       #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+       && ($mh{mFlgH} & 0x20)  #response required Flag
+       && !$mh{wakupAck}        #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983 not if wakeup is sent
+       ){
                 # fhem CUL shall ack a button press
       if ($mh{md} =~ m/^(HM-SEC-SC.*|ROTO_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
         push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."0101".((hex($mI[0])&1)?"C8":"00")."00";
@@ -3700,13 +3719,15 @@ sub CUL_HM_Parse($$) {#########################################################
   #------------ send default ACK if not applicable------------------
   #    ack if we are destination, anyone did accept the message (@evtEt)
   #        parser did not supress
-  push @ack,$mh{shash}, $mh{mNo}."8002".$ioId.$mh{src}."00"
-      if(   ($ioId eq $mh{dst})   #are we adressee
-         && ($mh{mFlgH} & 0x20)   #response required Flag
-         && !$mh{wakupAck}        #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
-         && @evtEt            #only ack if we identified it
-         && (!scalar(@ack))   #sender requested ACK
-         );
+	if(   ($ioId eq $mh{dst})   #are we adressee
+		 && ($mh{mFlgH} & 0x20)   #response required Flag
+     && !$mh{wakupAck}        #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983 not if wakeup is sent
+		 && @evtEt            #only ack if we identified it
+		 && (!scalar(@ack))   #sender requested ACK
+		 ) {
+#    Log(1,"----- ACK-$mh{devH}->{NAME}-04 ----- => ".Dumper($mh{devH}->{helper}{prt})) if($mh{src} eq '1C4E25' || $mh{src} eq '20DFE1');#frank: 
+    push @ack,$mh{shash}, $mh{mNo}."8002".$ioId.$mh{src}."00";
+	}
 
   if (scalar(@ack)) {# send acks and store for repeat
     my $rr = $respRemoved;
@@ -3734,15 +3755,17 @@ sub CUL_HM_Parse($$) {#########################################################
                  && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
                      || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
         $flr = sprintf("%02X", hex($flr)|0x01);
-        #$m =~ s/^(..)../$1$flr/s; #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+#        $m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement #frank: 
       }
       CUL_HM_SndCmd($h, $m);
     }
     $respRemoved = $rr;
     Log3 $mh{devN},5,"CUL_HM $mh{devN} sent ACK:".(int(@ack));
   }
+#  Log(1,"----- ACK-$mh{devH}->{NAME}-05 ----- => ".Dumper($mh{devH}->{helper}{prt})) if($mh{src} eq '1C4E25' || $mh{src} eq '20DFE1');#frank: 
   CUL_HM_ProcessCmdStack($mh{devH}) if ($respRemoved); # cont if complete
   CUL_HM_sndIfOpen("x:".$mh{ioName});
+#  Log(1,"----- ACK-$mh{devH}->{NAME}-06 ----- => ".Dumper($mh{devH}->{helper}{prt})) if($mh{src} eq '1C4E25' || $mh{src} eq '20DFE1');#frank: 
   
   #------------ process events ------------------
   push @evtEt,[$mh{devH},1,"noReceiver:src:$mh{src} ".$mh{mFlg}.$mh{mTp}." $mh{p}"] 
@@ -3772,6 +3795,8 @@ sub CUL_HM_parseCommon(@){#####################################################
                              $devHlpr->{HM_CMDNR} > 5);# this is power on
   $devHlpr->{HM_CMDNR} = hex($mhp->{mNo});# sync msgNo prior to any sending
   if ($mhp->{mFlgH} & 0x02) { # wakeup signal
+#    Log(1,"----- ACK-$mhp->{devH}->{NAME}-00 ----- => ".Dumper($mhp->{devH}->{helper}{prt}, $mhp->{devH}->{helper}{io})) 
+#      if($mhp->{src} eq '1C4E25' || $mhp->{src} eq '20DFE1');
     if ($mhp->{mFlgH} & 0x20) { # &0x22== 0x22 wakeup signal in lazy config device manner
       if    ($rxt & 0x10) { #lazy config device
         if ($devHlpr->{prt}{sleeping}) {
@@ -3780,11 +3805,12 @@ sub CUL_HM_parseCommon(@){#####################################################
             if (!(   $mhp->{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack was automatically sent
                   || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s )
                 ) {
+#             Log(1,"----- ACK-$mhp->{devH}->{NAME}-01 ----- => ".Dumper($mhp->{devH}->{helper}{prt})) if($mhp->{src} eq '1C4E25' || $mhp->{src} eq '20DFE1');
               CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #noansi: Ack with wakeup bit set for CUL
             }
             $devHlpr->{prt}{sleeping} = 0;
             CUL_HM_ProcessCmdStack($mhp->{devH});
-            $mhp->{wakupAck} = 1; #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+            $mhp->{wakupAck} = 1; #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983
           }
         }
         $devHlpr->{prt}{sleeping} = 1 if (!$devHlpr->{prt}{sProc}); # set back to sleeping with next trigger, if nothing to do
@@ -3795,10 +3821,11 @@ sub CUL_HM_parseCommon(@){#####################################################
           if (!(   $mhp->{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up does it automatically if configured to lazy config
                 || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) #HMLAN and HMUARTLGW does it automatically if configured to lazy config
               ) {
+            #Log(1,"----- ACK-$mhp->{devH}->{NAME}-02 ----- => ".Dumper($mhp->{devH}->{helper}{prt})) if($mhp->{src} eq '1C4E25' || $mhp->{src} eq '20DFE1');
             CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #noansi: Ack with wakeup bit set for CUL
           }
           CUL_HM_ProcessCmdStack($mhp->{devH});
-          $mhp->{wakupAck} = 1; #noansi not if wakeup is sent => #frank: https://forum.fhem.de/index.php/topic,125667.msg1202867.html#msg1202867
+          $mhp->{wakupAck} = 1; #frank: noansi from https://forum.fhem.de/index.php/topic,121139.msg1158983.html#msg1158983
         }
       }
     }
@@ -3809,6 +3836,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           if (!(   $mhp->{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up does it automatically if configured to lazy config
                 || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) #HMLAN and HMUARTLGW does it automatically if configured to lazy config
               ) {
+            #Log(1,"----- ACK-$mhp->{devH}->{NAME}-03 ----- => ".Dumper($mhp->{devH}->{helper}{prt})) if($mhp->{src} eq '1C4E25' || $mhp->{src} eq '20DFE1');
             CUL_HM_SndCmd($mhp->{devH}, '++A112'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}); #noansi: answer with wakeup received message for CUL
           }
           CUL_HM_ProcessCmdStack($mhp->{devH});
@@ -3832,13 +3860,15 @@ sub CUL_HM_parseCommon(@){#####################################################
     if ($devHlpr->{prt}{rspWait}{brstWu}){
       if ($devHlpr->{prt}{rspWait}{mNo} == $mNoInt &&
           $mhp->{mStp} eq "00"){
+        CUL_HM_appFromQ($mhp->{devN},"wu");# stack cmd(s) if waiting frank:
         if ($devHlpr->{prt}{awake} && $devHlpr->{prt}{awake}==4){#re-burstWakeup
-          delete $devHlpr->{prt}{rspWait};#clear burst-wakeup values
-          $devHlpr->{prt}{rspWait}{$_} = $devHlpr->{prt}{rspWaitSec}{$_}
-                  foreach (keys%{$devHlpr->{prt}{rspWaitSec}});   #back to original message
-          delete $devHlpr->{prt}{rspWaitSec};
-          IOWrite($mhp->{devH}, "", $devHlpr->{prt}{rspWait}{cmd});     # and send
-          CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s",hex(substr($devHlpr->{prt}{rspWait}{cmd},6,2)));
+          #delete $devHlpr->{prt}{rspWait};#clear burst-wakeup values
+          #$devHlpr->{prt}{rspWait}{$_} = $devHlpr->{prt}{rspWaitSec}{$_}
+          #        foreach (keys%{$devHlpr->{prt}{rspWaitSec}});   #back to original message
+          #delete $devHlpr->{prt}{rspWaitSec};
+          #IOWrite($mhp->{devH}, "", $devHlpr->{prt}{rspWait}{cmd});     # and send
+          #CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s",hex(substr($devHlpr->{prt}{rspWait}{cmd},6,2)));
+          CUL_HM_respPendRm($mhp->{devH});# frank:
           return "done";
         }
         $mhp->{devH}{protCondBurst} = "on" if (   $mhp->{devH}{protCondBurst}
@@ -3996,7 +4026,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       push @evtEt,[$chnhash,0,"CommandAccepted:$success"];
       CUL_HM_ProcessCmdStack($mhp->{devH}) if(CUL_HM_IoId($mhp->{devH}) eq $mhp->{dst});
       delete $devHlpr->{prt}{wuReSent}
-              if (!$devHlpr->{prt}{mmcS});
+              if (   !$devHlpr->{prt}{mmcS}
+                  && $devHlpr->{prt}{rspWait}{cmd} && substr($devHlpr->{prt}{rspWait}{cmd},8,2) ne "12");#frank:
     }
     $ret = $reply;
   }
@@ -4041,7 +4072,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         CUL_HM_respPendRm($mhp->{devH}); # remove all pending messages
         delete $mhp->{devH}{cmdStack};
         delete $devHlpr->{prt}{rspWait};
-        delete $devHlpr->{prt}{rspWaitSec};
+        #delete $devHlpr->{prt}{rspWaitSec};# frank:
         delete $mhp->{devH}{READINGS}{"RegL_00."};
         delete $mhp->{devH}{READINGS}{".RegL_00."};
         push @evtEt,[$defs{$ioOwn},1,"hmPair:name:$mhp->{devN} SN:".$regser." model:$attr{$mhp->{devN}}{model}"];
@@ -4191,8 +4222,10 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==============
       my $mNoWait = $rspWait->{mNo}; 
-      if ( $pendType eq "RegisterRead" && 
-          ($mNoWait == $mNoInt || $mNoInt == ($mNoWait+1)%256)){ #noWait +1 modulo 256
+      if (     $pendType eq "RegisterRead" 
+          && !(defined($rspWait->{data}) && $rspWait->{data} eq $mhp->{p})# frank: no device retry
+          &&  ($mNoWait == $mNoInt || $mNoInt == ($mNoWait+1)%256)){      #noWait +1 modulo 256
+        $rspWait->{data} = $mhp->{p};#frank: prevent timeout for device resends with mNo+2
         $rspWait->{mNo} = $mNoInt; # next message will be numbered same or one plus
         $repeat = 1;#prevent stop for messagenumber match
         CUL_HM_m_setCh($mhp,$rspWait->{forChn});
@@ -4245,7 +4278,22 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
       }
       else{
-        Log3 $mhp->{devH},4,"waiting for: $pendType, got:RegisterRead # await msgNo:".(defined $rspWait->{mNo} ? $rspWait->{mNo} :"-no msgNo").", rec:$mNoInt";
+        if(   $pendType eq "RegisterRead"# frank: prevent timeout for device resends with mNo+2 or wrong destination
+           && defined($rspWait->{data}) && $rspWait->{data} eq $mhp->{p}){
+          Log3 $mhp->{devH},3,"device resend for $pendType => mTp:$mhp->{mTp} mStp:$mhp->{mStp} mNo:".hex($mhp->{mNo})." dst:$mhp->{dst} data:$mhp->{p}\n          "
+                               .join("\n          ",map{"$_:$rspWait->{$_}"}keys %{$rspWait});
+          $rspWait->{mNo} = $mNoInt; # next message will be numbered same or one plus
+          $repeat = 1;#prevent stop for messagenumber match
+          CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
+          if(   $mhp->{dst} ne CUL_HM_IoId($mhp->{devH})                     # wrong destination, frank: manage fw bug HM-CC-TC
+             && $mhp->{devH}->{IODev}->{TYPE} !~ m/^(?:HMLAN|HMUARTLGW)$/s){ # only for cul io
+            #IOWrite($mhp->{devH},"","As0A$mhp->{mNo}8002".CUL_HM_IoId($mhp->{devH})."$mhp->{src}00");
+            CUL_HM_SndCmd($mhp->{devH},"$mhp->{mNo}8002".CUL_HM_IoId($mhp->{devH})."$mhp->{src}00");
+          }
+        }
+        else{
+          Log3 $mhp->{devH},4,"waiting for: $pendType, got:RegisterRead # await msgNo:".(defined $rspWait->{mNo} ? $rspWait->{mNo} :"-no msgNo").", rec:$mNoInt";
+        }
       }
       $ret = "done";
     }
@@ -5378,13 +5426,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       
         $hash->{helper}{prt}{bErr}=0;
         delete $hash->{cmdStack};
-        delete($hash->{protCmdPend});
+        #delete($hash->{protCmdPend});# frank:
         delete $hash->{helper}{prt}{rspWait};
-        delete $hash->{helper}{prt}{rspWaitSec};
+        #delete $hash->{helper}{prt}{rspWaitSec};# frank:
         delete $hash->{helper}{prt}{mmcA};
         delete $hash->{helper}{prt}{mmcS};
         delete $hash->{lastMsg};
-        delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
+        #delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));# frank:
+        delete ($hash->{$_}) foreach (grep {$_ =~ m/^prot/ && $_ ne 'protCondBurst'} keys %{$hash});# frank:
       
         if ($hash->{IODev}{NAME} &&
             $modules{CUL_HM}{$hash->{IODev}{NAME}} &&
@@ -7626,10 +7675,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_ProcessCmdStack($devHash);
       }
     }
-    elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
-      $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
+    elsif (CUL_HM_getAttrInt($name,"burstAccess")                                                  # frank: burstConditional - have a try
+           &&  (   !defined($devHash->{helper}{prt}{awake})                                        # frank: prevent A112/B112 at same time
+                ||  defined($devHash->{helper}{prt}{awake}) && $devHash->{helper}{prt}{awake} != 1)# frank: not if wuPrep is scheduled
+           && !(defined($devHash->{helper}{io}{flgs}) && $devHash->{helper}{io}{flgs} & 0x02)){    # frank: wuPrep is not active (for fhem start)
+      $devHash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup                                   # frank: change to device helper
       CUL_HM_SndCmd($devHash,"++B112$id$dst");
     }
+    elsif (     $rxType & 0x18                                                                     # frank: wu or lazy device 
+           && !(defined($devHash->{helper}{io}{flgs}) && $devHash->{helper}{io}{flgs} & 0x02)){    # frank: wuPrep is not active
+      Log(1,"----- CUL_HM_Set-$name-01 ----- => set wuPrep") if($devHash->{DEF} eq '1C4E25' || $devHash->{DEF} eq '20DFE1');# frank:
+      CUL_HM_hmInitMsgUpdt($devHash,1);                                                            # frank: 
+    }                                                                                              # frank: 
   }
   return ("",1);# no not generate trigger out of command
 }
@@ -8491,8 +8548,10 @@ sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
 
   return if (!defined($hash->{DEF}));
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
-  delete $hash->{helper}{prt}{rspWait};
-  delete $hash->{helper}{prt}{wuReSent};
+  delete $hash->{helper}{prt}{wuReSent} if (  !$hash->{helper}{prt}{mmcS}                              # frank:
+				                                    && $hash->{helper}{prt}{rspWait}{cmd}                      # frank: 
+																						&& substr($hash->{helper}{prt}{rspWait}{cmd},8,2) ne "12");# frank: 
+  delete $hash->{helper}{prt}{rspWait};                                                                # frank: 
   delete $hash->{helper}{tmdOn};
 #  delete $hash->{helper}{prt}{mmcA};
 #  delete $hash->{helper}{prt}{mmcS};
@@ -8505,9 +8564,12 @@ sub CUL_HM_respPendTout($) {
   my(undef,$HMid) = split(":",$HMidIn,2);
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
   my $pHash = $hash->{helper}{prt};#shortcut
+#  Log(1,"----- CUL_HM_respPendTout-$hash->{NAME}-00 ----- => "                  # frank:
+#    .Dumper($hash->{helper}{io}{flgs},$hash->{helper}{prt},$hash->{helper}{q},$hash->{cmdStack},$hash->{protCondBurst})) 
+#    if($hash->{DEF} eq '1C4E25' || $hash->{DEF} eq '20DFE1');
   if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
-    $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
+#   $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep            # frank:
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
     my $rxt = CUL_HM_getRxType($hash);
     if    ($pHash->{rspWait}{brstWu}){#burst-wakeup try failed (conditionalBurst)
@@ -8515,8 +8577,10 @@ sub CUL_HM_respPendTout($) {
       $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
                                           $hash->{protCondBurst} !~ m/forced/);;
       $pHash->{brstWu} = 0;# finished
-      $pHash->{awake} = 0;# set to asleep
+#     $pHash->{awake} = 0;# set to asleep                                       # frank: change to new mode
+      $pHash->{awake} = 1;                                                      # frank: new mode => set to "wait for wu" (wuPrep)
       CUL_HM_protState($hash,"CMDs_pending");
+      CUL_HM_hmInitMsgUpdt($hash,1);                                            # frank:
       # commandstack will be executed when device wakes up itself
     }
     elsif ($pHash->{try}){         #send try failed - revert, wait for wakeup
@@ -8525,7 +8589,9 @@ sub CUL_HM_respPendTout($) {
       unshift (@{$hash->{cmdStack}}, "++".substr($pHash->{rspWait}{cmd},6));
       delete $pHash->{try};
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
+      $pHash->{awake} = 1 if (defined $pHash->{awake});                         # frank: new mode => set to "wait for wu" (wuPrep)
       CUL_HM_protState($hash,"CMDs_pending");
+      CUL_HM_hmInitMsgUpdt($hash,1);                                            # frank:
     }
     elsif (!CUL_HM_operIObyIOHash($hash->{IODev})){#IO errors
       CUL_HM_eventP($hash,"IOdly");
@@ -8548,11 +8614,22 @@ sub CUL_HM_respPendTout($) {
       Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if   ($hash->{protCondBurst} && $hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
+        #need to fill back command to queue and wait for next wakeup            # frank: change mechanism
+        if ($pHash->{mmcA}){#fillback multi-message command                     # frank: 
+          unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});   # frank: 
+          delete $pHash->{mmcA};                                                # frank: 
+          delete $pHash->{mmcS};                                                # frank: 
+        }                                                                       # frank: 
+        else{#fillback simple command                                           # frank:
+          unshift (@{$hash->{cmdStack}},"++".substr($pHash->{rspWait}{cmd},6)); # frank: 
+        }                                                                       # frank: 
+        $pHash->{wuReSent} = $pHash->{rspWait}{reSent};                         # frank: 
+        delete $pHash->{rspWait};                                               # frank:
+        $pHash->{awake}=4;#start re-wakeup                                      # frank: change position
         my $addr = CUL_HM_IoId($hash);
-        $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}
-                    foreach (keys%{$pHash->{rspWait}});
+#        $pHash->{rspWaitSec}{$_} = $pHash->{rspWait}{$_}                       # frank: change mechanism
+#                    foreach (keys%{$pHash->{rspWait}});                        # frank:
         CUL_HM_SndCmd($hash,"++B112$addr$HMid");
-        $hash->{helper}{prt}{awake}=4;# start re-wakeup
       }
       elsif($rxt & 0x18){# wakeup/lazy devices
         #need to fill back command to queue and wait for next wakeup
@@ -8569,6 +8646,7 @@ sub CUL_HM_respPendTout($) {
         CUL_HM_respPendRm($hash);#clear
         CUL_HM_protState($hash,"CMDs_pending");
         $pHash->{wuReSent} = $wuReSent;# restore'invalid' count after general delete
+        CUL_HM_hmInitMsgUpdt($hash,1);                                          # frank:
       }
       else{# normal/burst device resend
         if ($rxt & 0x02){# type = burst - need to set burst-Bit for retry
@@ -8745,17 +8823,21 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my ($evntCnt,undef) = split(' last_at:',$evnt);
   $hash->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
+  my $pHash = $hash->{helper}{prt};                  # frank: change position
   if ($evntType =~ m/^(Nack|ResndFail|IOerr|dummy)/){# unrecoverable Error
     CUL_HM_UpdtReadSingle($hash,"state",$evntType,1);
-    $hash->{helper}{prt}{bErr}++;
+    $pHash->{bErr}++;                                # frank: change to helper shortcut
     $hash->{protCmdDel} = 0 if(!$hash->{protCmdDel});
     $hash->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
             if ($hash->{cmdStack});
     CUL_HM_protState($hash,"CMDs_done");
+    if ($pHash->{mmcA}){                             # frank: uncommented in CUL_HM_respPendRm
+      delete $pHash->{mmcA};
+      delete $pHash->{mmcS};
+    }
     CUL_HM_respPendRm($hash);
   }
   elsif($evntType eq "IOdly"){ # IO problem - will see whether it recovers
-    my $pHash = $hash->{helper}{prt};
     if ($pHash->{mmcA}){
       unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
       delete $pHash->{mmcA};
@@ -8772,6 +8854,9 @@ sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   my $name = $hash->{NAME};
 
+#  Log(1,"----- CUL_HM_protState-$hash->{NAME}-00 ----- => "# frank
+#	  .Dumper($hash->{helper}{io}{flgs},$hash->{helper}{prt},$hash->{helper}{q},$hash->{cmdStack},$hash->{protCondBurst})) 
+#    if($hash->{DEF} eq '1C4E25' || $hash->{DEF} eq '20DFE1');
   my $sProcIn = $hash->{helper}{prt}{sProc};
   $sProcIn = 0 if(!defined $sProcIn);
   if ($sProcIn == 3){#FW update processing
@@ -8818,9 +8903,10 @@ sub CUL_HM_protState($$){
   }
   Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
-  CUL_HM_hmInitMsgUpdt($hash) if (  $hash->{helper}{prt}{sProc} != $sProcIn
-                                  && (   $hash->{helper}{prt}{sProc} < 2
-                                      ||($hash->{helper}{prt}{sProc} == 2 && $sProcIn == 0 )));
+  CUL_HM_hmInitMsgUpdt($hash) if(   $hash->{helper}{prt}{sProc} != $sProcIn                                  # sProc changed                # frank: https://forum.fhem.de/index.php/topic,126197.0.html
+                                 && defined($hash->{helper}{io}{flgs}) && $hash->{helper}{io}{flgs} & 0x02   # wuPrep is active
+                                 && !$hash->{helper}{q}{qReqConf} && !$hash->{helper}{q}{qReqStat}           # no wuQueue is scheduled 
+                                 && $hash->{helper}{prt}{sProc} < 2);                                        # any changing to idle/processing
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -9659,7 +9745,8 @@ sub CUL_HM_cfgStateUpdate($) {#update cfgState
       ){
     $defs{$name}{helper}{cfgStateUpdt} = 0;
     my ($hm) = devspec2array("TYPE=HMinfo");
-    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if (defined $hm);
+    #HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if (defined $hm);
+    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name,CUL_HM_getPeers($name,"NamesExt"))).")\$") if (defined $hm);# frank:
   }
   else {
     $defs{$name}{helper}{cfgStateUpdt} = 1;  # use to remove duplicate timer                                                                       
@@ -11108,6 +11195,9 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   
   #return if (AttrVal($devN,"subType","") eq "virtual"); frank https://forum.fhem.de/index.php/topic,125378.msg1202273.html#msg1202273
   return if (AttrVal($devN,'subType','') eq 'virtual') || IsIgnored($devN) || IsDummy($devN); #Beta-User: extend frank proposal
+#	Log(1,"----- CUL_HM_unQEntity-$name-00 ----- => "# frank
+#	  .Dumper($defs{$devN}->{helper}{io}{flgs},$defs{$devN}->{helper}{prt},$defs{$devN}->{helper}{q},$defs{$devN}->{cmdStack},$defs{$devN}->{protCondBurst})) 
+#		if($defs{$devN}->{DEF} eq '1C4E25' || $defs{$devN}->{DEF} eq '20DFE1');
 
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
@@ -11140,6 +11230,9 @@ sub CUL_HM_qEntity($$){  # add to queue
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual" || IsIgnored($devN) || IsDummy($devN)); #Beta-User: frank in https://forum.fhem.de/index.php/topic,125347.msg1199793.html#msg1199793
+#	Log(1,"----- CUL_HM_qEntity-$name-00 ----- => "# frank
+#	  .Dumper($defs{$devN}->{helper}{io}{flgs},$defs{$devN}->{helper}{prt},$defs{$devN}->{helper}{q},$defs{$devN}->{cmdStack},$defs{$devN}->{protCondBurst})) 
+#		if($defs{$devN}->{DEF} eq '1C4E25' || $defs{$devN}->{DEF} eq '20DFE1');
 
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
@@ -11150,9 +11243,12 @@ sub CUL_HM_qEntity($$){  # add to queue
                                       $defs{$devN}{helper}{q}{$q}
                                       .",".substr(CUL_HM_name2Id($name),6,2));
   }
-  my $rxt = CUL_HM_getRxType($defs{$name});
+  my $rxt = CUL_HM_getRxType($defs{$devN});
   my $wu = ($rxt & 0x1C) ? 'Wu' : ''; #normal or wakeup q?
-  $wu = '' if($rxt & 0x80 && CUL_HM_getAttrInt($name,"burstAccess")); #frank: conditional burst, https://forum.fhem.de/index.php/topic,125378.msg1202342.html#msg1202342
+#  $wu = '' if(   $rxt & 0x80          #frank: conditional burst, https://forum.fhem.de/index.php/topic,125378.msg1202342.html#msg1202342
+#              #&& $defs{$devN}->{protCondBurst} && $defs{$devN}->{protCondBurst} eq "on" 
+#	            && CUL_HM_getAttrInt($devN,"burstAccess")
+#							);
   $q .= $wu;
   my $qa = $modules{CUL_HM}{helper}{$q};
   @{$qa} = CUL_HM_noDup(@{$qa},$devN); #we only q device - channels are stored in the device
@@ -11160,16 +11256,21 @@ sub CUL_HM_qEntity($$){  # add to queue
   CUL_HM_cfgStateDelay($devN)  if($q eq "qReqConf");
 
   if (!$wu) {
-    my $wT = !$modules{CUL_HM}{helper}{initDone} ? '90' : #Beta-User: Test for frank in https://forum.fhem.de/index.php/topic,125378.0.html
-            (@{$modules{CUL_HM}{helper}{qReqStat}})
-                                 ? 
+    my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
                                 "1" :
                                 $modules{CUL_HM}{hmAutoReadScan};
     RemoveInternalTimer("CUL_HM_procQs");
     InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
   }
   else {
-    CUL_HM_hmInitMsgUpdt($defs{$devN}, 1) if ($rxt & 0x18); #wakeup prep for wakeup, lazyConfig 
+    #CUL_HM_hmInitMsgUpdt($defs{$devN}, 1) if ($rxt & 0x18); #wakeup prep for wakeup, lazyConfig 
+    if(    $rxt & 0x18 #wakeup prep for wakeup, lazyConfig
+       && !(CUL_HM_getAttrInt($devN,"burstAccess") && $defs{$devN}->{cmdStack})
+		   && !(defined($defs{$devN}->{helper}{io}{flgs}) && $defs{$devN}->{helper}{io}{flgs} & 0x02)   # wuPrep is not active
+       ){
+      Log(1,"----- CUL_HM_qEntity-$name-01 ----- => set wuPrep") if($defs{$devN}->{DEF} eq '1C4E25' || $defs{$devN}->{DEF} eq '20DFE1');#frank:
+      CUL_HM_hmInitMsgUpdt($defs{$devN}, 1);
+    }
   }
 }
 
@@ -11460,8 +11561,8 @@ sub CUL_HM_cleanShadowReg($){
   # remove shadow-regs if those are identical to readings or 
   # the reading does not exist. 
   # return dirty "1" if some shadowregs still remain active
-  my ($name) = @_;
-  my $hash = $defs{$name} // return 0; #Beta-User: forum https://forum.fhem.de/index.php/topic,127772.msg1222611.html#msg1222611
+  my $name = shift // return 0; #Beta-User: forum https://forum.fhem.de/index.php/topic,127772.msg1222611.html#msg1222611
+  my $hash = $defs{$name} // return 0;
   my $dirty = 0;
   foreach my $rLn (keys %{$hash->{helper}{shadowReg}}){ 
     my $rLnP = ($hash->{helper}{expert}{raw} ? "" : ".").$rLn;

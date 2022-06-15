@@ -318,7 +318,7 @@ sub HMinfo_status($){##########################################################
   my %errFltN;
   my %err;
 
-  if(defined $modules{CUL_HM}{defptr}{"000000"}){ #update action detector
+  if(defined $modules{CUL_HM}{defptr}{"000000"} && defined $modules{CUL_HM}{defptr}{"000000"}->{NAME}){ #update action detector
     CUL_HM_Set($defs{$modules{CUL_HM}{defptr}{"000000"}{NAME}},
                      $modules{CUL_HM}{defptr}{"000000"}{NAME},"update");
   }
