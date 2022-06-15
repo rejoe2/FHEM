@@ -202,7 +202,7 @@ sub MPD_updateConfig($)
         readingsEndUpdate($hash,0);
 
         MPD_Outputs_Status($hash);
-        mpd_cmd($hash, clb.cle);
+        mpd_cmd($hash, clb.cle) if ReadingsVal($name,'presence','none') ne 'absent';
 
         if ($hash->{".volume"} eq "0")
         { # ist Mute aktiv oder soll sie mit Absicht 0 sein ?
@@ -330,6 +330,7 @@ sub MPD_Attr (@)
    }
    elsif (($attrName eq "disable") && ($attrVal == 0))
    {
+       return if !$init_done;
        $attr{$name}{disable} = $attrVal;
        readingsSingleUpdate($hash,"state","reset",1);
        $hash->{".reset"} = 1;
@@ -383,7 +384,7 @@ sub MPD_Attr (@)
       $attr{$name}{disable} = 0;
       readingsSingleUpdate($hash,"state","reset",1);
       $hash->{".reset"}=1;
-      MPD_updateConfig($hash);      
+      MPD_updateConfig($hash);
   }
   elsif ($attrName eq "statePlaylists") { $hash->{".sPlayL"}  = 1; }
   elsif ($attrName eq "stateMusic")     { $hash->{".sMusicL"} = 1; }
@@ -966,6 +967,7 @@ sub MPD_Outputs_Status($)
 {
  my ($hash)= @_;
  my $name = $hash->{NAME};
+ return if ReadingsVal($name,'presence','none') eq 'absent';
  $hash->{".outputs"} = mpd_cmd($hash, "i|outputs|x");
  my @outp = split("\n" , $hash->{".outputs"});
  readingsBeginUpdate($hash);
