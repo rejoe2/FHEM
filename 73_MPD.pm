@@ -1227,11 +1227,26 @@ sub MPD_IdleStart($)
 
  return $name."|IdleStart: $!" if (!$sock);
 
- my $read = new IO::Select() || return 'Fehler beim Aufruf von IO::Select!\n';
- $read->add($sock);
- my @count = $read->can_read($hash->{TIMEOUT});
- return "Fehler - keine Daten vom MPD!\n" if @count < 1;
- while (<$sock>) { last if $_ ; }
+ #my $read = new IO::Select() || return 'Fehler beim Aufruf von IO::Select!\n';
+ #$read->add($sock);
+ #my @count = $read->can_read($hash->{TIMEOUT});
+ #return "Fehler - keine Daten vom MPD!\n" if @count < 1;
+
+ if ( !eval {
+        $SIG{ALRM} = sub {Carp::carp 'timeout';};
+        alarm(1);
+        while (<$sock>)     # MPD rede mit mir , egal was ;)
+            { last if $_ ; } # end of output.
+        alarm(0);
+        1; } 
+    ) { 
+        return $@ if $@;
+    }
+
+# while (<$sock>)  # MPD rede mit mir , egal was ;)
+# { last if $_ ; } # end of output. 
+
+ #while (<$sock>) { last if $_ ; }
 
  chomp $_;
 
