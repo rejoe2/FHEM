@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-15 Beta-User $
+#  $Id: 73_MPD.pm 23900 2022-06-19 Beta-User + JensS fixes $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -161,7 +161,7 @@ sub MPD_updateConfig($)
         $hash->{helper}{playlistcollection}{val} = -1;
 
 	$hash->{".password"} = AttrVal($name, "password", "");
-    $hash->{TIMEOUT}     = AttrVal($name, 'timeout', 0.5);
+    $hash->{TIMEOUT}     = AttrVal($name, 'timeout', 0.7);
 	$hash->{".sMusicL"}  = AttrVal($name, "stateMusic", 1);
 	$hash->{".sPlayL"}   = AttrVal($name, "statePlaylists", 1);
         $hash->{".apikey"}   = AttrVal($name, "lastfm_api_key", "f3a26c7c8b4c4306bc382557d5c04ad5");
@@ -456,8 +456,9 @@ sub MPD_Set($@)
  my $subcmd = (defined($a[2])) ? $a[2] : "";
  return undef if ($subcmd eq '---'); # erster Eintrag im select Feld ignorieren
 
- my $step    = int(AttrVal($name, "volumeStep", 5)); # vllt runtersetzen auf default = 2 ?
- my $vol_now = int($hash->{".volume"});
+ my $step    = int(AttrVal($name, 'volumeStep', 5)); # vllt runtersetzen auf default = 2 ?
+ my $vol_now = $hash->{'.volume'} // 0;
+ $vol_now = int($vol_now);
  my $vol_new;
   
  if ($cmd eq "reset")   { $hash->{".reset"} = 1; MPD_updateConfig($hash); return undef;}
@@ -1023,8 +1024,24 @@ sub mpd_cmd($$)
   return $!; 
  }
 
- while (<$sock>)  # MPD rede mit mir , egal was ;)
- { last if $_ ; } # end of output.
+# my $read = new IO::Select() || return 'Error in calling IO::Select!\n';
+# $read->add($sock);
+# my @count = $read->can_read($hash->{TIMEOUT});
+# return 'error - no data received from MPD!\n' if @count < 1;
+ 
+ if ( !eval {
+        $SIG{ALRM} = sub {Carp::carp 'timeout';};
+        alarm(1);
+        while (<$sock>)     # MPD rede mit mir , egal was ;)
+            { last if $_ ; } # end of output.
+        alarm(0);
+        1; } 
+    ) { 
+        return $@ if $@;
+    }
+
+# while (<$sock>)  # MPD rede mit mir , egal was ;)
+# { last if $_ ; } # end of output.
 
  chomp $_;
 
@@ -1210,6 +1227,10 @@ sub MPD_IdleStart($)
 
  return $name."|IdleStart: $!" if (!$sock);
 
+ my $read = new IO::Select() || return 'Fehler beim Aufruf von IO::Select!\n';
+ $read->add($sock);
+ my @count = $read->can_read($hash->{TIMEOUT});
+ return "Fehler - keine Daten vom MPD!\n" if @count < 1;
  while (<$sock>) { last if $_ ; }
 
  chomp $_;

@@ -1,3 +1,5 @@
+#  $Id: 98_OpenMultiroom.pm 2022-06-21 Beta-User $
+
 package main;
 use strict;
 use warnings;
@@ -50,8 +52,8 @@ sub OpenMultiroom_Initialize {
     $hash->{AttrFn}     = \&OpenMultiroom_Attr;
     $hash->{NotifyOrderPrefix} = '80-'; 
     $hash->{AttrList} =
-          'mrSystem:SNAPCAST soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern stateSaveDir seekStep seekDirect:percent,seconds seekStepSmall seekStepThreshold digitTimeout '
-        . $readingFnAttributes;
+          'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep  seekStepSmall seekStepThreshold digitTimeout '
+        . $readingFnAttributes; #seekDirect:percent,seconds stateSaveDir 
     return;
 }
 
@@ -65,13 +67,13 @@ sub OpenMultiroom_Define {
     readingsSingleUpdate($hash,'state','defined',1);
     RemoveInternalTimer($hash);
     notifyRegexpChanged($hash,'',1);
-    $attr{$name}{mrSystem}          = 'SNAPCAST' if !exists $attr{$name}{mrSystem};
-    $attr{$name}{soundSystem}       = 'MPD'      if !exists $attr{$name}{soundSystem};
-    $attr{$name}{seekStep}          = '7'        if !exists $attr{$name}{seekStep};
-    $attr{$name}{seekDirect}        = 'percent'  if !exists $attr{$name}{seekDirect};
-    $attr{$name}{seekStepSmall}     = '2'        if !exists $attr{$name}{seekStepSmall};
-    $attr{$name}{seekStepThreshold} = '8'        if !exists $attr{$name}{seekStepThreshold};
-    Log3($name,5,'MAC DEFINED');
+    #$attr{$name}{mrSystem}          = 'SNAPCAST' if !exists $attr{$name}{mrSystem};
+    #$attr{$name}{mrSystem}          = 'Snapcast' if !exists $attr{$name}{mrSystem};
+    #$attr{$name}{soundSystem}       = 'MPD'      if !exists $attr{$name}{soundSystem};
+    #$attr{$name}{seekStep}          = '7'        if !exists $attr{$name}{seekStep};
+    #$attr{$name}{seekDirect}        = 'percent'  if !exists $attr{$name}{seekDirect};
+    #$attr{$name}{seekStepSmall}     = '2'        if !exists $attr{$name}{seekStepSmall};
+    #$attr{$name}{seekStepThreshold} = '8'        if !exists $attr{$name}{seekStepThreshold};
     return;
 }
 
@@ -185,25 +187,18 @@ sub OpenMultiroom_Set {
     my $cmd = shift @param;
     my $val = shift @param;
 
-    my $mrname=AttrVal($name,"mr","undefined");
     my $soundname = $hash->{SOUND} // '';
     if ( !defined $defs{$soundname} ) {
         OpenMultiroom_setNotifyDef($hash);
         $soundname = $hash->{SOUND} // '';
     }
 
-    my $mrhash=$defs{$mrname};
-
-    my $soundhash = $defs{$soundname} // '';
-
-    my $soundtyp = AttrVal($name,'soundSystem','');
-    my $soundModuleHash = $modules{$soundtyp};
-
     my @ttsmap = split m{,}x, AttrVal($name,'ttsMapping','');
     my $ttsname = '';
     for my $map (@ttsmap) {
         my ($stream,$tts) = split /\:/,$map;
         $ttsname = $tts if $stream eq ReadingsVal($name,'stream','');
+        last if $ttsname;
     }
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged($hash,'tts',$ttsname);
@@ -214,19 +209,29 @@ sub OpenMultiroom_Set {
         return "Unknown argument $cmd, choose one of " . join(q{ }, @cList);
     }
     # clear:noArg clear_readings:noArg mpdCMD next:noArg outputenabled0:0,1 pause:noArg play playfile playlist previous:noArg random:noArg repeat:noArg reset:noArg single:noArg stop:noArg toggle:noArg updateDb:noArg volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg
-    return OpenMultiroom_Error($hash,'no sound backend connected or soundsystem not defined, check soundMapping and soundSystem attributes',1)
-        if $OpenMultiroom_sets{$cmd}>2 && (!defined $soundhash || $soundhash eq '' || !defined $soundModuleHash || $soundModuleHash eq '');
-    return OpenMultiroom_Error($hash,'no multiroom backend connected, check mr attribute',1) if $OpenMultiroom_sets{$cmd}>1 && (!defined $mrhash || $mrhash eq '');
 
-    if ($cmd=~/^\d$/){ # is the command 1 digit?
+    my $mrname = AttrVal($name,'mr',undef);
+    my $mrhash = defined $mrname ? $defs{$mrname} : 0;
+
+    return OpenMultiroom_Error($hash,'no multiroom backend connected, check mr attribute',1) if $OpenMultiroom_sets{$cmd} > 1 && !$mrhash;
+
+    my $soundhash = $defs{$soundname};
+    my $soundtyp = AttrVal($name,'soundSystem','MPD');
+    my $soundModuleHash = $modules{$soundtyp};
+
+    return OpenMultiroom_Error($hash,'no sound backend connected or soundsystem not defined, check soundMapping and soundSystem attributes',1)
+        if $OpenMultiroom_sets{$cmd} > 2 && (!defined $soundhash || !$soundModuleHash );
+
+
+    if ( $cmd =~ m{\A\d\z}x ) { # is the command 1 digit?
         # function called when a client presses a number on the remote. sets a timeout  and waits for the next number in case of multi digit numbers.
         # numbers are always entered by a client in preperation of a function like next, next playlist etc.
         RemoveInternalTimer($hash, \&OpenMultiroom_clearDigitBuffer);
-        my $last = $hash->{lastdigittime}; # when was last digit received?
+        my $ldt = $hash->{lastdigittime}; # when was last digit received?
         my $now = time();
         my $timeout = AttrVal($name,'digitTimeout',10);
         $hash->{lastdigittime} = $now; # reset time for last digit
-        if ( $now-$last < $timeout ) {
+        if ( $now-$ldt < $timeout ) {
             $hash->{digitBuffer} = $hash->{digitBuffer} * 10 + $cmd;
         } else {
             $hash->{digitBuffer} = $cmd;
@@ -261,7 +266,7 @@ sub OpenMultiroom_Set {
         if ( $number > 0 ){
             $percent = 0.01*$number;
         } else {
-             my $step = 0.01*(0.01*AttrVal($name,'seekStepThreshold',0) > $percent ? AttrVal($name,'seekStepSmall',3) : AttrVal($name,'seekStep',7));
+             my $step = 0.01*(0.01*AttrVal($name,'seekStepThreshold',8) > $percent ? AttrVal($name,'seekStepSmall',2) : AttrVal($name,'seekStep',7));
              $percent +=$step if $cmd eq 'forward';
              $percent -=$step if $cmd eq 'rewind';
         }
@@ -277,10 +282,10 @@ sub OpenMultiroom_Set {
         # get lists based on regexp. Seperate those playlists that have a 2 or 3 digit number in them.
         my $filter = AttrVal($name,'playlistPattern','.*');
         my @allPlaylists = split m{:}x,ReadingsVal($name,'playlistcollection','');
-        my @filteredPlaylists = grep { /$filter/ } @allPlaylists;
+        my @filteredPlaylists = grep { m{$filter}x } @allPlaylists;
         return 'no playlists found' if !@filteredPlaylists;
-        my @filteredPlaylistsWithNumbers = grep { /\d{2,3}/ }  @filteredPlaylists;
-        my @filteredPlaylistsWithoutNumbers = grep { !/\d{2,3}/ }  @filteredPlaylists;
+        my @filteredPlaylistsWithNumbers = grep { m{\d{2,3}}x }  @filteredPlaylists;
+        my @filteredPlaylistsWithoutNumbers = grep { !m{\d{2,3}}x }  @filteredPlaylists;
 
         # delete existing playlist array and crate a reference to an empty array to pupulate it afterwards
         delete $hash->{PLARRAY};
@@ -288,7 +293,7 @@ sub OpenMultiroom_Set {
         # iterate the items with a number first, to try to put the to the slot according to their number. 
         for my $item (@filteredPlaylistsWithNumbers){
             # for each one push it to the according position. pushPlArray will ensure no slot is used twice and increase accordingly
-            $item=~/(\d{2,3})/;
+            $item =~ m{(\d{2,3})}x;
             OpenMultiroom_pushPlArray($hash,$item,$1);
         }
         # do the same for the other items and push them into the array
@@ -352,28 +357,28 @@ sub OpenMultiroom_Set {
         return;
     }
 
-    if($cmd eq "copystate"){
+    if($cmd eq "copystate" || $cmd eq "control" || $cmd eq "streamreset"){
         return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
-        my $defaultstream = AttrVal($name,"defaultStream","");
-        return undef if $defaultstream eq "";
-        CallFn($mrname,"SetFn",$defs{$mrname},$mrname,"stream",$defaultstream);
-        return undef;
+        #my $defaultstream = AttrVal($name,"defaultStream","");
+        #return if $defaultstream eq '';
+        #CallFn($mrname,"SetFn",$defs{$mrname},$mrname,"stream",$defaultstream);
+        #return;
     }
-
+=pod
     if($cmd eq "control"){
         return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
         my $defaultstream = AttrVal($name,"defaultStream","");
-        return undef if $defaultstream eq "";
+        return if $defaultstream eq '';
         CallFn($mrname,"SetFn",$defs{$mrname},$mrname,"stream",$defaultstream);
-        return undef;
+        return;
     }
     if($cmd eq "streamreset"){
         return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
         my $defaultstream = AttrVal($name,'defaultStream',undef) // return;
         CallFn($mrname,"SetFn",$defs{$mrname},$mrname,"stream",$defaultstream);
-        return undef;
+        return;
     }
-
+=cut
     return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
 }
 
@@ -460,6 +465,8 @@ sub OpenMultiroom_TTS {
     return;
 }
 
+1;
+
 __END__
 
 =pod
@@ -522,45 +529,46 @@ __END__
   <h4>Attributes</h4>
   <ul>
     The following attributes change the behavior of the module. Without the attributes <i>mr</i> and <i>soundMapping</i>, the module cannot be used in a meaningful way.
-    <li>mrSystem (Default: Snapcast)<br>
+    <a id="OpenMultiroom-attr-mrSystem"></a><li>mrSystem (Default: Snapcast)<br>
       The type of the multiroom backend module. Currently only Snapcast is supported.
     </li>
-        <li>soundSystem (Default: MPD)<br>
+    <a id="OpenMultiroom-attr-soundSystem"></a><li>soundSystem (Default: MPD)<br>
     The type of the sound backend module. Currently only MPD is supported.
     </li>
-        <li>mr<br>
-    The name of the multiroom backend definition. For Snapcast, this must be the name of a snapcast module in client mode.  
+    <a id="OpenMultiroom-attr-mr"></a><li>mr<br>
+    The name of the multiroom backend definition. For Snapcast, this must be the name of a snapcast module in client mode.
     </li>
-        <li>soundMapping<br>
+    <a id="OpenMultiroom-attr-soundMapping"></a><li>soundMapping<br>
     The mapping of the multiroom streams to the sound players. For Snapcast and MPD it defines, which MPD modules are playing on which snapcast streams. Check the WIKI for a comprehensive example. 
     <pre>attr &lt;name&gt; soundMapping stream1:mpd.room1,stream2:mpd.stream2</pre>
     </li>
-        <li>ttsMapping<br>
+    
+    <a id="OpenMultiroom-attr-ttsMapping"></a><li>ttsMapping<br>
     If Text2Speech is used, this maps the defined Text2Speech modules to the associated Multiroom-System-Streams. 
      <pre>attr &lt;name&gt; ttsMapping stream1:tts.room1,stream2:tts.stream2</pre>
     </li>
-        <li>defaultTts<br>
+    <a id="OpenMultiroom-attr-defaultTts"></a><li>defaultTts<br>
     defines what is the default tts module to use. Requires a name of a Text2Speech module. 
     </li>
-        <li>defaultStream<br>
+    <a id="OpenMultiroom-attr-defaultStream"></a><li>defaultStream<br>
     Name of the default stream of this module. This is used for a reset function (not yet implemented)
     </li>
-        <li>defaultSound<br>
+    <a id="OpenMultiroom-attr-defaultSound"></a><li>defaultSound<br>
     Name of the default sound backend of this module. This is used for a reset function (not yet implemented)
     </li>
-        <li>playlistPattern<br>
+    <a id="OpenMultiroom-attr-playlistPattern"></a><li>playlistPattern<br>
     Regular expression to filter the playlists used by the channel, channelUp and channelDown commands.
     </li>
-        <li>seekStep (Default: 7)<br>
+    <a id="OpenMultiroom-attr-seekStep"></a><li>seekStep (Default: 7)<br>
     set this to define how far the forward and rewind commands jump in the current track. Defaults to 7 if not set 
     </li>
-        <li>seekStepSmall (Default: 2)<br>
+    <a id="OpenMultiroom-attr-seekStepSmall"></a><li>seekStepSmall (Default: 2)<br>
      set this on top of seekStep to define a smaller step size, if the current playing position is below seekStepThreshold percent. This is useful to skip intro music, e.g. in radio plays or audiobooks. 
     </li>
-        <li>seekStepThreshold (Default: 8)<br>
+    <a id="OpenMultiroom-attr-seekStepThreshold"></a><li>seekStepThreshold (Default: 8)<br>
     used to define when seekStep or seekStepSmall is applied. Defaults to 0. If set e.g. to 10, then during the first 10% of a track, forward and rewind are using the seekStepSmall value.
     </li>
-        <li>digitTimeout<br>
+    <a id="OpenMultiroom-attr-digitTimeout"></a><li>digitTimeout<br>
     Time within digits can be entered and chained to a multi-digit number before the digit memory is set to 0 again. 
     </li>
   </ul>
