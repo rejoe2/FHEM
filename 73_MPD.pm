@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-19 Beta-User + JensS fixes $
+#  $Id: 73_MPD.pm 23900 2022-06-22 Beta-User + JensS fixes $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -1024,11 +1024,6 @@ sub mpd_cmd($$)
   return $!; 
  }
 
-# my $read = new IO::Select() || return 'Error in calling IO::Select!\n';
-# $read->add($sock);
-# my @count = $read->can_read($hash->{TIMEOUT});
-# return 'error - no data received from MPD!\n' if @count < 1;
- 
  if ( !eval {
         $SIG{ALRM} = sub {Carp::carp 'timeout';};
         alarm(1);
@@ -1039,9 +1034,6 @@ sub mpd_cmd($$)
     ) { 
         return $@ if $@;
     }
-
-# while (<$sock>)  # MPD rede mit mir , egal was ;)
-# { last if $_ ; } # end of output.
 
  chomp $_;
 
@@ -1227,11 +1219,6 @@ sub MPD_IdleStart($)
 
  return $name."|IdleStart: $!" if (!$sock);
 
- #my $read = new IO::Select() || return 'Fehler beim Aufruf von IO::Select!\n';
- #$read->add($sock);
- #my @count = $read->can_read($hash->{TIMEOUT});
- #return "Fehler - keine Daten vom MPD!\n" if @count < 1;
-
  if ( !eval {
         $SIG{ALRM} = sub {Carp::carp 'timeout';};
         alarm(1);
@@ -1242,11 +1229,6 @@ sub MPD_IdleStart($)
     ) { 
         return $@ if $@;
     }
-
-# while (<$sock>)  # MPD rede mit mir , egal was ;)
-# { last if $_ ; } # end of output. 
-
- #while (<$sock>) { last if $_ ; }
 
  chomp $_;
 
