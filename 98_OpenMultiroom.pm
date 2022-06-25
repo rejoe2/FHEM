@@ -1,4 +1,4 @@
-#  $Id: 98_OpenMultiroom.pm 2022-06-21 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-25 Beta-User $
 
 package main;
 use strict;
@@ -129,8 +129,10 @@ sub OpenMultiroom_setNotifyDef {
     }
     OpenMultiroom_getReadings($hash,$hash->{SOUND}) if $hash->{SOUND} && $hash->{SOUND} ne $oldsound;
     $devsp .= ",$hash->{SOUND}" if defined $hash->{SOUND} && $hash->{SOUND};
-    setNotifyDev($hash,$devsp);
-    #$hash->{NOTIFYDEV} .= ",".$hash->{SOUND} if defined($hash->{SOUND}) and $hash->{SOUND} ne "";
+    if ($devsp) {
+        delete $hash->{disableNotifyFn};
+        setNotifyDev($hash,$devsp);
+    }
     return;
 }
 
