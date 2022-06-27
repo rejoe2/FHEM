@@ -234,7 +234,7 @@ sub Snapcast_Read {
       return;
     };
     my $update = $decoded_json;
-    if ( defined $hash->{IDLIST}->{$update->{id}} ) {
+    if ( defined $hash->{IDLIST} && defined $hash->{IDLIST}->{$update->{id}} ) {
       my $id = $update->{id};
       #Log3 $name,2, "id: $id ";
       if ( $hash->{IDLIST}->{$id}->{method} eq 'Server.GetStatus' ) {
@@ -483,7 +483,7 @@ sub Snapcast_parseStatus {
 
   
   $hash->{STATUS}->{server} = $server;
-  readingsBeginUpdate($hash) if defined $groups || defined $streams;
+  #readingsBeginUpdate($hash) if defined $groups || defined $streams;
   if ( defined $groups ){
     my @groups = @{$groups};
     my $gnumber = 1;
@@ -500,7 +500,9 @@ sub Snapcast_parseStatus {
           Snapcast_updateClient($hash,$c,$cnumber);
           $cnumber++;
         }
+        readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash,'clients',$cnumber-1 );
+        readingsEndUpdate($hash,1);
       }
     }
   }
@@ -508,12 +510,14 @@ sub Snapcast_parseStatus {
         my @streams = @{$streams};
         my $snumber = 1;
         for my $s(@streams){
-            Snapcast_updateStream($hash,$s,$snumber,1);
+            Snapcast_updateStream($hash,$s,$snumber);
             $snumber++;
         }
+        #readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash,'streams',$snumber-1 );
+        readingsEndUpdate($hash,1);
     }
-    readingsEndUpdate($hash,1) if defined $groups || defined $streams;
+    #readingsEndUpdate($hash,1) if defined $groups || defined $streams;
     InternalTimer(gettimeofday() + 300, "Snapcast_getStatus", $hash, 1); # every 5 Minutes, get the full update, also to apply changed vol constraints. 
     return;
 }
