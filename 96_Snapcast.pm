@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 22532 2022-06-27 Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-06-28 Beta-User $
 #
 #  Maintainer: Sebatian Stuecker / FHEM Forum: unimatrix / Github: unimatrix27
 #  
@@ -95,8 +95,8 @@ sub Snapcast_Define {
         DevIo_CloseDev($hash);
         return Snapcast_Client_Register_Server($hash);
     }
-    $hash->{ip}   = $arr[2] // 'localhost'; 
-    $hash->{port} = $arr[3] // '1705'; 
+    $hash->{ip}   = $arr[1] // 'localhost'; 
+    $hash->{port} = $arr[2] // '1705'; 
     $hash->{MODE} = 'server';
     readingsSingleUpdate($hash,'state','defined',1);
     RemoveInternalTimer($hash);
@@ -169,6 +169,7 @@ sub Snapcast_Set {
   }
   if ( defined $Snapcast_clientmethods{$opt} ) {
     my $client;
+    Log3( $hash, 3, "snap: $opt command received" );
     if ( $hash->{MODE} eq 'client' ) {
       my $clientmod = $hash;
       $client = $hash->{NAME};
@@ -178,6 +179,7 @@ sub Snapcast_Set {
     } else {
       $client = shift @param;
     }
+    Log3( $hash, 5, "Snap: $opt command received for $client" );
 
     return 'client not found, use unique name, IP, or MAC as client identifier' if !defined $client;
 
@@ -229,7 +231,7 @@ sub Snapcast_Read {
       1;
     } ) {
     # Decode JSON died, probably because of incorrect JSON from Snapcast. 
-      Log3 $name,2, "Invalid Response from Snapcast,ignoring result: $line";
+      Log3($name,1, "Invalid Response from Snapcast,ignoring result: $line");
       readingsSingleUpdate($hash,'lastError',"Invalid JSON: $buf",1); 
       return;
     };
@@ -250,43 +252,42 @@ sub Snapcast_Read {
           my $client = $hash->{IDLIST}->{$id}->{params}->{id};
 
           $client=~s/\://g;
-          Log3 $name,2, "client: $client ";
-          Log3 $name,2, "key: $key ";
-          Log3 $name,2, "value: $value ";
-          if($key eq "volume"){
+          Log3($name,5, "client: $client, key: $key, value: $value");
+          
+          if ( $key eq 'volume' ) {
             my $temp_percent = $update->{result}->{volume}->{percent};
             #Log3 $name,2, "percent: $temp_percent ";
             readingsBeginUpdate($hash); 
-            readingsBulkUpdateIfChanged($hash,"clients_".$client."_muted",$update->{result}->{volume}->{muted} );
-            readingsBulkUpdateIfChanged($hash,"clients_".$client."_volume",$update->{result}->{volume}->{percent} );
+            readingsBulkUpdateIfChanged($hash,"clients_${client}_muted",$update->{result}->{volume}->{muted} );
+            readingsBulkUpdateIfChanged($hash,"clients_${client}_volume",$update->{result}->{volume}->{percent} );
             readingsEndUpdate($hash,1);
             my $clientmodule = $hash->{$client};
             my $clienthash=$defs{$clientmodule};
             my $maxvol = Snapcast_getVolumeConstraint($clienthash);
             if (defined $clientmodule) {
               readingsBeginUpdate($clienthash); 
-              readingsBulkUpdateIfChanged($clienthash,"muted",$update->{result}->{volume}->{muted} );
-              readingsBulkUpdateIfChanged($clienthash,"volume",$update->{result}->{volume}->{percent} );
+              readingsBulkUpdateIfChanged($clienthash,'muted',$update->{result}->{volume}->{muted} );
+              readingsBulkUpdateIfChanged($clienthash,'volume',$update->{result}->{volume}->{percent} );
               readingsEndUpdate($clienthash,1);
             }
           }
-          elsif($key eq "stream"){
+          elsif ( $key eq 'stream' ){
             #Log3 $name,2, "key: $key ";
-            my $group = $hash->{"IDLIST"}->{$id}->{params}->{id};
+            my $group = $hash->{IDLIST}->{$id}->{params}->{id};
             #Log3 $name,2, "group: $group ";
             for my $i (1 .. ReadingsVal($name,'clients',0) ) {
-              $client = $hash->{STATUS}->{clients}->{"$i"}->{id};
-              my $client_group = ReadingsVal($hash->{NAME},"clients_".$client."_group","");
+              $client = $hash->{STATUS}->{clients}->{$i}->{id};
+              my $client_group = ReadingsVal($hash->{NAME},"clients_${client}_group",'');
               #Log3 $name,2, "client_group: $client_group ";
               my $clientmodule = $hash->{$client};
               my $clienthash=$defs{$clientmodule};
               if ($group eq $client_group) {          
                 readingsBeginUpdate($hash); 
-                readingsBulkUpdateIfChanged($hash,"clients_".$client."_stream_id",$update->{result}->{stream_id} );
+                readingsBulkUpdateIfChanged($hash,"clients_${client}_stream_id",$update->{result}->{stream_id} );
                 readingsEndUpdate($hash,1);
                 if (defined $clientmodule) {
                   readingsBeginUpdate($clienthash); 
-                  readingsBulkUpdateIfChanged($clienthash,"stream_id",$update->{result}->{stream_id} );
+                  readingsBulkUpdateIfChanged($clienthash,'stream_id',$update->{result}->{stream_id} );
                   readingsEndUpdate($clienthash,1);
                 }
               }
@@ -294,7 +295,7 @@ sub Snapcast_Read {
           }
           else{
             readingsBeginUpdate($hash); 
-            readingsBulkUpdateIfChanged($hash,"clients_".$client."_".$key,$update->{result});
+            readingsBulkUpdateIfChanged($hash,"clients_${client}_$key",$update->{result});
             readingsEndUpdate($hash,1);
             my $clientmodule = $hash->{$client};
             my $clienthash = $defs{$clientmodule} // return;
@@ -310,7 +311,13 @@ sub Snapcast_Read {
     }
     elsif($update->{method}=~/Client\.OnDelete/){
       my $s=$update->{params}->{data};
-      fhem "deletereading $name clients.*";
+      #fhem "deletereading $name clients.*";
+      for my $reading (grep { m{\A(?:clients)}m }
+                            #keys %{$hash{READINGS}} ) {
+                            keys %{$hash->{READINGS}} ) {
+        readingsDelete($hash, $reading);
+      }
+      
       Snapcast_getStatus($hash);
       return;
     }
@@ -329,8 +336,8 @@ sub Snapcast_Read {
       Snapcast_updateStream($hash,$s,0);
       return;
     }
-    Log3 $name,2,"unknown JSON, please ontact module maintainer: $buf";
-    readingsSingleUpdate($hash,"lastError","unknown JSON, please ontact module maintainer: $buf",1);
+    Log3($name,2,"unknown JSON, please contact module maintainer: $buf");
+    readingsSingleUpdate($hash,'lastError',"unknown JSON, please ontact module maintainer: $buf",1);
     return 'unknown JSON received'
   }
   return;
@@ -343,14 +350,14 @@ sub Snapcast_Ready {
     return if AttrVal($name, 'disable', 0);
     return if ReadingsVal( $name, 'state', 'disconnected' ) ne 'disconnected';
     #if ( ReadingsVal( $name, 'state', 'disconnected' ) eq 'disconnected' ) {
-    for my $reading (grep { m{\A(?:streams|clients)}m }
+    for my $reading (grep { m{\A(?:streams|clients)}xms }
                             #keys %{$hash{READINGS}} ) {
                             keys %{$hash->{READINGS}} ) {
         readingsDelete($hash, $reading);
     }
 #      fhem "deletereading $name streams.*";
 #      fhem "deletereading $name clients.*";
-    DevIo_OpenDev($hash, 1,"Snapcast_onConnect", sub(){});
+    DevIo_OpenDev($hash, 1,\&Snapcast_onConnect, sub(){});
     return;
 #    }
 #    return;
@@ -369,7 +376,6 @@ sub Snapcast_updateClient {
     my $hash     = shift // return;
     my $c        = shift // return;
     my $cnumber  = shift // return;
-    my $noendupd = shift;
     if ( $cnumber ==0 ) {
         $cnumber++;
         while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{host}->{mac} ne $hash->{STATUS}->{clients}->{$cnumber}->{host}->{mac} ) {
@@ -387,7 +393,7 @@ sub Snapcast_updateClient {
   $hash->{STATUS}->{clients}->{$cnumber}->{id}=$id;
   $hash->{STATUS}->{clients}->{$cnumber}->{origid}=$orig_id;
 
-  readingsBeginUpdate($hash) if !$noendupd;
+  readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged($hash,"clients_${id}_online",$c->{connected} ? 'true' : 'false' );
     readingsBulkUpdateIfChanged($hash,"clients_${id}_name",$c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name} );
     readingsBulkUpdateIfChanged($hash,"clients_${id}_latency",$c->{config}->{latency} );
@@ -399,23 +405,23 @@ sub Snapcast_updateClient {
     readingsBulkUpdateIfChanged($hash,"clients_${id}_id",$id); 
     readingsBulkUpdateIfChanged($hash,"clients_${id}_origid",$orig_id); 
     readingsBulkUpdateIfChanged($hash,"clients_${id}_nr",$cnumber); 
-    readingsBulkUpdateIfChanged($hash,"clients_${id}_group",$c->{config}->{group_id}); 
-  readingsEndUpdate($hash,1) if !$noendupd;
+    readingsBulkUpdateIfChanged($hash,"clients_${id}_group",$c->{config}->{group_id});
+  readingsEndUpdate($hash,1);
 
   my $clienthash = $defs{$hash->{$id}} // return;
 
   readingsBeginUpdate($clienthash);
-    readingsBulkUpdateIfChanged($clienthash,"online",$c->{connected} ? 'true' : 'false' );
-    readingsBulkUpdateIfChanged($clienthash,"name",$c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name} );
-    readingsBulkUpdateIfChanged($clienthash,"latency",$c->{config}->{latency} );
-    readingsBulkUpdateIfChanged($clienthash,"stream_id",$c->{config}->{stream_id} );
-    readingsBulkUpdateIfChanged($clienthash,"volume",$c->{config}->{volume}->{percent} );
-    readingsBulkUpdateIfChanged($clienthash,"muted",$c->{config}->{volume}->{muted} ? 'true' : 'false' );
-    readingsBulkUpdateIfChanged($clienthash,"ip",$c->{host}->{ip} );
-    readingsBulkUpdateIfChanged($clienthash,"mac",$c->{host}->{mac}); 
-    readingsBulkUpdateIfChanged($clienthash,"id",$id); 
-    readingsBulkUpdateIfChanged($clienthash,"origid",$orig_id); 
-    readingsBulkUpdateIfChanged($clienthash,"group",$c->{config}->{group_id}); 
+    readingsBulkUpdateIfChanged($clienthash,'online',$c->{connected} ? 'true' : 'false' );
+    readingsBulkUpdateIfChanged($clienthash,'name',$c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name} );
+    readingsBulkUpdateIfChanged($clienthash,'latency',$c->{config}->{latency} );
+    readingsBulkUpdateIfChanged($clienthash,'stream_id',$c->{config}->{stream_id} );
+    readingsBulkUpdateIfChanged($clienthash,'volume',$c->{config}->{volume}->{percent} );
+    readingsBulkUpdateIfChanged($clienthash,'muted',$c->{config}->{volume}->{muted} ? 'true' : 'false' );
+    readingsBulkUpdateIfChanged($clienthash,'ip',$c->{host}->{ip} );
+    readingsBulkUpdateIfChanged($clienthash,'mac',$c->{host}->{mac});
+    readingsBulkUpdateIfChanged($clienthash,'id',$id);
+    readingsBulkUpdateIfChanged($clienthash,'origid',$orig_id);
+    readingsBulkUpdateIfChanged($clienthash,'group',$c->{config}->{group_id});
   readingsEndUpdate($clienthash,1);
 
     my $maxvol = Snapcast_getVolumeConstraint($clienthash);
@@ -427,7 +433,6 @@ sub Snapcast_updateStream {
     my $hash     = shift // return;
     my $s        = shift // return;
     my $snumber  = shift // return;
-    my $noendupd = shift;
     if( $snumber == 0 ) {
         $snumber++;
         while ( defined $hash->{STATUS}->{streams}->{$snumber} && $s->{id} ne $hash->{STATUS}->{streams}->{$snumber}->{id} ) {
@@ -436,10 +441,10 @@ sub Snapcast_updateStream {
         return if !defined $hash->{STATUS}->{streams}->{$snumber};
     }
     $hash->{STATUS}->{streams}->{$snumber} = $s;
-    readingsBeginUpdate($hash) if !$noendupd;
+    readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged($hash,"streams_${snumber}_id",$s->{id} );
     readingsBulkUpdateIfChanged($hash,"streams_${snumber}_status",$s->{status} );
-    readingsEndUpdate($hash,1) if !$noendupd;
+    readingsEndUpdate($hash,1);
     return;
 }
 
@@ -452,7 +457,7 @@ sub Snapcast_Client_Register_Server {
         InternalTimer(gettimeofday() + 30, "Snapcast_Client_Register_Server", $hash, 1); # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
         return;
     }
-    $server = $defs{$server} // return; # get the server hash
+    $server = $defs{$server}; # get the server hash
     $server->{$hash->{ID}} = $name;
     Snapcast_getStatus($server);
     return;
@@ -513,7 +518,7 @@ sub Snapcast_parseStatus {
             Snapcast_updateStream($hash,$s,$snumber);
             $snumber++;
         }
-        #readingsBeginUpdate($hash);
+        readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged($hash,'streams',$snumber-1 );
         readingsEndUpdate($hash,1);
     }
@@ -525,11 +530,14 @@ sub Snapcast_parseStatus {
 sub Snapcast_setClient {
     my ($hash,$id,$param,$value) = @_;
     my $name = $hash->{NAME};
+    Log3($name,3,"SNAP setClient: $hash->{NAME}, id $id, param $param, val $value");
     my $cnumber = ReadingsVal($name,"clients_${id}_nr",undef) // return;
     my $method = $Snapcast_clientmethods{$param} // return;
-
+    
   my $paramset->{id} = Snapcast_getId($hash,$id);
-  
+  Log3($name,3,"SNAP setClient still there: $hash->{NAME}, paramsetid $paramset->{id}");
+
+
   if($param eq 'volumeConstraint'){
     my @values = split m{ }x, $value;
     return 'not enough parameters for volumeConstraint' if @values < 2;
@@ -547,8 +555,6 @@ sub Snapcast_setClient {
     }
     return;
   }
-  
-    
 
   if ( $param eq 'stream' ) {
     $paramset->{id} = ReadingsVal($name,"clients_${id}_group",""); # for setting stream we now use group id instead of client id in snapcast 0.11 JSON format
@@ -608,11 +614,12 @@ sub Snapcast_setClient {
     $param = 'volume'; # change param to "volume" to match new format
   }
 
-    if ( looks_like_number($value) ) {
+    if ( ref $value ne 'HASH' && looks_like_number($value) ) {
         $paramset->{$param} = $value+0;
     }else{
         $paramset->{$param} = $value
     }
+    
     Snapcast_Do($hash,$method,$paramset);
     return;
 }
@@ -621,7 +628,9 @@ sub Snapcast_Do {
     my $hash   = shift // return;
     my $method = shift // return;
     my $param  = shift // '';
-    return DevIo_SimpleWrite($hash,Snapcast_Encode($hash,$method,$param),2);
+    my $payload = Snapcast_Encode($hash,$method,$param);
+    Log3($hash,3,"SNAP: Do $payload");
+    return DevIo_SimpleWrite($hash,$payload,2);
 }
 
 sub Snapcast_Encode {

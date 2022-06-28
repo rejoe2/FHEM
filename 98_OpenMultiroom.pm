@@ -1,4 +1,4 @@
-#  $Id: 98_OpenMultiroom.pm 2022-06-25 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-28 Beta-User $
 
 package main;
 use strict;
@@ -52,7 +52,7 @@ sub OpenMultiroom_Initialize {
     $hash->{AttrFn}     = \&OpenMultiroom_Attr;
     $hash->{NotifyOrderPrefix} = '80-'; 
     $hash->{AttrList} =
-          'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep  seekStepSmall seekStepThreshold digitTimeout '
+          'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep seekStepSmall seekStepThreshold digitTimeout amplifier '
         . $readingFnAttributes; #seekDirect:percent,seconds stateSaveDir 
     return;
 }
@@ -67,13 +67,7 @@ sub OpenMultiroom_Define {
     readingsSingleUpdate($hash,'state','defined',1);
     RemoveInternalTimer($hash);
     notifyRegexpChanged($hash,'',1);
-    #$attr{$name}{mrSystem}          = 'SNAPCAST' if !exists $attr{$name}{mrSystem};
-    #$attr{$name}{mrSystem}          = 'Snapcast' if !exists $attr{$name}{mrSystem};
-    #$attr{$name}{soundSystem}       = 'MPD'      if !exists $attr{$name}{soundSystem};
-    #$attr{$name}{seekStep}          = '7'        if !exists $attr{$name}{seekStep};
-    #$attr{$name}{seekDirect}        = 'percent'  if !exists $attr{$name}{seekDirect};
-    #$attr{$name}{seekStepSmall}     = '2'        if !exists $attr{$name}{seekStepSmall};
-    #$attr{$name}{seekStepThreshold} = '8'        if !exists $attr{$name}{seekStepThreshold};
+    OpenMultiroom_setNotifyDef($hash);
     return;
 }
 
@@ -82,28 +76,42 @@ sub OpenMultiroom_Attr {
     my $name = shift;
     my $attr = shift // return;
     my $value = shift;
+    return if !$init_done;
     my $hash = $defs{$name} // return;
     Log3($name,5,"$name Attr set: $attr, $value");
     if ($cmd eq 'set'){
         if ( $attr eq 'mr' ){
-            #my $devsp = $value;
-            #$devsp .= ",$hash->{SOUND}" if defined $hash->{SOUND} && $hash->{SOUND};
-            #setNotifyDev($hash,$devsp);
-            OpenMultiroom_setNotifyDef($hash,$value);
+            my $ret = OpenMultiroom_setNotifyDef($hash,$value);
+            return $ret if $ret;
             OpenMultiroom_getReadings($hash,$value);
         }
-        if($attr eq 'soundMapping'){
+        if( $attr eq 'soundMapping' ) {
             $hash->{soundMapping}=$value;
-            OpenMultiroom_setNotifyDef($hash);
+            return OpenMultiroom_setNotifyDef($hash);
+        }
+        if($attr eq 'amplifier'){
+            my ($amp, $inp ) = split m{:}x,$value;
+            $hash->{amp}      = $amp if $amp;
+            $hash->{ampInput} = $inp if $inp;
+            return OpenMultiroom_setNotifyDef($hash,undef,$amp);
         }
     }
-    elsif ($cmd eq 'del'){
-        if ( $attr eq 'mr' ){
+    elsif ( $cmd eq 'del' ) {
+        if ( $attr eq 'mr' || $attr eq 'soundMapping' || $attr eq 'amplifier' ){
+            if ( $attr eq 'amplifier' ){
+                delete $hash->{amp};
+                delete $hash->{ampInput};
+                for my $reading (grep { m{\A(?:amp|mr)}m }
+                            #keys %{$hash{READINGS}} ) {
+                            keys %{$hash->{READINGS}} ) {
+                    readingsDelete($hash, $reading);
+                }
+            }
             InternalTimer(gettimeofday(),\&OpenMultiroom_setNotifyDef, $hash, 0);
         }
     }
-    my $out=toJSON($hash);
-    Log3($name,5,$out);
+    #my $out=toJSON($hash);
+    #Log3($name,5,$out);
     return;
 }
 
@@ -111,7 +119,12 @@ sub OpenMultiroom_setNotifyDef {
     my $hash  = shift // return;
     my $name  = $hash->{NAME} // return;
     my $devsp = shift // AttrVal($name,'mr','');
+    my $ampl  = shift // AttrVal($name,'amplifier','');
+    my ($amp, $inp ) = split m{:}x,$ampl;
+
     my $oldsound = $hash->{SOUND} // q{};
+    my $oldamp   = $hash->{amp}   // q{};
+
     if (!$init_done){
       InternalTimer(gettimeofday()+5,\&OpenMultiroom_setNotifyDef, $hash, 0);
       return; # 'init not done';
@@ -129,10 +142,14 @@ sub OpenMultiroom_setNotifyDef {
     }
     OpenMultiroom_getReadings($hash,$hash->{SOUND}) if $hash->{SOUND} && $hash->{SOUND} ne $oldsound;
     $devsp .= ",$hash->{SOUND}" if defined $hash->{SOUND} && $hash->{SOUND};
-    if ($devsp) {
+    $devsp .= ",$amp" if $amp;
+    if ( $devsp ) {
         delete $hash->{disableNotifyFn};
         setNotifyDev($hash,$devsp);
+    } else {
+        notifyRegexpChanged($hash,'',1);
     }
+    #$hash->{NOTIFYDEV} .= ",".$hash->{SOUND} if defined($hash->{SOUND}) and $hash->{SOUND} ne "";
     return;
 }
 
@@ -198,13 +215,11 @@ sub OpenMultiroom_Set {
     my @ttsmap = split m{,}x, AttrVal($name,'ttsMapping','');
     my $ttsname = '';
     for my $map (@ttsmap) {
-        my ($stream,$tts) = split /\:/,$map;
+        my ($stream,$tts) = split m{:}x,$map;
         $ttsname = $tts if $stream eq ReadingsVal($name,'stream','');
         last if $ttsname;
     }
-    readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash,'tts',$ttsname);
-    readingsEndUpdate($hash,1);
+    readingsSingleUpdate( $hash, 'tts', $ttsname, 1 ) if $ttsname && $ttsname ne ReadingsVal( $name, 'tts' , '' );
 
     if( !defined $OpenMultiroom_sets{$cmd} ) {
         my @cList = keys %OpenMultiroom_sets;
@@ -295,7 +310,7 @@ sub OpenMultiroom_Set {
         # iterate the items with a number first, to try to put the to the slot according to their number. 
         for my $item (@filteredPlaylistsWithNumbers){
             # for each one push it to the according position. pushPlArray will ensure no slot is used twice and increase accordingly
-            $item =~ m{(\d{2,3})}x;
+            $item =~ m{(\d{2,3})}x || next;
             OpenMultiroom_pushPlArray($hash,$item,$1);
         }
         # do the same for the other items and push them into the array
@@ -451,7 +466,7 @@ sub OpenMultiroom_clearDigitBuffer {
 sub OpenMultiroom_getDigits {
     my $hash = shift // return;
     my $name = $hash->{NAME} // return;;
-    my $buf = $hash->{digitBuffer};
+    my $buf = $hash->{digitBuffer} // '';
     RemoveInternalTimer($hash, \&OpenMultiroom_clearDigitBuffer);
     $hash->{digitBuffer} = 0;
     return $buf;
@@ -482,7 +497,7 @@ __END__
 <ul>
     <i>OpenMultiroom</i> is a module that integrates the functions of an audio player module and a multiroom module into one module, giving one interface with one set of readings and set-commands. Currently it supports the <a href="#MPD">MPD module</a> as sound backend and the <a href="#Snapcast">Snapcast module</a> as multiroom backend. Optionally a <a href="#Text2Speech">Text2Speech module</a> can be attached on top to enable audio-feedback on userinteraction, which makes most sense if used in a headless environment. OpenMultiroom is specificallz optimized to be used just with a remote control without a display, but its interface also allows to be used with common frontends such as TabletUI or SmartVISU. A comprehensive introcuction into how to use and configure this module and the associated modules and software services is given in the <a href="http://www.fhemwiki.de/wiki/OpenMultiroom">Wiki</a> (german only). 
     <a id="OpenMultiroom-define"></a>
-    <b>Define</b>
+    <h4>Define</h4>
     <ul>
         <code>define <name> OpenMultiroom</code>
         <br><br>
@@ -497,32 +512,32 @@ __END__
         <br><br>
         Options:
         <ul>
-              <li><i>0...9</i><br>
+              <a id="OpenMultiroom-set-digits" data-pattern="[0-9]"></a><li><i>0...9</i><br>
                   Any single digit. This is useful to connect the digits on a IR or radio remote to this module. The module has a memory of digits "pressed". Whenever more digits are pressed within the timeout(Attribute <i>digitTimeout</i>) the digits are chained together to a number, similar to changing a channel on a TV with numbers on a remote. If afterwards one of the functions that can be controled with numbers is used, the number will be used as argument to it, e.g. for skipping to a track with a specific number. If the timeout occurs before that, the number memory is set to 0 and optionally a configurable NACK-Sound is played. (configured in associated TTS-Module)</li>
-              <li><i>play</i><br>
+              <a id="OpenMultiroom-set-play"></a><li><i>play</i><br>
                   play is forwarded to the sound backend. If a number is entered before, it will skip to the track with that number.</li>
-              <li><i>pause</i><br>
+              <a id="OpenMultiroom-set-pause"></a><li><i>pause</i><br>
                   pause just pauses the sound backend</li>
-              <li><i>toggle</i><br>
+              <a id="OpenMultiroom-set-toggle"></a><li><i>toggle</i><br>
                   toggles between play and pause in the sound backend</li>
-              <li><i>stop</i><br>
+              <a id="OpenMultiroom-set-stop"></a><li><i>stop</i><br>
                   stops the sound backend</li>
-              <li><i>next / previous</i><br>
+              <a id="OpenMultiroom-set-next" data-pattern="next|previous"></a><li><i>next / previous</i><br>
                   Skips to the next or previous track in the sound backend</li>
-              <li><i>forward / rewind</i><br>
+              <a id="OpenMultiroom-set-forward" data-pattern="forward|rewind"></a><li><i>forward / rewind</i><br>
                   jump forward or backward in the current track as far as defined in the Attributes <i>seekStep</i>, <i>seekStepSmall</i> and <i>seekStepThreshold</i>, default 7%<br>
                   If a number is entered before, skips to the given position either in seconds or in percent, depending on Attribute <i>seekDirect</i><</li>
-              <li><i>random, single, repeat</i><br>
+              <a id="OpenMultiroom-set-single" data-pattern="random|single|repeat"></a><li><i>random, single, repeat</i><br>
                   Those commands are just forwarded to the sound backend and change its behavior accordingly.</li>
-              <li><i>channelUp / channelDown / channel (number)</i><br>
+              <a id="OpenMultiroom-set-channel" data-pattern="channel.*"></a><li><i>channelUp / channelDown / channel (number)</i><br>
                   loads the next or previous playlist in the sound backend. To determine what is the next or previous playlist the module uses the attribute <i>playlistPattern</i> which is applied as regular expression filter to the list of playlists available. On top of that the module sorts the playlist in a way, that those playlists that have a number in its name are available on exactly that position in the list. This way a playlist can be named with a certain number and is then later available through this module by entering that number with the digits of a remote and then using the channel or channelUp command. If there is more than one playlist with the same number in its name, it will be sorted into the list at the next free number slot</li>
-               <li><i>volume [number]</i><br>
+               <a id="OpenMultiroom-set-volume"></a><li><i>volume [number]</i><br>
                   sets the volume of the multiroom backend, either by giving volume as a parameter, or by entering a number with digits before using this command.</li>                 
-               <li><i>volup / voldown</i><br>
-                  uses the volup or voldown command of the multiroom backend to change the volume in configurable steps</li>  
-               <li><i>mute [true|false]</i><br>
+               <a id="OpenMultiroom-set-volumeUp" data-pattern="volumeUp|volumeDown"></a><li><i>volumeUp / volumeDown</i><br>
+                  uses the volumeUp or volumeDown command of the multiroom backend to change the volume in configurable steps</li>  
+               <a id="OpenMultiroom-set-mute"></a><li><i>mute [true|false]</i><br>
                   mutes or unmutes the multiroom backend using the true or false option. Without option given, toggles the mute status</li>
-               <li><i>stream [streamname]</i><br>
+               <a id="OpenMultiroom-set-stream"></a><li><i>stream [streamname]</i><br>
                   changes the stream to which the module is listening to in the multiroom backend. Without argument, it just switches to the next stream, or with argument, to the stream with the given name. A change of stream also leads to a situation, where the module is connected to a different instance of the sound backend and therefore all readings of the sound backend will be updated with those from the new sound backend. The new sound backend is determined based on the attribute <i>soundMapping</i>. This also means, that the module is always in control of the sound backend instance that it is listening to.</li>
         </ul>
 </ul>
@@ -539,6 +554,11 @@ __END__
     </li>
     <a id="OpenMultiroom-attr-mr"></a><li>mr<br>
     The name of the multiroom backend definition. For Snapcast, this must be the name of a snapcast module in client mode.
+    </li>
+    <a id="OpenMultiroom-attr-amplifier"></a><li>amplifier<br>
+    The name of the amplifier device which is feed by the multiroom backend definition. You may add the input source used by the multiroom backend.
+    <pre>attr &lt;name&gt; amplifier yamaha_kitchen:airplay</pre><br>
+    Might later be used to activate the amplifier as well and/or apply volume commands towards the hardware rather than the (software) backend.
     </li>
     <a id="OpenMultiroom-attr-soundMapping"></a><li>soundMapping<br>
     The mapping of the multiroom streams to the sound players. For Snapcast and MPD it defines, which MPD modules are playing on which snapcast streams. Check the WIKI for a comprehensive example. 
@@ -578,3 +598,54 @@ __END__
 
 
 =end html
+
+=pod
+https://ethulhu.co.uk/multi-room-audio
+
+https://github.com/mikebrady/shairport-sync
+
+
+https://wiki.archlinux.org/title/PulseAudio/Examples#PulseAudio_over_network
+
+
+
+load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;192.168.2.0/24
+
+
+[Service]
+ExecStart=/usr/bin/pulseaudio --system
+
+=>
+[Service]
+ExecStart=/usr/bin/pulseaudio --system -D --disallow-module-loading
+
+
+/etc/pulse/default.pa #(statt server.pa!?!)
+
+
+#https://wiki.archlinux.org/title/Avahi (#Installation) =>
+/etc/systemd/resolved.conf
+MulticastDNS=false
+
+https://github.com/badaix/snapcast/issues/991
+
+
+https://github.com/badaix/snapcast/issues/810#issuecomment-782727574
+sudo -u snapclient snapclient --player pulse:server=127.0.0.1
+
+
+audio_output {
+    type                "pulse"
+    name                "Pulse wohn"
+    server             "127.0.0.1"        # optional
+    sink                "wohn"      # optional
+    stream-properties   "props,media.role=music"
+}
+
+https://github.com/badaix/snapcast/issues/810#issuecomment-851586430
+SNAPCLIENT_OPTS="--player pulse --soundcard 0 --sampleformat 96000:24:* --mixer hardware --host 127.0.0.1 --logfilter *:notice"
+
+
+https://bbs.archlinux.org/viewtopic.php?pid=1428615#p1428615
+mplayer -ao pulse::SINKNAME URI
+=cut
