@@ -1,4 +1,20 @@
+################################################################
+#
 #  $Id: 98_OpenMultiroom.pm 2022-06-28 Beta-User $
+#
+#  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
+#
+#  This code is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+################################################################
 
 package main;
 use strict;
@@ -648,4 +664,6 @@ SNAPCLIENT_OPTS="--player pulse --soundcard 0 --sampleformat 96000:24:* --mixer 
 
 https://bbs.archlinux.org/viewtopic.php?pid=1428615#p1428615
 mplayer -ao pulse::SINKNAME URI
+
+https://shallowsky.com/linux/pulseaudio-command-line.html
 =cut

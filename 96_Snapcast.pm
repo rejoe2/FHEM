@@ -2,13 +2,7 @@
 #
 #  $Id: 96_Snapcast.pm 26176 2022-06-28 Beta-User $
 #
-#  Maintainer: Sebatian Stuecker / FHEM Forum: unimatrix / Github: unimatrix27
-#  
-#  FHEM Forum : https://forum.fhem.de/index.php/topic,62389.0.html
-#
-#  Github: https://github.com/unimatrix27/fhemmodules/blob/master/96_Snapcast.pm
-#
-#  Feedback bitte nur ins FHEM Forum, Bugs oder Pull Request bitte direkt auf Github. 
+#  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
 #  This code is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -27,7 +21,6 @@
 # Future developments beyond this revision are not necessarily supported. 
 # The module uses DevIo for communication. There is no blocking communication whatsoever. 
 # Communication to Snapcast goes through a TCP Socket, Writing and Reading are managed asynchronously.
-# It is necessary to have  JSON module installed. If not, the module will detect this and put a message in the log file.
 
 package main;
 use strict;
