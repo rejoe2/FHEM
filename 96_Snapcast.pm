@@ -696,12 +696,12 @@ sub Snapcast_getVolumeConstraint {
     if ( $cname eq $phase ) {
       my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time+86400);
       my $tomorrow = sprintf("%04d",1900+$year)."-".sprintf("%02d",$mon+1)."-".sprintf("%02d",$mday)." ";
-      $list =~ s/^\s+//; # get rid of whitespaces
-      $list =~ s/\s+$//; 
-      my @listelements=split(" ", $list);
-      my $mindiff=time_str2num($tomorrow."23:59:00"); # eine Tageslänge
+      $list = trim($list); #=~ s/^\s+//; # get rid of whitespaces
+      #$list =~ s/\s+$//; 
+      my @listelements = split m{ }x, $list;
+      my $mindiff=time_str2num($tomorrow.'23:59:00'); # eine Tageslänge
       for(my $i=0;$i<@listelements/2;$i++){
-          my $diff=abstime2rel($listelements[$i*2].":00"); # wie lange sind wir weg von der SChaltzeit?
+          my $diff=abstime2rel($listelements[$i*2].':00'); # wie lange sind wir weg von der SChaltzeit?
           if(time_str2num($tomorrow.$diff)<$mindiff){$mindiff=time_str2num($tomorrow.$diff);$value=$listelements[1+($i*2)];} # wir suchen die kleinste relative Zeit
       }
     }
