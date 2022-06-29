@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-29 II Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-29 III Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -197,6 +197,7 @@ sub OpenMultiroom_Notify {
         my $hit;
         if ( $devType eq 'MPD' ){
             $hit = $name =~ s{\A(state|volume|mute)\z}{sound_$1}x;
+            #do we need/want more MPD readings to be doubled here?
         }
         if ( $devType eq 'Snapcast' ) {
             $hit = 1;
@@ -211,7 +212,7 @@ sub OpenMultiroom_Notify {
         # processing $event with further code
     }
     my $vol = ReadingsVal($ownName, 'mr_volume', 50 );
-    $vol = $vol * ReadingsVal($ownName, 'amp_volume', 50 ) if defined $hash->{amp};
+    $vol = $vol / 100 * ReadingsVal($ownName, 'amp_volume', 50 ) if defined $hash->{amp};
     readingsBulkUpdateIfChanged($hash,'volume',$vol);
     readingsEndUpdate($hash,1);
     OpenMultiroom_setNotifyDef($hash) if $updateFlag;
@@ -349,7 +350,7 @@ sub OpenMultiroom_Set {
         } else {
             # for next or prev, just increase the number or decrease the number based on $cmd, call getPlName(number)
             if ( $cmd eq 'channelUp'){
-                $currentindex =  !defined $currentindex || $currentindex == @indexes-1 ? 0 : $currentindex+1;
+                $currentindex = !defined $currentindex || $currentindex == @indexes - 1 ? 0 : $currentindex + 1;
             }
             if($cmd eq 'channelDown'){
                 $currentindex = !defined $currentindex || $currentindex == 0 ? @indexes-1 : $currentindex-1;
