@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-28 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-29 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -203,7 +203,9 @@ sub OpenMultiroom_Notify {
             $name =~ s{name}{mr_name}x;
             $updateFlag = 1 if $name eq 'stream';
         }
-
+        if ( $devName eq $hash->{amp} ) {
+            $name =~ s{\A(state|name|input|volume|mute)\z}{amp_$1}x;
+        }
         readingsBulkUpdateIfChanged($hash,$name,$value );
         Log3($ownName,4,"$name got reading from $devName: $devType: $name|$value");
         # processing $event with further code
