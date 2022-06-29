@@ -199,7 +199,8 @@ sub OpenMultiroom_Notify {
             $hit = $name =~ s{\A(state|volume|mute)\z}{sound_$1}x;
         }
         if ( $devType eq 'Snapcast' ) {
-            $hit = $name =~ s{\A(state|name)\z}{mr_$1}x;
+            $hit = 1;
+            $name =~ s{\A(state|volume|name)\z}{mr_$1}x;
             $updateFlag = 1 if $name eq 'stream';
         }
         if ( $devName eq $hash->{amp} ) {
@@ -209,6 +210,9 @@ sub OpenMultiroom_Notify {
         Log3($ownName,4,"$name got reading from $devName: $devType: $name|$value");
         # processing $event with further code
     }
+    my $vol = ReadingsVal($ownName, 'mr_volume', 50 );
+    $vol = $vol * ReadingsVal($ownName, 'amp_volume', 50 ) if defined $hash->{amp};
+    readingsBulkUpdateIfChanged($hash,'volume',$vol);
     readingsEndUpdate($hash,1);
     OpenMultiroom_setNotifyDef($hash) if $updateFlag;
     Log3($ownName,5,"$ownName Notify_done");
