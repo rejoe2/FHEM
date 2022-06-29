@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-06-28 Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-06-29 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -162,7 +162,7 @@ sub Snapcast_Set {
   }
   if ( defined $Snapcast_clientmethods{$opt} ) {
     my $client;
-    Log3( $hash, 3, "snap: $opt command received" );
+    Log3( $hash, 5, "snap: $opt command received" );
     if ( $hash->{MODE} eq 'client' ) {
       my $clientmod = $hash;
       $client = $hash->{NAME};
@@ -523,12 +523,12 @@ sub Snapcast_parseStatus {
 sub Snapcast_setClient {
     my ($hash,$id,$param,$value) = @_;
     my $name = $hash->{NAME};
-    Log3($name,3,"SNAP setClient: $hash->{NAME}, id $id, param $param, val $value");
+    Log3($name,4,"SNAP setClient: $hash->{NAME}, id $id, param $param, val $value");
     my $cnumber = ReadingsVal($name,"clients_${id}_nr",undef) // return;
     my $method = $Snapcast_clientmethods{$param} // return;
     
-  my $paramset->{id} = Snapcast_getId($hash,$id);
-  Log3($name,3,"SNAP setClient still there: $hash->{NAME}, paramsetid $paramset->{id}");
+    my $paramset->{id} = Snapcast_getId($hash,$id);
+    Log3($name,4,"SNAP setClient still there: $hash->{NAME}, paramsetid $paramset->{id}");
 
 
   if($param eq 'volumeConstraint'){
@@ -622,7 +622,7 @@ sub Snapcast_Do {
     my $method = shift // return;
     my $param  = shift // '';
     my $payload = Snapcast_Encode($hash,$method,$param);
-    Log3($hash,3,"SNAP: Do $payload");
+    #Log3($hash,5,"SNAP: Do $payload");
     return DevIo_SimpleWrite($hash,$payload,2);
 }
 
@@ -685,7 +685,7 @@ sub Snapcast_getVolumeConstraint {
 
   for my $c (@constraints){
     my ($cname,$list)= split m{\|}x, $c;
-    Log3 $name,3,"SNAP cname: $cname, list: $list";
+    #Log3($name,3,"SNAP cname: $cname, list: $list");
     if ( $cname eq $phase ) {
       my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime(time+86400);
       my $tomorrow = sprintf("%04d",1900+$year)."-".sprintf("%02d",$mon+1)."-".sprintf("%02d",$mday)." ";
