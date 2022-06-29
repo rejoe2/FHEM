@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-29 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-29 II Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -194,19 +194,18 @@ sub OpenMultiroom_Notify {
         next if !defined $event;
         my ($name,$value) = split m{:}x , $event;
         next if !defined $value;
+        my $hit;
         if ( $devType eq 'MPD' ){
-            $name =~ s{volume}{sound_volume}x;
-            $name =~ s{state}{sound_state}x;
+            $hit = $name =~ s{\A(state|volume|mute)\z}{sound_$1}x;
         }
         if ( $devType eq 'Snapcast' ) {
-            $name =~ s{state}{mr_state}x;
-            $name =~ s{name}{mr_name}x;
+            $hit = $name =~ s{\A(state|name)\z}{mr_$1}x;
             $updateFlag = 1 if $name eq 'stream';
         }
         if ( $devName eq $hash->{amp} ) {
-            $name =~ s{\A(state|name|input|volume|mute)\z}{amp_$1}x;
+            $hit = $name =~ s{\A(state|name|input|volume|mute)\z}{amp_$1}x;
         }
-        readingsBulkUpdateIfChanged($hash,$name,$value );
+        readingsBulkUpdateIfChanged($hash,$name,$value) if $hit;
         Log3($ownName,4,"$name got reading from $devName: $devType: $name|$value");
         # processing $event with further code
     }
@@ -219,9 +218,8 @@ sub OpenMultiroom_Notify {
 sub OpenMultiroom_Set {
     my ($hash, @param) = @_;
 
-    return '"set OpenMultiroom" needs at least one argument' if int @param < 2;
     my $name = shift @param;
-    my $cmd = shift @param;
+    my $cmd = shift @param // return '"set OpenMultiroom" needs at least one argument';
     my $val = shift @param;
 
     my $soundname = $hash->{SOUND} // '';
@@ -364,21 +362,33 @@ sub OpenMultiroom_Set {
     }
 
     if ( $cmd eq 'volume' ) {
-        my $number = OpenMultiroom_getDigits($hash);
+        my $number = $val // OpenMultiroom_getDigits($hash);
         if ( $number > 0 ) {
             $val = $number;
             $val = 100 if $val > 100;
         }
-        CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume',$val);
+        if ( $val < ReadingsVal($name, 'mr_volume', 0) || !defined $hash->{amp}) {
+            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume',$val);
+        } else {
+            CommandSet(undef,"$hash->{amp} volume $val");
+        }
         return;
     }
 
     if ( $cmd eq 'volumeUp' ) {
-        CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','up');
+        if ( ReadingsVal( $name, 'mr_volume', 0 ) < 100 || !defined $hash->{amp}) {
+            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','up');
+        } else {
+            CommandSet(undef,"$hash->{amp} volume volumeUp");
+        }
         return;
     }
     if ( $cmd eq 'volumeDown' ) {
-        CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','down');
+        if ( !defined $hash->{amp}) {
+            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','down');
+        } else {
+            CommandSet(undef,"$hash->{amp} volume volumeDown");
+        }
         return;
     }
     if ( $cmd eq 'mute') {
@@ -389,6 +399,11 @@ sub OpenMultiroom_Set {
     if ( $cmd eq 'stream' ) {
         my $targetStream = $val // 'next';
         CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'stream',$targetStream);
+        if ( defined $hash->{amp} 
+            && defined $hash->{ampInput} 
+            && ReadingsVal( $name, 'amp_input', $hash->{ampInput} ) ne $hash->{ampInput} ) {
+            CommandSet(undef,"$hash->{amp} input $hash->{ampInput}");
+        }
         return;
     }
 
