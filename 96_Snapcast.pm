@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-06-29 Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-06-30 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -77,7 +77,7 @@ sub Snapcast_Define {
     my $def  = shift // return;
     my @arr  = split m{\s+}xms, $def;
     my $name = shift @arr;
-    if(defined($arr[1]) && $arr[1] eq 'client'){
+    if ( defined($arr[1]) && $arr[1] eq 'client' ) {
         return 'Usage: define <name> Snapcast client <server> <id>' if !defined $arr[2] || !defined $arr[3];
         return "Server $arr[2] not defined" if !defined $defs{$arr[2]};
         $hash->{MODE} = 'client';
@@ -447,7 +447,7 @@ sub Snapcast_Client_Register_Server {
     my $name = $hash->{NAME} // return;
     my $server = $hash->{SERVER};
     if ( !defined $defs{$server} ) {
-        InternalTimer(gettimeofday() + 30, "Snapcast_Client_Register_Server", $hash, 1); # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
+        InternalTimer(gettimeofday() + 30, \&Snapcast_Client_Register_Server, $hash, 1); # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
         return;
     }
     $server = $defs{$server}; # get the server hash
@@ -516,7 +516,7 @@ sub Snapcast_parseStatus {
         readingsEndUpdate($hash,1);
     }
     #readingsEndUpdate($hash,1) if defined $groups || defined $streams;
-    InternalTimer(gettimeofday() + 300, "Snapcast_getStatus", $hash, 1); # every 5 Minutes, get the full update, also to apply changed vol constraints. 
+    InternalTimer(gettimeofday() + 300, \&Snapcast_getStatus, $hash, 1); # every 5 Minutes, get the full update, also to apply changed vol constraints. 
     return;
 }
 
@@ -531,7 +531,7 @@ sub Snapcast_setClient {
     Log3($name,4,"SNAP setClient still there: $hash->{NAME}, paramsetid $paramset->{id}");
 
 
-  if($param eq 'volumeConstraint'){
+  if ( $param eq 'volumeConstraint' ) {
     my @values = split m{ }x, $value;
     return 'not enough parameters for volumeConstraint' if @values < 2;
 
@@ -568,6 +568,7 @@ sub Snapcast_setClient {
   if ( $param eq 'volume' ) {
     
     #return undef unless defined($currentVol);
+    return if !$value;
 
     # check if volume was given as increment or decrement, then find out current volume and calculate new volume
     if($value=~/^([\+\-])(\d{1,2})$/){

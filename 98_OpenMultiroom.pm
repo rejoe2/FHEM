@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-29 III Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-30 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -463,7 +463,7 @@ sub OpenMultiroom_Error { # hier noch TTS feedback einbauen je nach errorlevel
     
     my $name = $hash->{NAME} // return;
     if (!$init_done){
-      InternalTimer(gettimeofday()+10,"OpenMultiroom_getReadings", $hash, $device);
+      InternalTimer(gettimeofday()+10,\&OpenMultiroom_getReadings, $hash, $device);
       return; # "init not done";
     }
     my $modhash  = $defs{$device} // return;
