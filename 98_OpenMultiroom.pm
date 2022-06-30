@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-30 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-06-30 I Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -243,10 +243,9 @@ sub OpenMultiroom_Set {
     readingsSingleUpdate( $hash, 'tts', $ttsname, 1 ) if $ttsname && $ttsname ne ReadingsVal( $name, 'tts' , '' );
 
     if( !defined $OpenMultiroom_sets{$cmd} ) {
-        my @cList = keys %OpenMultiroom_sets;
-        return "Unknown argument $cmd, choose one of " . join(q{ }, @cList);
+        #my @cList = keys %OpenMultiroom_sets;
+        return "Unknown argument $cmd, choose one of 0:noArg 1:noArg 2:noArg 3:noArg 4:noArg 5:noArg 6:noArg 7:noArg 8:noArg 9:noArg mute:true,false volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg forward:noArg rewind:noArg next:noArg previous:noArg play:noArg pause:noArg toggle:noArg stop:noArg random:noArg single:noArg repeat:noArg statesave stateload channelUp:noArg channelDown:noArg trackinfo offtimer stream copystate control streamreset:noArg";
     }
-    # clear:noArg clear_readings:noArg mpdCMD next:noArg outputenabled0:0,1 pause:noArg play playfile playlist previous:noArg random:noArg repeat:noArg reset:noArg single:noArg stop:noArg toggle:noArg updateDb:noArg volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg
 
     my $mrname = AttrVal($name,'mr',undef);
     my $mrhash = defined $mrname ? $defs{$mrname} : 0;
@@ -550,8 +549,8 @@ __END__
         <br><br>
         Options:
         <ul>
-              <a id="OpenMultiroom-set-digits" data-pattern="[0-9]"></a><li><i>0...9</i><br>
-                  Any single digit. This is useful to connect the digits on a IR or radio remote to this module. The module has a memory of digits "pressed". Whenever more digits are pressed within the timeout(Attribute <i>digitTimeout</i>) the digits are chained together to a number, similar to changing a channel on a TV with numbers on a remote. If afterwards one of the functions that can be controled with numbers is used, the number will be used as argument to it, e.g. for skipping to a track with a specific number. If the timeout occurs before that, the number memory is set to 0 and optionally a configurable NACK-Sound is played. (configured in associated TTS-Module)</li>
+              <a id="OpenMultiroom-set-digits" data-pattern="[0-9]"></a><li><i>&lt;digit&gt; 0...9</i><br>
+                  Any single digit. This is useful to connect the digits on a IR or radio remote to this module. The module has a memory of digits "pressed". Whenever more digits are pressed within the timeout(Attribute <i>digitTimeout</i>) the digits are chained together to a <b>number</b>, similar to changing a channel on a TV with numbers on a remote. If afterwards one of the functions that can be controled with numbers is used, the number will be used as argument to it, e.g. for skipping to a track with a specific number. If the timeout occurs before that, the number memory is set to 0 and optionally a configurable NACK-Sound is played. (configured in associated TTS-Module)</li>
               <a id="OpenMultiroom-set-play"></a><li><i>play</i><br>
                   play is forwarded to the sound backend. If a number is entered before, it will skip to the track with that number.</li>
               <a id="OpenMultiroom-set-pause"></a><li><i>pause</i><br>
@@ -636,56 +635,3 @@ __END__
 
 
 =end html
-
-=pod
-https://ethulhu.co.uk/multi-room-audio
-
-https://github.com/mikebrady/shairport-sync
-
-
-https://wiki.archlinux.org/title/PulseAudio/Examples#PulseAudio_over_network
-
-
-
-load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;192.168.2.0/24
-
-
-[Service]
-ExecStart=/usr/bin/pulseaudio --system
-
-=>
-[Service]
-ExecStart=/usr/bin/pulseaudio --system -D --disallow-module-loading
-
-
-/etc/pulse/default.pa #(statt server.pa!?!)
-
-
-#https://wiki.archlinux.org/title/Avahi (#Installation) =>
-/etc/systemd/resolved.conf
-MulticastDNS=false
-
-https://github.com/badaix/snapcast/issues/991
-
-
-https://github.com/badaix/snapcast/issues/810#issuecomment-782727574
-sudo -u snapclient snapclient --player pulse:server=127.0.0.1
-
-
-audio_output {
-    type                "pulse"
-    name                "Pulse wohn"
-    server             "127.0.0.1"        # optional
-    sink                "wohn"      # optional
-    stream-properties   "props,media.role=music"
-}
-
-https://github.com/badaix/snapcast/issues/810#issuecomment-851586430
-SNAPCLIENT_OPTS="--player pulse --soundcard 0 --sampleformat 96000:24:* --mixer hardware --host 127.0.0.1 --logfilter *:notice"
-
-
-https://bbs.archlinux.org/viewtopic.php?pid=1428615#p1428615
-mplayer -ao pulse::SINKNAME URI
-
-https://shallowsky.com/linux/pulseaudio-command-line.html
-=cut

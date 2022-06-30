@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-06-30 Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-06-30 I Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -148,13 +148,13 @@ sub Snapcast_Set {
   my $opt   = shift @param;
 
 #  my $clientmod;
-  my %sets = $hash->{MODE} eq 'client' ? %Snapcast_client_sets : %Snapcast_sets;
-  if ( !defined $sets{$opt} ) {
-    my @cList = keys %sets;
+  my %snap_sets = $hash->{MODE} eq 'client' ? %Snapcast_client_sets : %Snapcast_sets;
+  if ( !defined $snap_sets{$opt} ) {
+    my @cList = keys %snap_sets;
     return "Unknown argument $opt, choose one of " . join(q{ }, @cList);
   }
-  if ( @param < $sets{$opt} ) {
-    return "$opt requires at least $sets{$opt} arguments";
+  if ( @param < $snap_sets{$opt} ) {
+    return "$opt requires at least $snap_sets{$opt} arguments";
   }
   if ( $opt eq 'update' ){
     Snapcast_getStatus($hash);
