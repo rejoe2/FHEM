@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-06-30 I Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-07-01 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -21,55 +21,52 @@ use strict;
 use warnings;
 
 my %OpenMultiroom_sets = (
-    0              =>1,
-    1              =>1,
-    2              =>1,
-    3              =>1,
-    4              =>1,
-    5              =>1,
-    6              =>1,
-    7              =>1,
-    8              =>1,
-    9              =>1,
-    mute           =>2,
-    volume         =>2,
-    volumeUp       =>2,
-    volumeDown     =>2,
-    forward        =>3,
-    rewind         =>3,
-    next           =>3,
-    previous       =>3,
-    play           =>3,
-    pause          =>3,
-    toggle         =>3,
-    stop           =>3,
-    random         =>3,
-    single         =>3,
-    repeat         =>3,
-    statesave      =>3,
-    stateload      =>3,
-    channelUp      =>3,
-    channelDown    =>3,
-    trackinfo      =>3,
-    offtimer       =>2,
-    stream         =>2,
-    copystate      =>2,
-    control        =>2,
-    streamreset    =>2
+    0           => 1,
+    1           => 1,
+    2           => 1,
+    3           => 1,
+    4           => 1,
+    5           => 1,
+    6           => 1,
+    7           => 1,
+    8           => 1,
+    9           => 1,
+    mute        => 2,
+    volume      => 2,
+    volumeUp    => 2,
+    volumeDown  => 2,
+    forward     => 3,
+    rewind      => 3,
+    next        => 3,
+    previous    => 3,
+    play        => 3,
+    pause       => 3,
+    toggle      => 3,
+    stop        => 3,
+    random      => 3,
+    single      => 3,
+    repeat      => 3,
+    statesave   => 3,
+    stateload   => 3,
+    channelUp   => 3,
+    channelDown => 3,
+    trackinfo   => 3,
+    offtimer    => 2,
+    stream      => 2,
+    copystate   => 2,
+    control     => 2,
+    streamreset => 2
 );
-
 
 sub OpenMultiroom_Initialize {
     my $hash = shift // return;
-    $hash->{DefFn}      = \&OpenMultiroom_Define;
-    $hash->{UndefFn}    = \&OpenMultiroom_Undef;
-    $hash->{NotifyFn}   = \&OpenMultiroom_Notify;
-    $hash->{SetFn}      = \&OpenMultiroom_Set;
-    $hash->{AttrFn}     = \&OpenMultiroom_Attr;
-    $hash->{NotifyOrderPrefix} = '80-'; 
-    $hash->{AttrList} =
-          'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep seekStepSmall seekStepThreshold digitTimeout amplifier '
-        . $readingFnAttributes; #seekDirect:percent,seconds stateSaveDir 
+    $hash->{DefFn}             = \&OpenMultiroom_Define;
+    $hash->{UndefFn}           = \&OpenMultiroom_Undef;
+    $hash->{NotifyFn}          = \&OpenMultiroom_Notify;
+    $hash->{SetFn}             = \&OpenMultiroom_Set;
+    $hash->{AttrFn}            = \&OpenMultiroom_Attr;
+    $hash->{NotifyOrderPrefix} = '80-';
+    $hash->{AttrList}          = 'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep seekStepSmall seekStepThreshold digitTimeout amplifier ' . $readingFnAttributes;    #seekDirect:percent,seconds stateSaveDir
     return;
 }
 
@@ -80,92 +77,95 @@ sub OpenMultiroom_Define {
 
     my $name = shift @arr;
 
-    readingsSingleUpdate($hash,'state','defined',1);
+    readingsSingleUpdate( $hash, 'state', 'defined', 1 );
     RemoveInternalTimer($hash);
-    notifyRegexpChanged($hash,'',1);
+    notifyRegexpChanged( $hash, '', 1 );
     OpenMultiroom_setNotifyDef($hash);
     return;
 }
 
 sub OpenMultiroom_Attr {
-    my $cmd  = shift;
-    my $name = shift;
-    my $attr = shift // return;
+    my $cmd   = shift;
+    my $name  = shift;
+    my $attr  = shift // return;
     my $value = shift;
     return if !$init_done;
     my $hash = $defs{$name} // return;
-    Log3($name,5,"$name Attr set: $attr, $value");
-    if ($cmd eq 'set'){
-        if ( $attr eq 'mr' ){
-            my $ret = OpenMultiroom_setNotifyDef($hash,$value);
+    Log3( $name, 5, "$name Attr set: $attr, $value" );
+    if ( $cmd eq 'set' ) {
+        if ( $attr eq 'mr' ) {
+            my $ret = OpenMultiroom_setNotifyDef( $hash, $value );
             return $ret if $ret;
-            OpenMultiroom_getReadings($hash,$value);
+            OpenMultiroom_getReadings( $hash, $value );
         }
-        if( $attr eq 'soundMapping' ) {
-            $hash->{soundMapping}=$value;
+        if ( $attr eq 'soundMapping' ) {
+            $hash->{soundMapping} = $value;
             return OpenMultiroom_setNotifyDef($hash);
         }
-        if($attr eq 'amplifier'){
-            my ($amp, $inp ) = split m{:}x,$value;
+        if ( $attr eq 'amplifier' ) {
+            my ( $amp, $inp ) = split m{:}x, $value;
             $hash->{amp}      = $amp if $amp;
             $hash->{ampInput} = $inp if $inp;
-            return OpenMultiroom_setNotifyDef($hash,undef,$amp);
+            return OpenMultiroom_setNotifyDef( $hash, undef, $amp );
         }
     }
     elsif ( $cmd eq 'del' ) {
-        if ( $attr eq 'mr' || $attr eq 'soundMapping' || $attr eq 'amplifier' ){
-            if ( $attr eq 'amplifier' ){
+        if ( $attr eq 'mr' || $attr eq 'soundMapping' || $attr eq 'amplifier' ) {
+            if ( $attr eq 'amplifier' ) {
                 delete $hash->{amp};
                 delete $hash->{ampInput};
-                for my $reading (grep { m{\A(?:amp|mr)}m }
-                            #keys %{$hash{READINGS}} ) {
-                            keys %{$hash->{READINGS}} ) {
-                    readingsDelete($hash, $reading);
+                for my $reading (
+                    grep {m{\A(?:amp|mr)}m}
+
+                    #keys %{$hash{READINGS}} ) {
+                    keys %{ $hash->{READINGS} }
+                    )
+                {
+                    readingsDelete( $hash, $reading );
                 }
             }
-            InternalTimer(gettimeofday(),\&OpenMultiroom_setNotifyDef, $hash, 0);
+            InternalTimer( gettimeofday(), \&OpenMultiroom_setNotifyDef, $hash, 0 );
         }
     }
+
     #my $out=toJSON($hash);
     #Log3($name,5,$out);
     return;
 }
 
 sub OpenMultiroom_setNotifyDef {
-    my $hash  = shift // return;
+    my $hash  = shift         // return;
     my $name  = $hash->{NAME} // return;
-    my $devsp = shift // AttrVal($name,'mr','');
-    my $ampl  = shift // AttrVal($name,'amplifier','');
-    my ($amp, $inp ) = split m{:}x,$ampl;
+    my $devsp = shift         // AttrVal( $name, 'mr',        '' );
+    my $ampl  = shift         // AttrVal( $name, 'amplifier', '' );
+    my ( $amp, $inp ) = split m{:}x, $ampl;
 
     my $oldsound = $hash->{SOUND} // q{};
     my $oldamp   = $hash->{amp}   // q{};
 
-    if (!$init_done){
-      InternalTimer(gettimeofday()+5,\&OpenMultiroom_setNotifyDef, $hash, 0);
-      return; # 'init not done';
+    if ( !$init_done ) {
+        InternalTimer( gettimeofday() + 5, \&OpenMultiroom_setNotifyDef, $hash, 0 );
+        return;    # 'init not done';
     }
 
-    #$hash->{NOTIFYDEV}=AttrVal($name,"mr","undefined");
-    #$devsp .= ",$hash->{SOUND}" if defined $hash->{SOUND} && $hash->{SOUND};
-      
     my $sm = $hash->{soundMapping} // q{};
-    my @soundMapping = split m{,}x,$sm;
-    delete ($hash->{SOUND});
-    for my $map (@soundMapping){
-        my @mapping = split m{:}x,$map;
-        $hash->{SOUND} = $mapping[1] if ReadingsVal($name,'stream','') eq $mapping[0];
+    my @soundMapping = split m{,}x, $sm;
+    delete( $hash->{SOUND} );
+    for my $map (@soundMapping) {
+        my @mapping = split m{:}x, $map;
+        $hash->{SOUND} = $mapping[1] if ReadingsVal( $name, 'stream', '' ) eq $mapping[0];
     }
-    OpenMultiroom_getReadings($hash,$hash->{SOUND}) if $hash->{SOUND} && $hash->{SOUND} ne $oldsound;
+    OpenMultiroom_getReadings( $hash, $hash->{SOUND} ) if $hash->{SOUND} && $hash->{SOUND} ne $oldsound;
     $devsp .= ",$hash->{SOUND}" if defined $hash->{SOUND} && $hash->{SOUND};
     $devsp .= ",$amp" if $amp;
-    if ( $devsp ) {
+    if ($devsp) {
         delete $hash->{disableNotifyFn};
-        setNotifyDev($hash,$devsp);
-    } else {
-        notifyRegexpChanged($hash,'',1);
+        setNotifyDev( $hash, $devsp );
     }
-    #$hash->{NOTIFYDEV} .= ",".$hash->{SOUND} if defined($hash->{SOUND}) and $hash->{SOUND} ne "";
+    else {
+        notifyRegexpChanged( $hash, '', 1 );
+    }
+
     return;
 }
 
@@ -176,27 +176,28 @@ sub OpenMultiroom_Undef {
 }
 
 sub OpenMultiroom_Notify {
-    my $hash     = shift // return;
-    my $dev_hash = shift // return;
+    my $hash     = shift         // return;
+    my $dev_hash = shift         // return;
     my $ownName  = $hash->{NAME} // return;
 
-    return if IsDisabled($ownName); # Return without any further action if the module is disabled
+    return if IsDisabled($ownName);    # Return without any further action if the module is disabled
 
-    my $events = deviceEvents($dev_hash,1);
+    my $events = deviceEvents( $dev_hash, 1 );
     return if !$events;
 
     my $updateFlag;
-    my $devName  = $dev_hash->{NAME} // return;
-    my $devType  = InternalVal($devName, 'TYPE','');
+    my $devName = $dev_hash->{NAME} // return;
+    my $devType = InternalVal( $devName, 'TYPE', '' );
 
     readingsBeginUpdate($hash);
-    for my $event (@{$events}) {
+    for my $event ( @{$events} ) {
         next if !defined $event;
-        my ($name,$value) = split m{:}x , $event;
+        my ( $name, $value ) = split m{:}x, $event;
         next if !defined $value;
         my $hit;
-        if ( $devType eq 'MPD' ){
+        if ( $devType eq 'MPD' ) {
             $hit = $name =~ s{\A(state|volume|mute)\z}{sound_$1}x;
+
             #do we need/want more MPD readings to be doubled here?
         }
         if ( $devType eq 'Snapcast' ) {
@@ -207,25 +208,26 @@ sub OpenMultiroom_Notify {
         if ( $devName eq $hash->{amp} ) {
             $hit = $name =~ s{\A(state|name|input|volume|mute)\z}{amp_$1}x;
         }
-        readingsBulkUpdateIfChanged($hash,$name,$value) if $hit;
-        Log3($ownName,4,"$name got reading from $devName: $devType: $name|$value");
+        readingsBulkUpdateIfChanged( $hash, $name, $value ) if $hit;
+        Log3( $ownName, 4, "$name got reading from $devName: $devType: $name|$value" );
+
         # processing $event with further code
     }
-    my $vol = ReadingsVal($ownName, 'mr_volume', 50 );
-    $vol = $vol / 100 * ReadingsVal($ownName, 'amp_volume', 50 ) if defined $hash->{amp};
-    readingsBulkUpdateIfChanged($hash,'volume',$vol);
-    readingsEndUpdate($hash,1);
+    my $vol = ReadingsVal( $ownName, 'mr_volume', 50 );
+    $vol = $vol / 100 * ReadingsVal( $ownName, 'amp_volume', 50 ) if defined $hash->{amp};
+    readingsBulkUpdateIfChanged( $hash, 'volume', $vol );
+    readingsEndUpdate( $hash, 1 );
     OpenMultiroom_setNotifyDef($hash) if $updateFlag;
-    Log3($ownName,5,"$ownName Notify_done");
+    Log3( $ownName, 5, "$ownName Notify_done" );
     return;
 }
 
 sub OpenMultiroom_Set {
-    my ($hash, @param) = @_;
+    my ( $hash, @param ) = @_;
 
     my $name = shift @param;
-    my $cmd = shift @param // return '"set OpenMultiroom" needs at least one argument';
-    my $val = shift @param;
+    my $cmd  = shift @param // return '"set OpenMultiroom" needs at least one argument';
+    my $val  = shift @param;
 
     my $soundname = $hash->{SOUND} // '';
     if ( !defined $defs{$soundname} ) {
@@ -233,134 +235,143 @@ sub OpenMultiroom_Set {
         $soundname = $hash->{SOUND} // '';
     }
 
-    my @ttsmap = split m{,}x, AttrVal($name,'ttsMapping','');
+    my @ttsmap  = split m{,}x, AttrVal( $name, 'ttsMapping', '' );
     my $ttsname = '';
     for my $map (@ttsmap) {
-        my ($stream,$tts) = split m{:}x,$map;
-        $ttsname = $tts if $stream eq ReadingsVal($name,'stream','');
+        my ( $stream, $tts ) = split m{:}x, $map;
+        $ttsname = $tts if $stream eq ReadingsVal( $name, 'stream', '' );
         last if $ttsname;
     }
-    readingsSingleUpdate( $hash, 'tts', $ttsname, 1 ) if $ttsname && $ttsname ne ReadingsVal( $name, 'tts' , '' );
+    readingsSingleUpdate( $hash, 'tts', $ttsname, 1 ) if $ttsname && $ttsname ne ReadingsVal( $name, 'tts', '' );
 
-    if( !defined $OpenMultiroom_sets{$cmd} ) {
+    if ( !defined $OpenMultiroom_sets{$cmd} ) {
+
         #my @cList = keys %OpenMultiroom_sets;
         return "Unknown argument $cmd, choose one of 0:noArg 1:noArg 2:noArg 3:noArg 4:noArg 5:noArg 6:noArg 7:noArg 8:noArg 9:noArg mute:true,false volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg forward:noArg rewind:noArg next:noArg previous:noArg play:noArg pause:noArg toggle:noArg stop:noArg random:noArg single:noArg repeat:noArg statesave stateload channelUp:noArg channelDown:noArg trackinfo offtimer stream copystate control streamreset:noArg";
     }
 
-    my $mrname = AttrVal($name,'mr',undef);
+    my $mrname = AttrVal( $name, 'mr', undef );
     my $mrhash = defined $mrname ? $defs{$mrname} : 0;
 
-    return OpenMultiroom_Error($hash,'no multiroom backend connected, check mr attribute',1) if $OpenMultiroom_sets{$cmd} > 1 && !$mrhash;
+    return OpenMultiroom_Error( $hash, 'no multiroom backend connected, check mr attribute', 1 ) if $OpenMultiroom_sets{$cmd} > 1 && !$mrhash;
 
-    my $soundhash = $defs{$soundname};
-    my $soundtyp = AttrVal($name,'soundSystem','MPD');
+    my $soundhash       = $defs{$soundname};
+    my $soundtyp        = AttrVal( $name, 'soundSystem', 'MPD' );
     my $soundModuleHash = $modules{$soundtyp};
 
-    return OpenMultiroom_Error($hash,'no sound backend connected or soundsystem not defined, check soundMapping and soundSystem attributes',1)
-        if $OpenMultiroom_sets{$cmd} > 2 && (!defined $soundhash || !$soundModuleHash );
+    return OpenMultiroom_Error( $hash, 'no sound backend connected or soundsystem not defined, check soundMapping and soundSystem attributes', 1 )
+        if $OpenMultiroom_sets{$cmd} > 2 && ( !defined $soundhash || !$soundModuleHash );
 
-
-    if ( $cmd =~ m{\A\d\z}x ) { # is the command 1 digit?
-        # function called when a client presses a number on the remote. sets a timeout  and waits for the next number in case of multi digit numbers.
-        # numbers are always entered by a client in preperation of a function like next, next playlist etc.
-        RemoveInternalTimer($hash, \&OpenMultiroom_clearDigitBuffer);
-        my $ldt = $hash->{lastdigittime}; # when was last digit received?
-        my $now = time();
-        my $timeout = AttrVal($name,'digitTimeout',10);
-        $hash->{lastdigittime} = $now; # reset time for last digit
-        if ( $now-$ldt < $timeout ) {
+    if ( $cmd =~ m{\A\d\z}x ) {    # is the command 1 digit?
+                                   # function called when a client presses a number on the remote. sets a timeout  and waits for the next number in case of multi digit numbers.
+                                   # numbers are always entered by a client in preperation of a function like next, next playlist etc.
+        RemoveInternalTimer( $hash, \&OpenMultiroom_clearDigitBuffer );
+        my $ldt     = $hash->{lastdigittime};                 # when was last digit received?
+        my $now     = time();
+        my $timeout = AttrVal( $name, 'digitTimeout', 10 );
+        $hash->{lastdigittime} = $now;                        # reset time for last digit
+        if ( $now - $ldt < $timeout ) {
             $hash->{digitBuffer} = $hash->{digitBuffer} * 10 + $cmd;
-        } else {
+        }
+        else {
             $hash->{digitBuffer} = $cmd;
         }
-        OpenMultiroom_TTS($hash,$hash->{digitBuffer} );
-        InternalTimer(gettimeofday()+ AttrVal($name,'digitTimeout',10),\&OpenMultiroom_clearDigitBuffer, $hash, 0);
+        OpenMultiroom_TTS( $hash, $hash->{digitBuffer} );
+        InternalTimer( gettimeofday() + AttrVal( $name, 'digitTimeout', 10 ), \&OpenMultiroom_clearDigitBuffer, $hash, 0 );
         return;
     }
 
-    if ( $cmd eq 'play') {
+    if ( $cmd eq 'play' ) {
         my $number = OpenMultiroom_getDigits($hash);
-        if ( $number > 0 ){
-            CallFn($soundname,'SetFn',$defs{$soundname},$soundname,$cmd,$number);
-        }else{
-            CallFn($soundname,'SetFn',$defs{$soundname},$soundname,$cmd);
+        if ( $number > 0 ) {
+            CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, $cmd, $number );
+        }
+        else {
+            CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, $cmd );
         }
         return;
     }
 
-    if ( $cmd eq 'pause' || $cmd eq 'toggle' || $cmd eq 'stop' || $cmd eq 'next' || $cmd eq 'previous' || $cmd eq 'random' || $cmd eq 'single' || $cmd eq 'repeat' ){
-        CallFn($soundname,'SetFn',$defs{$soundname},$soundname,$cmd);
+    if ( $cmd eq 'pause' || $cmd eq 'toggle' || $cmd eq 'stop' || $cmd eq 'next' || $cmd eq 'previous' || $cmd eq 'random' || $cmd eq 'single' || $cmd eq 'repeat' ) {
+        CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, $cmd );
         return;
     }
 
-    if( $cmd eq 'forward' || $cmd eq 'rewind' ) {
-        my ($elapsed,$total) = split m{:}x, ReadingsVal($name,'time','');
+    if ( $cmd eq 'forward' || $cmd eq 'rewind' ) {
+        my ( $elapsed, $total ) = split m{:}x, ReadingsVal( $name, 'time', '' );
         return if !defined $total;
         $total = int $total;
         return if !$total;
         my $percent = $elapsed / $total;
-        my $number = OpenMultiroom_getDigits($hash);
-        if ( $number > 0 ){
-            $percent = 0.01*$number;
-        } else {
-             my $step = 0.01*(0.01*AttrVal($name,'seekStepThreshold',8) > $percent ? AttrVal($name,'seekStepSmall',2) : AttrVal($name,'seekStep',7));
-             $percent +=$step if $cmd eq 'forward';
-             $percent -=$step if $cmd eq 'rewind';
+        my $number  = OpenMultiroom_getDigits($hash);
+        if ( $number > 0 ) {
+            $percent = 0.01 * $number;
+        }
+        else {
+            my $step = 0.01 * ( 0.01 * AttrVal( $name, 'seekStepThreshold', 8 ) > $percent ? AttrVal( $name, 'seekStepSmall', 2 ) : AttrVal( $name, 'seekStep', 7 ) );
+            $percent += $step if $cmd eq 'forward';
+            $percent -= $step if $cmd eq 'rewind';
         }
         $percent = 0    if $percent < 0;
         $percent = 0.99 if $percent > 0.99;
-        my $new = $percent*$total;
+        my $new    = $percent * $total;
         my $newint = int $new;
-        CallFn($soundname,'SetFn',$defs{$soundname},$soundname,'seekcur',$newint);
+        CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, 'seekcur', $newint );
         return;
     }
 
-    if ( $cmd eq 'channelUp' || $cmd eq 'channelDown' ){ # next playlist or specific playlist if number was entered before
-        # get lists based on regexp. Seperate those playlists that have a 2 or 3 digit number in them.
-        my $filter = AttrVal($name,'playlistPattern','.*');
-        my @allPlaylists = split m{:}x,ReadingsVal($name,'playlistcollection','');
-        my @filteredPlaylists = grep { m{$filter}x } @allPlaylists;
+    if ( $cmd eq 'channelUp' || $cmd eq 'channelDown' ) {    # next playlist or specific playlist if number was entered before
+                                                             # get lists based on regexp. Seperate those playlists that have a 2 or 3 digit number in them.
+        my $filter            = AttrVal( $name, 'playlistPattern', '.*' );
+        my @allPlaylists      = split m{:}x, ReadingsVal( $name, 'playlistcollection', '' );
+        my @filteredPlaylists = grep {m{$filter}x} @allPlaylists;
         return 'no playlists found' if !@filteredPlaylists;
-        my @filteredPlaylistsWithNumbers = grep { m{\d{2,3}}x }  @filteredPlaylists;
-        my @filteredPlaylistsWithoutNumbers = grep { !m{\d{2,3}}x }  @filteredPlaylists;
+        my @filteredPlaylistsWithNumbers    = grep {m{\d{2,3}}x} @filteredPlaylists;
+        my @filteredPlaylistsWithoutNumbers = grep { !m{\d{2,3}}x } @filteredPlaylists;
 
         # delete existing playlist array and crate a reference to an empty array to pupulate it afterwards
         delete $hash->{PLARRAY};
-        $hash->{PLARRAY}=[];
-        # iterate the items with a number first, to try to put the to the slot according to their number. 
-        for my $item (@filteredPlaylistsWithNumbers){
+        $hash->{PLARRAY} = [];
+
+        # iterate the items with a number first, to try to put the to the slot according to their number.
+        for my $item (@filteredPlaylistsWithNumbers) {
+
             # for each one push it to the according position. pushPlArray will ensure no slot is used twice and increase accordingly
             $item =~ m{(\d{2,3})}x || next;
-            OpenMultiroom_pushPlArray($hash,$item,$1);
+            OpenMultiroom_pushPlArray( $hash, $item, $1 );
         }
+
         # do the same for the other items and push them into the array
-        for my $item (@filteredPlaylistsWithoutNumbers){
-            OpenMultiroom_pushPlArray($hash,$item);
+        for my $item (@filteredPlaylistsWithoutNumbers) {
+            OpenMultiroom_pushPlArray( $hash, $item );
         }
-        # next 3 lines, build an array of pl numbers, get the number of the current one and its index in the index array. This could probably be done better. 
-        my $mpdplaylist = $soundhash->{'.playlist'} // '';
-        my (@indexes) = grep { defined(${$hash->{PLARRAY}}[$_]) } (0 .. @{$hash->{PLARRAY}});
-        my ($current) = grep { ${$hash->{PLARRAY}}[$_] eq $mpdplaylist } (0 .. @{$hash->{PLARRAY}});
-        my ($currentindex) = grep { defined($current) && defined($indexes[$_]) && $indexes[$_] eq $current } (0 .. @indexes-1);
+
+        # next 3 lines, build an array of pl numbers, get the number of the current one and its index in the index array. This could probably be done better.
+        my $mpdplaylist    = $soundhash->{'.playlist'} // '';
+        my (@indexes)      = grep { defined( ${ $hash->{PLARRAY} }[$_] ) } ( 0 .. @{ $hash->{PLARRAY} } );
+        my ($current)      = grep { ${ $hash->{PLARRAY} }[$_] eq $mpdplaylist } ( 0 .. @{ $hash->{PLARRAY} } );
+        my ($currentindex) = grep { defined($current) && defined( $indexes[$_] ) && $indexes[$_] eq $current } ( 0 .. @indexes - 1 );
 
         my $number = OpenMultiroom_getDigits($hash);
-        if ( $number > 0 && $number < @indexes ){
+        if ( $number > 0 && $number < @indexes ) {
             $currentindex = $number;
-        } else {
+        }
+        else {
             # for next or prev, just increase the number or decrease the number based on $cmd, call getPlName(number)
-            if ( $cmd eq 'channelUp'){
+            if ( $cmd eq 'channelUp' ) {
                 $currentindex = !defined $currentindex || $currentindex == @indexes - 1 ? 0 : $currentindex + 1;
             }
-            if($cmd eq 'channelDown'){
-                $currentindex = !defined $currentindex || $currentindex == 0 ? @indexes-1 : $currentindex-1;
+            if ( $cmd eq 'channelDown' ) {
+                $currentindex = !defined $currentindex || $currentindex == 0 ? @indexes - 1 : $currentindex - 1;
             }
         }
+
         # load the playlist
-        CallFn($soundname,'SetFn',$defs{$soundname},$soundname,'playlist',${$hash->{PLARRAY}}[$indexes[$currentindex]]);
-        Log3($name,4,"$name: CallFn $soundname, SetFn, ".$defs{$soundname}.", $soundname, playlist, ".${$hash->{PLARRAY}}[$indexes[$currentindex]]);
-        readingsSingleUpdate($hash,'playlistnumber',$indexes[$currentindex],1);
-        OpenMultiroom_TTS($hash,$indexes[$currentindex]);
-        CallFn($soundname,'SetFn',$defs{$soundname},$soundname,'play');       
+        CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, 'playlist', ${ $hash->{PLARRAY} }[ $indexes[$currentindex] ] );
+        Log3( $name, 4, "$name: CallFn $soundname, SetFn, " . $defs{$soundname} . ", $soundname, playlist, " . ${ $hash->{PLARRAY} }[ $indexes[$currentindex] ] );
+        readingsSingleUpdate( $hash, 'playlistnumber', $indexes[$currentindex], 1 );
+        OpenMultiroom_TTS( $hash, $indexes[$currentindex] );
+        CallFn( $soundname, 'SetFn', $defs{$soundname}, $soundname, 'play' );
 
         return;
     }
@@ -371,53 +382,59 @@ sub OpenMultiroom_Set {
             $val = $number;
             $val = 100 if $val > 100;
         }
-        if ( $val < ReadingsVal($name, 'mr_volume', 0) || !defined $hash->{amp}) {
-            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume',$val);
-        } else {
-            CommandSet(undef,"$hash->{amp} volume $val");
+        if ( $val < ReadingsVal( $name, 'mr_volume', 0 ) || !defined $hash->{amp} ) {
+            CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'volume', $val );
+        }
+        else {
+            CommandSet( undef, "$hash->{amp} volume $val" );
         }
         return;
     }
 
     if ( $cmd eq 'volumeUp' ) {
-        if ( ReadingsVal( $name, 'mr_volume', 0 ) < 100 || !defined $hash->{amp}) {
-            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','up');
-        } else {
-            CommandSet(undef,"$hash->{amp} volume volumeUp");
+        if ( ReadingsVal( $name, 'mr_volume', 0 ) < 100 || !defined $hash->{amp} ) {
+            CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'volume', 'up' );
+        }
+        else {
+            CommandSet( undef, "$hash->{amp} volume volumeUp" );
         }
         return;
     }
     if ( $cmd eq 'volumeDown' ) {
-        if ( !defined $hash->{amp}) {
-            CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'volume','down');
-        } else {
-            CommandSet(undef,"$hash->{amp} volume volumeDown");
+        if ( !defined $hash->{amp} ) {
+            CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'volume', 'down' );
+        }
+        else {
+            CommandSet( undef, "$hash->{amp} volume volumeDown" );
         }
         return;
     }
-    if ( $cmd eq 'mute') {
-        CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'mute',$val);
+    if ( $cmd eq 'mute' ) {
+        CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'mute', $val );
         return;
     }
 
     if ( $cmd eq 'stream' ) {
         my $targetStream = $val // 'next';
-        CallFn($mrname,'SetFn',$defs{$mrname},$mrname,'stream',$targetStream);
-        if ( defined $hash->{amp} 
-            && defined $hash->{ampInput} 
-            && ReadingsVal( $name, 'amp_input', $hash->{ampInput} ) ne $hash->{ampInput} ) {
-            CommandSet(undef,"$hash->{amp} input $hash->{ampInput}");
+        CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'stream', $targetStream );
+        if (   defined $hash->{amp}
+            && defined $hash->{ampInput}
+            && ReadingsVal( $name, 'amp_input', $hash->{ampInput} ) ne $hash->{ampInput} )
+        {
+            CommandSet( undef, "$hash->{amp} input $hash->{ampInput}" );
         }
         return;
     }
 
-    if($cmd eq "copystate" || $cmd eq "control" || $cmd eq "streamreset"){
-        return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
+    if ( $cmd eq "copystate" || $cmd eq "control" || $cmd eq "streamreset" ) {
+        return OpenMultiroom_Error( $hash, "$cmd not yet implemented", 2 );
+
         #my $defaultstream = AttrVal($name,"defaultStream","");
         #return if $defaultstream eq '';
         #CallFn($mrname,"SetFn",$defs{$mrname},$mrname,"stream",$defaultstream);
         #return;
     }
+
 =pod
     if($cmd eq "control"){
         return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
@@ -433,46 +450,47 @@ sub OpenMultiroom_Set {
         return;
     }
 =cut
-    return OpenMultiroom_Error($hash,"$cmd not yet implemented",2) ;
+
+    return OpenMultiroom_Error( $hash, "$cmd not yet implemented", 2 );
 }
 
-sub OpenMultiroom_pushPlArray{
-    my $hash   = shift // return;
-    my $item   = shift // return;
-    my $number = shift // 1;
-    my $name = $hash->{NAME} // return;
-    while ( defined ${$hash->{PLARRAY}}[$number] ){
+sub OpenMultiroom_pushPlArray {
+    my $hash   = shift         // return;
+    my $item   = shift         // return;
+    my $number = shift         // 1;
+    my $name   = $hash->{NAME} // return;
+    while ( defined ${ $hash->{PLARRAY} }[$number] ) {
         $number++;
     }
-    ${$hash->{PLARRAY}}[$number] = $item;
-    $hash->{CURRENTPL} = $number if ReadingsVal($name,'playlistname','') eq $item;
+    ${ $hash->{PLARRAY} }[$number] = $item;
+    $hash->{CURRENTPL} = $number if ReadingsVal( $name, 'playlistname', '' ) eq $item;
     return $number;
 }
 
-sub OpenMultiroom_Error { # hier noch TTS feedback einbauen je nach errorlevel
+sub OpenMultiroom_Error {    # hier noch TTS feedback einbauen je nach errorlevel
     my $hash  = shift // return;
     my $msg   = shift // return;
     my $level = shift // 3;
     return $msg;
 }
 
- sub OpenMultiroom_getReadings{
+sub OpenMultiroom_getReadings {
     my $hash   = shift // return;
     my $device = shift // return;
-    
+
     my $name = $hash->{NAME} // return;
-    if (!$init_done){
-      InternalTimer(gettimeofday()+10,\&OpenMultiroom_getReadings, $hash, $device);
-      return; # "init not done";
+    if ( !$init_done ) {
+        InternalTimer( gettimeofday() + 10, \&OpenMultiroom_getReadings, $hash, $device );
+        return;    # "init not done";
     }
-    my $modhash  = $defs{$device} // return;
-    my $readings = $modhash->{READINGS};
-    my $devType  = InternalVal($device,'TYPE',undef) // return;
+    my $modhash    = $defs{$device} // return;
+    my $readings   = $modhash->{READINGS};
+    my $devType    = InternalVal( $device, 'TYPE', undef ) // return;
     my $updateFlag = 0;
-    Log3($name,4,"$name getting readings from $device");
+    Log3( $name, 4, "$name getting readings from $device" );
     readingsBeginUpdate($hash);
-    while ( my ($key, $value) = each %{$readings} ) {
-        if ( $devType eq 'MPD' ){
+    while ( my ( $key, $value ) = each %{$readings} ) {
+        if ( $devType eq 'MPD' ) {
             $key =~ s{volume}{sound_volume}x;
             $key =~ s{state}{sound_state}x;
         }
@@ -481,41 +499,42 @@ sub OpenMultiroom_Error { # hier noch TTS feedback einbauen je nach errorlevel
             $key =~ s{name}{mr_name}x;
             $updateFlag = 1 if $key eq 'stream';
         }
-        readingsBulkUpdateIfChanged($hash,$key,$value->{VAL} );
-        Log3($name,5,"$name getReading got reading $key from $device, ".$value->{VAL});
+        readingsBulkUpdateIfChanged( $hash, $key, $value->{VAL} );
+        Log3( $name, 5, "$name getReading got reading $key from $device, " . $value->{VAL} );
     }
-    readingsEndUpdate($hash,1);
+    readingsEndUpdate( $hash, 1 );
     OpenMultiroom_setNotifyDef($hash) if $updateFlag;
-    if ( ReadingsVal($name,'stream','') eq '' && $device eq AttrVal($name,'mr','') ) {
-        InternalTimer(gettimeofday()+10,\&OpenMultiroom_getReadings, $hash, $device);
+    if ( ReadingsVal( $name, 'stream', '' ) eq '' && $device eq AttrVal( $name, 'mr', '' ) ) {
+        InternalTimer( gettimeofday() + 10, \&OpenMultiroom_getReadings, $hash, $device );
     }
     return;
- }
+}
 
 sub OpenMultiroom_clearDigitBuffer {
     my $hash = shift // return;
+
     #my $name = $hash->{NAME};
     $hash->{digitBuffer} = 0;
-    OpenMultiroom_TTS($hash,':NACK1:');
+    OpenMultiroom_TTS( $hash, ':NACK1:' );
     return;
 }
 
 sub OpenMultiroom_getDigits {
-    my $hash = shift // return;
-    my $name = $hash->{NAME} // return;;
-    my $buf = $hash->{digitBuffer} // '';
-    RemoveInternalTimer($hash, \&OpenMultiroom_clearDigitBuffer);
+    my $hash = shift                // return;
+    my $name = $hash->{NAME}        // return;
+    my $buf  = $hash->{digitBuffer} // '';
+    RemoveInternalTimer( $hash, \&OpenMultiroom_clearDigitBuffer );
     $hash->{digitBuffer} = 0;
     return $buf;
 }
 
 sub OpenMultiroom_TTS {
-    my $hash  = shift // return;
-    my $value = shift // return;
-    my $name = $hash->{NAME} // return;
-    my $ttsname = ReadingsVal($name,'tts','');
+    my $hash    = shift         // return;
+    my $value   = shift         // return;
+    my $name    = $hash->{NAME} // return;
+    my $ttsname = ReadingsVal( $name, 'tts', '' );
     return if !defined $defs{$ttsname};
-    CallFn($ttsname,'SetFn',$defs{$ttsname},$ttsname,'tts',$value);
+    CallFn( $ttsname, 'SetFn', $defs{$ttsname}, $ttsname, 'tts', $value );
     return;
 }
 
