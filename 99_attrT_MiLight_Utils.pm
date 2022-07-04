@@ -1,5 +1,5 @@
 ##############################################
-# $Id: attrT_MiLight_Utils.pm 2020-11-14 Beta-User $
+# $Id: attrT_MiLight_Utils.pm 2022-07-04 Beta-User $
 #
 
 package FHEM::attrT_MiLight_Utils;    ## no critic 'Package declaration'
@@ -225,121 +225,128 @@ sub MPDcontrol {
   my $rets = json2nameValue($event);
   
   if (defined $rets->{state} && $rets->{state} =~ m{on}ixms) { 
-    CommandSetReading(undef, "$avrname CommandSet not on, $avrname not set to volume 25" ) if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
-    if (ReadingsVal($name,"state","play") =~ m{pause|stop}ixms) {
+    CommandSetReading(undef, "$avrname CommandSet not on, $avrname not set to volume 25" ) if $avrname ne $name && ReadingsVal($avrname,'state','off') ne 'on';
+    if (ReadingsVal($name,'state','play') =~ m{pause|stop}ixms) {
       CommandSet(undef, "$name play");      
-      return { "CommandSet" => "$name play" };
+      return { CommandSet => "$name play" };
     } else { 
-      return { "CommandSet" => "$name already playing" };
+      return { CommandSet => "$name already playing" };
     }
   }
   if (defined $rets->{state} && $rets->{state} =~ m{off}ixms) { 
-    my $command = (ReadingsVal($name,"state","play") eq "pause" ) ? "stop" : "pause";
+    my $command = (ReadingsVal($name,'state','play') eq 'pause' ) ? 'stop' : 'pause';
     CommandSet(undef, "$name $command");
-    return { "CommandSet" => "$name $command" };
+    return { CommandSet => "$name $command" };
   }
   if (defined $rets->{brightness}) {
     my $level = round($rets->{brightness}/2.55,0);
     CommandSet(undef, "$name volume $level");
-    return { "CommandSet" => "$name volume $level" };
+    return { CommandSet => "$name volume $level" };
   }
   if (defined $rets->{color_temp}) {
     my $avrVol = 100 - int(($rets->{color_temp}-153)/2.17);
-    return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
+    return { CommandSet => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,'state','off') ne 'on';
     CommandSet(undef, "$avrname volume $avrVol");
-    return { "CommandSet" => "$avrname volume $avrVol" };
+    return { CommandSet => "$avrname volume $avrVol" };
   }
   if (defined $rets->{saturation}) {
     my $avrVol = 100 - $rets->{saturation};
-    return { "CommandSet" => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,"state","off") ne "on";
+    return { CommandSet => "$avrname not on, $avrname not set to volume $avrVol" } if $avrname ne $name && ReadingsVal($avrname,'state','off') ne 'on';
     CommandSet(undef, "$avrname volume $avrVol");
-    return { "CommandSet" => "$avrname volume $avrVol" };
+    return { CommandSet => "$avrname volume $avrVol" };
   }
     if (defined $rets->{command}) {
-    if ($rets->{command} eq "mode_speed_up") {
+    if ($rets->{command} eq 'mode_speed_up') {
       CommandSet(undef, "$name previous") ;
-      return { "CommandSet" => "$name previous" } ;
+      return { CommandSet => "$name previous" } ;
     }
-    if  ($rets->{command} eq "mode_speed_down") {
+    if  ($rets->{command} eq 'mode_speed_down') {
       CommandSet(undef, "$name next");
-      return { "CommandSet" => "$name next" };
+      return { CommandSet => "$name next" };
     }
     else {
-      return { "CommandSet" => "$rets->{command} not assigned" };
+      return { CommandSet => "$rets->{command} not assigned" };
     }
   }
   if (defined $rets->{mode}) {
-    my $gainmode = CommandGet(undef, "$name mpdCMD replay_gain_status") =~ m{album}ixms ? "auto" : "album"; 
+    my $gainmode = CommandGet(undef, "$name mpdCMD replay_gain_status") =~ m{album}ixms ? 'auto' : 'album'; 
 
     CommandSet(undef, "$name mpdCMD replay_gain_mode $gainmode");
-    return { "CommandSet" => "$name mpdCMD replay_gain_mode $gainmode" };
+    return { CommandSet => "$name mpdCMD replay_gain_mode $gainmode" };
   }
   if (defined $rets->{bulb_mode} && $rets->{bulb_mode} =~ m{white}ixms) {
-    my $consumer = CommandGet(undef, "$name mpdCMD status") =~ m{consume. 0}ixms ? "1" : "0"; 
+    my $consumer = CommandGet(undef, "$name mpdCMD status") =~ m{consume. 0}ixms ? 1 : 0; 
     CommandSet(undef, "$name mpdCMD consume $consumer");
-    return { "CommandSet" => "$name mpdCMD consume $consumer" };
+    return { CommandSet => "$name mpdCMD consume $consumer" };
   }
   my $ret;
   for my $k (sort keys %$rets) {
     $ret .= '\n' if $ret;
     $ret .= "$k $rets->{$k}";
   }
-  return { "CommandSet" => "$name MPDcontrol not assigned: $ret" };
+  return { CommandSet => "$name MPDcontrol not assigned: $ret" };
 }
 
 sub shuttercontrol {
   my $name  = shift;
   my $event = shift // return;
-  my $type = InternalVal($name,"TYPE","MQTT2_DEVICE"); 
-  my $moving = ReadingsVal($name,"motor","stop") =~ m{stop}ixms ? 0 : 1;
-  $moving = 1 if ReadingsNum($name,"power",0) > 1 && $type eq "ZWave";
+  my $type = InternalVal($name,'TYPE','MQTT2_DEVICE'); 
+  my $moving = ReadingsVal($name,'motor','stop') =~ m{stop}ixms ? 0 : 1;
+  $moving = 1 if ReadingsNum($name,'power',0) > 1 && $type eq 'ZWave';
 
   my $rets = json2nameValue($event);
   
-  my $com = "off";
+  my $com = 'off';
   my $now = gettimeofday;
   if (!$moving && defined $rets->{state} && $rets->{state} =~ m{on|off}ixms) {
-    if ($now - ReadingsVal($name, "myLastRCOnOff",$now) < 5) {
+    if ($now - ReadingsVal($name, 'myLastRCOnOff',$now) < 5) {
       CommandSetReading(undef,"$name myLastRCOnOff $now");
       my $level = $rets->{state} =~ m/off/i ? 0 : 100;
-      $com = $type eq "ZWave" ? "dim" : "pct"; 
-      $level = 99 if ($level == 100 && $type eq "ZWave");
+      $com = $type eq 'ZWave' ? 'dim' : 'pct'; 
+      $level = 99 if ($level == 100 && $type eq 'ZWave');
       CommandSet(undef, "$name $com $level");
-      return { "CommandSet" => "$name $com $level" };
+      return { CommandSet => "$name $com $level" };
     } 
     return CommandSetReading(undef,"$name myLastRCOnOff $now"); 
   } 
   if (defined $rets->{state} && $rets->{state} =~ m{on|off}ixms) { 
     CommandSetReading(undef,"$name myLastRCOnOff $now");
     CommandSet(undef,"$name stop");
-    return { "CommandSet" => "$name stop" };
+    return { CommandSet => "$name stop" };
   }
   if (defined $rets->{brightness}) {
     my $level = round($rets->{brightness}/2.55,0);
-    $com = $type eq "ZWave" ? "dim" : "pct"; 
-    $level = 99 if ($level == 100 && $type eq "ZWave");
+    $com = $type eq 'ZWave' ? 'dim' : 'pct'; 
+    $level = 99 if ($level == 100 && $type eq 'ZWave');
+    if ( ReadingsAge( $name, 'CommandSet', 1000 ) < 1 && ReadingsVal( $name, 'CommandSet', '') =~ m{$name.$com.}x ) {
+	    AnalyzeCommandChain(undef,"sleep 0.5 ${name}_$com quiet; set $name $com $level" );
+        return { CommandSet => "sleep: $name $com $level" };
+    }
     CommandSet(undef, "$name $com $level");
-    return { "CommandSet" => "$name $com $level" };
+    return { CommandSet => "$name $com $level" };
   } 
   if (defined $rets->{saturation}) {
     my $slatname = $name;
     my $slatlevel = 100 - $rets->{saturation};
-    $com = $type eq "ZWave" ? "dim" : "slats"; 
-    $slatlevel = 99 if ($slatlevel == 100 && $type eq "ZWave");
-    my ($def,$defnr) = split(" ", InternalVal($name,"DEF",$name));
+    $com = $type eq 'ZWave' ? 'dim' : 'slats'; 
+    $slatlevel = 99 if $slatlevel == 100 && $type eq 'ZWave';
+    my ($def,$defnr) = split m{ }x, InternalVal($name,'DEF',$name);
     $defnr++;
     my @slatnames = devspec2array("DEF=$def".'.'.$defnr);
     $slatname = shift @slatnames;
-    
+    if ( ReadingsAge( $name, 'CommandSet', 1000 ) < 1 && ReadingsVal( $name, 'CommandSet', '') =~ m{$slatname.$com.}x ) {
+	    AnalyzeCommandChain(undef,"sleep 0.5 ${slatname}_$com quiet; set $slatname $com $slatlevel" );
+        return { CommandSet => "sleep: $slatname $com $slatlevel" };
+    }
     CommandSet(undef, "$slatname $com $slatlevel");
-    return { "CommandSet" => "$slatname $com $slatlevel" };
+    return { CommandSet => "$slatname $com $slatlevel" };
 
   } 
   if (defined $rets->{color_temp}) {
     my $slatname = $name;
     my $slatlevel = 100 - ($rets->{color_temp}/(370-153))*100;
-    $com = $type eq "ZWave" ? "dim" : "slats"; 
-    $slatlevel = 99 if ($slatlevel == 100 && $type eq "ZWave");
+    $com = $type eq 'ZWave' ? 'dim' : 'slats'; 
+    $slatlevel = 99 if $slatlevel == 100 && $type eq 'ZWave';
     my ($def,$defnr) = split(" ", InternalVal($name,"DEF",$name));
     $defnr++;
     my @slatnames = devspec2array("DEF=$def".'.'.$defnr);
@@ -348,11 +355,11 @@ sub shuttercontrol {
     return { "CommandSet" => "$slatname $com $slatlevel" };
   }
   my $ret;
-  for my $k (sort keys %$rets) {
+  for my $k ( sort keys %{$rets} ) {
     $ret .= '\n' if $ret;
     $ret .= "$k $rets->{$k}";
   }
-  return { "CommandSet" => "$name shuttercontrol not assigned: $ret" };
+  return { CommandSet => "$name shuttercontrol not assigned: $ret" };
 }
 
 sub four_Lights_matrix {
