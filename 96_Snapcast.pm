@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-07-01 Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-07-05 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -22,12 +22,41 @@
 # The module uses DevIo for communication. There is no blocking communication whatsoever. 
 # Communication to Snapcast goes through a TCP Socket, Writing and Reading are managed asynchronously.
 
-package main;
+package FHEM::Media::Snapcast;    ## no critic 'Package declaration'
+
 use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw(gettimeofday);
 use DevIo;
 use JSON;
+use GPUtils qw(GP_Import);
+
+
+#-- Run before package compilation
+BEGIN {
+
+    # Import from main context
+    GP_Import(
+        qw(
+          defs
+          init_done
+          readingFnAttributes
+          readingsSingleUpdate
+          readingsBeginUpdate readingsEndUpdate
+          readingsBulkUpdate readingsBulkUpdateIfChanged
+          readingsDelete
+          AttrVal
+          ReadingsVal
+          Log3
+          InternalTimer RemoveInternalTimer
+          FmtDateTime
+          DevIo_OpenDev DevIo_CloseDev DevIo_SimpleRead DevIo_SimpleWrite
+          )
+    );
+}
+
+sub ::Snapcast_Initialize { goto &Initialize }
 
 my %Snapcast_sets = (
     update  => 0,
@@ -56,21 +85,21 @@ my %Snapcast_clientmethods = (
     latency => 'Client.SetLatency'
 );
 
-sub Snapcast_Initialize {
+sub Initialize {
     my $hash = shift // return;
-    $hash->{DefFn}    = \&Snapcast_Define;
-    $hash->{UndefFn}  = \&Snapcast_Undef;
-    $hash->{SetFn}    = \&Snapcast_Set;
-    $hash->{GetFn}    = \&Snapcast_Get;
-    $hash->{WriteFn}  = \&Snapcast_Write;
-    $hash->{ReadyFn}  = \&Snapcast_Ready;
-    $hash->{AttrFn}   = \&Snapcast_Attr;
-    $hash->{ReadFn}   = \&Snapcast_Read;
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{SetFn}    = \&Set;
+    $hash->{GetFn}    = \&Get;
+    #$hash->{WriteFn}  = \&Snapcast_Write;
+    $hash->{ReadyFn}  = \&Ready;
+    $hash->{AttrFn}   = \&Attr;
+    $hash->{ReadFn}   = \&Read;
     $hash->{AttrList} = "streamnext:all,playing constraintDummy constraints disable:1 volumeStepSize volumeStepSizeSmall volumeStepSizeThreshold $readingFnAttributes";
     return;
 }
 
-sub Snapcast_Define {
+sub Define {
     my $hash = shift // return;
     my $def  = shift // return;
     my @arr  = split m{\s+}xms, $def;
@@ -108,7 +137,7 @@ sub Snapcast_Connect {
     return DevIo_OpenDev( $hash, 0, \&Snapcast_onConnect, );
 }
 
-sub Snapcast_Attr {
+sub Attr {
     my $cmd   = shift;
     my $name  = shift;
     my $attr  = shift // return;
@@ -126,7 +155,7 @@ sub Snapcast_Attr {
     return;
 }
 
-sub Snapcast_Undef {
+sub Undef {
     my $hash = shift // return;
     RemoveInternalTimer($hash);
     DevIo_CloseDev($hash);
@@ -134,11 +163,11 @@ sub Snapcast_Undef {
     return;
 }
 
-sub Snapcast_Get {
+sub Get {
     return 'get is not supported by this module';
 }
 
-sub Snapcast_Set {
+sub Set {
     my ( $hash, @param ) = @_;
     return '"set Snapcast" needs at least one argument' if int @param < 2;
     my $name = shift @param;
@@ -192,7 +221,7 @@ sub Snapcast_Set {
     return "$opt not implemented";
 }
 
-sub Snapcast_Read {
+sub Read {
     my $hash = shift // return;
     my $name = $hash->{NAME};
     my $buf;
@@ -348,7 +377,7 @@ sub Snapcast_Read {
     return;
 }
 
-sub Snapcast_Ready {
+sub Ready {
     my $hash = shift // return;
     my $name = $hash->{NAME};
     return if AttrVal( $name, 'disable', 0 );
