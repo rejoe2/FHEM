@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-07-05 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26176 2022-07-06 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -456,7 +456,7 @@ sub Snapcast_updateClient {
     readingsBulkUpdateIfChanged( $clienthash, 'group',     $c->{config}->{group_id} );
     readingsEndUpdate( $clienthash, 1 );
 
-    my $maxvol = Snapcast_getVolumeConstraint($clienthash);
+    my $maxvol = Snapcast_getVolumeConstraint($clienthash) // 100;
     Snapcast_setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{config}->{volume}->{percent} > $maxvol;
     return;
 }
