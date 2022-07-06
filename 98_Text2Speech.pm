@@ -1,6 +1,6 @@
 
 ##############################################
-# $Id: 98_Text2Speech.pm 25785 2022-03-06 10:00:56Z Tobias.Faust $
+# $Id: 98_Text2Speech.pm 25785 2022-07-06 Beta-User - Mimic 3 version $
 #
 # 98_Text2Speech.pm
 #
@@ -119,7 +119,7 @@ sub Text2Speech_Initialize($)
   $hash->{AttrFn}    = "Text2Speech_Attr";
   $hash->{AttrList}  = "disable:0,1".
                        " TTS_Delimiter".
-                       " TTS_Ressource:ESpeak,SVOX-pico,Amazon-Polly,". join(",", sort keys %ttsHost).
+                       " TTS_Ressource:ESpeak,SVOX-pico,Amazon-Polly,maryTTS,". join(",", sort keys %ttsHost).
                        " TTS_APIKey".
                        " TTS_User".
                        " TTS_Quality:".
@@ -960,6 +960,63 @@ sub Text2Speech_Download($$$) {
     Log3 $hash->{NAME}, 4, $hash->{NAME}.": Schreibe mp3 in die Datei $file mit ". $res->RequestCharacters ." Chars";
     close($fh);
   }
+  
+  if ( $TTS_Ressource eq 'maryTTS' ) {
+    my $maryTTSResponse;
+    my $maryTTSResponseErr;
+    my $fh2;
+
+    my $mTTSurl  = $TTS_User;
+    my($unnamed, $named) = parseParams($mTTSurl);
+    $named->{host}     //= shift @{$unnamed} // '127.0.0.1';
+    $named->{port}     //= shift @{$unnamed} // '59125';
+    $named->{lang}     //= shift @{$unnamed} // $TTS_Language eq 'Deutsch' ? 'de_DE' : $TTS_Language;
+    $named->{voice}    //= shift @{$unnamed} // 'thorsten_low';
+    $named->{endpoint} //= shift @{$unnamed} // 'process';
+
+    $mTTSurl = "http://$named->{host}:$named->{port}/$named->{endpoint}?INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$named->{lang}&VOICE=$named->{voice}&INPUT_TEXT=";
+=pod
+https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L21
+query_hash = {"INPUT_TEXT":input_text,
+              "INPUT_TYPE":"TEXT", # Input text
+              "LOCALE":"en_US",
+              "VOICE":"cmu-slt-hsmm", # Voice informations  (need to be compatible)
+              "OUTPUT_TYPE":"AUDIO",
+              "AUDIO":"WAVE", # Audio informations (need both)
+              }
+query = urlencode(query_hash)
+print("query = \"http://%s:%s/process?%s\"" % (mary_host, mary_port, query))
+=cut
+
+    #https://github.com/marytts/marytts-txt2wav/blob/sh/txt2wav.sh#L29     if sox --no-show-progress <(curl --silent --get --data "$curl_data" --data-urlencode "INPUT_TEXT@$textfile.work" $maryserver/process) --type wav "$audiofile" 2>/dev/null; then
+    #INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$lang&VOICE=$voice
+    #"https://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
+    $mTTSurl .= uri_escape($text);
+
+    Log3( $hash->{NAME}, 4, "$hash->{NAME}: Hole URL: $mTTSurl" );
+    #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $TTS_Language . "&" . $ttsQuery . uri_escape($text));
+    my $param = {     url         => $mTTSurl,
+                      timeout     => 5,
+                      hash        => $hash, # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
+                      method      => 'POST'    # see https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L33
+                  };
+    ($maryTTSResponseErr, $maryTTSResponse) = HttpUtils_BlockingGet($param);
+
+    if(length($maryTTSResponseErr) > 0) {
+      Log3($hash->{NAME}, 3, "$hash->{NAME}: Fehler beim Abrufen der Daten von $TTS_Ressource: $maryTTSResponseErr");
+      return;
+    }
+
+    $fh2 = new IO::File ">$file";
+    if ( !defined $fh2 ) {
+      Log3($hash->{NAME}, 2, "$hash->{NAME}: mp3 Datei <$file> konnte nicht angelegt werden.");
+      return;
+    }
+
+    $fh2->print($maryTTSResponse);
+    Log3($hash->{NAME}, 4, "$hash->{NAME}: Schreibe mp3 in die Datei $file mit ".length $maryTTSResponse . ' Bytes');
+    return close $fh2;
+  }
 }
 
 #####################################
@@ -1377,6 +1434,10 @@ the result on a local or remote loudspeaker
          aws_access_key_id = xxxxxxxxxxxxxxx
        </code>
       </li>
+      <li>maryTTS<br>
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> or <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Engine. Prerequisite: Installation of respective server, appropriate settings in <a href="#Text2Speech-attr-TTS_User">TTS_User</a> attribute (if other than default settings shall be applied).<br>
+        Both are open source software speech synthesizers for English and other languages.
+      </li>
     </ul>
   </li>
 
@@ -1396,7 +1457,9 @@ the result on a local or remote loudspeaker
   </li>
 
   <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
-    Actual without any usage. Needed in case if a TTS Engine needs a username and an APIKey for a request.
+    Actual only used for maryTTS (and Mimic 3). Needed in case if a TTS Engine needs a username and an APIKey for a request. <br>
+    <p>(Full) example for maryTTS (values are defaults and may be left out):</p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=thorsten_low</code></p>
   </li>
 
   <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
@@ -1671,6 +1734,10 @@ the result on a local or remote loudspeaker
          aws_access_key_id = xxxxxxxxxxxxxxx
        </code>
       </li>
+      <li>maryTTS<br>
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> oder <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Sprachsynthesizer, der betr. Server muss separat installiert werden. Beides sind open source Lösungen für English und andere Sprachen.
+        Über das Attribut <a href="#Text2Speech-attr-TTS_User">TTS_User</a> können ergänzende Angaben zu Server, Port und verwendeten Stimme etc. gemacht werden.<br>
+      </li>
     </ul>
   </li>
 
@@ -1691,7 +1758,9 @@ the result on a local or remote loudspeaker
   </li>
 
   <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
-    Bisher ohne Benutzung. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.
+    Derzeit nur für maryTTS (bzw. Mimic 3) genutzt. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.<br>
+    <p>(Vollständiges) Beispiel für maryTTS (die angegebenen Werte entsprechen den defaults):</p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=thorsten_low</code></p>
   </li>
 
   <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
