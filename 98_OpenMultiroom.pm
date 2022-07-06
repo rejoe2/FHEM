@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 98_OpenMultiroom.pm 2022-07-01 Beta-User $
+#  $Id: 98_OpenMultiroom.pm 2022-07-06 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -16,9 +16,40 @@
 #  GNU General Public License for more details.
 ################################################################
 
-package main;
+package FHEM::Media::OpenMultiroom;    ## no critic 'Package declaration'
+
 use strict;
 use warnings;
+use Time::HiRes qw(gettimeofday);
+
+use GPUtils qw(GP_Import);
+
+BEGIN {
+
+    # Import from main context
+    GP_Import(
+        qw(
+          defs modules
+          init_done
+          readingFnAttributes
+          readingsSingleUpdate
+          readingsBeginUpdate readingsEndUpdate
+          readingsBulkUpdate readingsBulkUpdateIfChanged
+          readingsDelete
+          AttrVal
+          ReadingsVal
+          Log3
+          InternalTimer RemoveInternalTimer
+          CommandSet CallFn
+          notifyRegexpChanged setNotifyDev deviceEvents
+          FmtDateTime
+          IsDisabled
+          )
+    );
+}
+
+sub ::OpenMultiroom_Initialize { goto &Initialize }
+
 
 my %OpenMultiroom_sets = (
     0           => 1,
@@ -58,19 +89,19 @@ my %OpenMultiroom_sets = (
     streamreset => 2
 );
 
-sub OpenMultiroom_Initialize {
+sub Initialize {
     my $hash = shift // return;
-    $hash->{DefFn}             = \&OpenMultiroom_Define;
-    $hash->{UndefFn}           = \&OpenMultiroom_Undef;
-    $hash->{NotifyFn}          = \&OpenMultiroom_Notify;
-    $hash->{SetFn}             = \&OpenMultiroom_Set;
-    $hash->{AttrFn}            = \&OpenMultiroom_Attr;
+    $hash->{DefFn}             = \&Define;
+    $hash->{UndefFn}           = \&Undef;
+    $hash->{NotifyFn}          = \&Notify;
+    $hash->{SetFn}             = \&Set;
+    $hash->{AttrFn}            = \&Attr;
     $hash->{NotifyOrderPrefix} = '80-';
     $hash->{AttrList}          = 'mrSystem:Snapcast soundSystem:MPD mr soundMapping ttsMapping defaultTts defaultStream defaultSound playlistPattern seekStep seekStepSmall seekStepThreshold digitTimeout amplifier ' . $readingFnAttributes;    #seekDirect:percent,seconds stateSaveDir
     return;
 }
 
-sub OpenMultiroom_Define {
+sub Define {
     my $hash = shift // return;
     my $def  = shift // return;
     my @arr  = split m{\s+}xms, $def;
@@ -84,7 +115,7 @@ sub OpenMultiroom_Define {
     return;
 }
 
-sub OpenMultiroom_Attr {
+sub Attr {
     my $cmd   = shift;
     my $name  = shift;
     my $attr  = shift // return;
@@ -169,13 +200,13 @@ sub OpenMultiroom_setNotifyDef {
     return;
 }
 
-sub OpenMultiroom_Undef {
+sub Undef {
     my $hash = shift // return;
     RemoveInternalTimer($hash);
     return;
 }
 
-sub OpenMultiroom_Notify {
+sub Notify {
     my $hash     = shift         // return;
     my $dev_hash = shift         // return;
     my $ownName  = $hash->{NAME} // return;
@@ -222,7 +253,7 @@ sub OpenMultiroom_Notify {
     return;
 }
 
-sub OpenMultiroom_Set {
+sub Set {
     my ( $hash, @param ) = @_;
 
     my $name = shift @param;
