@@ -36,7 +36,7 @@ BEGIN {
           readingsBeginUpdate readingsEndUpdate
           readingsBulkUpdate readingsBulkUpdateIfChanged
           readingsDelete
-          AttrVal
+          AttrVal InternalVal
           ReadingsVal
           Log3
           InternalTimer RemoveInternalTimer

@@ -70,7 +70,8 @@ my %ttsQuality       = ("Google"     => "",
 my %ttsMaxChar      = ("Google"     => 200,
                        "VoiceRSS"   => 300,
                        "SVOX-pico"  => 1000,
-                       "Amazon-Polly" => 3000
+                       "Amazon-Polly" => 3000,
+                        maryTTS       => 3000 
                        );
 my %language        = ("Google"     =>  { "Deutsch"       => "de",
                                           "English-US"    => "en-us",
@@ -505,8 +506,8 @@ sub Text2Speech_Set($@)
 
   return "no set argument specified" if(int(@a) < 2);
 
-  return "No APIKey specified"                  if (!defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
-  return "No Username for TTS Access specified" if (!defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
+  return "No APIKey specified"                  if ( $TTS_Ressource ne 'maryTTS' && !defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
+  return "No Username for TTS Access specified" if ( $TTS_Ressource ne 'maryTTS' && !defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
 
   my $ret = Text2Speech_loadmodules($hash, $TTS_Ressource);
   if ($ret) {
@@ -970,7 +971,7 @@ sub Text2Speech_Download($$$) {
     my($unnamed, $named) = parseParams($mTTSurl);
     $named->{host}     //= shift @{$unnamed} // '127.0.0.1';
     $named->{port}     //= shift @{$unnamed} // '59125';
-    $named->{lang}     //= shift @{$unnamed} // $TTS_Language eq 'Deutsch' ? 'de_DE' : $TTS_Language;
+    $named->{lang}     //= shift @{$unnamed} // !$TTS_Language || $TTS_Language eq 'Deutsch' ? 'de_DE' : $TTS_Language;
     $named->{voice}    //= shift @{$unnamed} // 'thorsten_low';
     $named->{endpoint} //= shift @{$unnamed} // 'process';
 
