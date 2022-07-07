@@ -1,6 +1,6 @@
 
 ##############################################
-# $Id: 98_Text2Speech.pm 25785 2022-07-06 Beta-User - Mimic 3 version $
+# $Id: 98_Text2Speech.pm 25785 2022-07-07 Beta-User - Mimic 3 version $
 #
 # 98_Text2Speech.pm
 #
@@ -56,7 +56,8 @@ my %ttsAddon        = ("Google"     => "client=tw-ob&ie=UTF-8",
                        "VoiceRSS"   => ""
                        );
 my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
-                       "VoiceRSS"   => "key="
+                       "VoiceRSS"   => "key=",
+                       maryTTS       => ''
                        );
 my %ttsUser         = ("Google"     => "", # kein Username nötig
                        "VoiceRSS"   => ""  # kein Username nötig
@@ -71,7 +72,7 @@ my %ttsMaxChar      = ("Google"     => 200,
                        "VoiceRSS"   => 300,
                        "SVOX-pico"  => 1000,
                        "Amazon-Polly" => 3000,
-                        maryTTS       => 3000 
+                        maryTTS       => 3000
                        );
 my %language        = ("Google"     =>  { "Deutsch"       => "de",
                                           "English-US"    => "en-us",
@@ -506,7 +507,7 @@ sub Text2Speech_Set($@)
 
   return "no set argument specified" if(int(@a) < 2);
 
-  return "No APIKey specified"                  if ( $TTS_Ressource ne 'maryTTS' && !defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
+  return "No APIKey specified"                  if (!defined($TTS_APIKey) && ($ttsAPIKey{$TTS_Ressource} || length($ttsAPIKey{$TTS_Ressource})>0));
   return "No Username for TTS Access specified" if ( $TTS_Ressource ne 'maryTTS' && !defined($TTS_User) && ($ttsUser{$TTS_Ressource} || length($ttsUser{$TTS_Ressource})>0));
 
   my $ret = Text2Speech_loadmodules($hash, $TTS_Ressource);
@@ -963,10 +964,6 @@ sub Text2Speech_Download($$$) {
   }
   
   if ( $TTS_Ressource eq 'maryTTS' ) {
-    my $maryTTSResponse;
-    my $maryTTSResponseErr;
-    my $fh2;
-
     my $mTTSurl  = $TTS_User;
     my($unnamed, $named) = parseParams($mTTSurl);
     $named->{host}     //= shift @{$unnamed} // '127.0.0.1';
@@ -975,48 +972,37 @@ sub Text2Speech_Download($$$) {
     $named->{voice}    //= shift @{$unnamed} // 'thorsten_low';
     $named->{endpoint} //= shift @{$unnamed} // 'process';
 
-    $mTTSurl = "http://$named->{host}:$named->{port}/$named->{endpoint}?INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$named->{lang}&VOICE=$named->{voice}&INPUT_TEXT=";
-=pod
-https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L21
-query_hash = {"INPUT_TEXT":input_text,
-              "INPUT_TYPE":"TEXT", # Input text
-              "LOCALE":"en_US",
-              "VOICE":"cmu-slt-hsmm", # Voice informations  (need to be compatible)
-              "OUTPUT_TYPE":"AUDIO",
-              "AUDIO":"WAVE", # Audio informations (need both)
-              }
-query = urlencode(query_hash)
-print("query = \"http://%s:%s/process?%s\"" % (mary_host, mary_port, query))
-=cut
-
-    #https://github.com/marytts/marytts-txt2wav/blob/sh/txt2wav.sh#L29     if sox --no-show-progress <(curl --silent --get --data "$curl_data" --data-urlencode "INPUT_TEXT@$textfile.work" $maryserver/process) --type wav "$audiofile" 2>/dev/null; then
-    #INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$lang&VOICE=$voice
-    #"https://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
+    $mTTSurl = "http://$named->{host}:$named->{port}/$named->{endpoint}?INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$named->{lang}&VOICE=$named->{voice}&INPUT_TEXT="; # https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L21
     $mTTSurl .= uri_escape($text);
 
     Log3( $hash->{NAME}, 4, "$hash->{NAME}: Hole URL: $mTTSurl" );
-    #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $TTS_Language . "&" . $ttsQuery . uri_escape($text));
     my $param = {     url         => $mTTSurl,
                       timeout     => 5,
                       hash        => $hash, # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
                       method      => 'POST'    # see https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L33
                   };
-    ($maryTTSResponseErr, $maryTTSResponse) = HttpUtils_BlockingGet($param);
+    my ($maryTTSResponseErr, $maryTTSResponse) = HttpUtils_BlockingGet($param);
 
     if(length($maryTTSResponseErr) > 0) {
       Log3($hash->{NAME}, 3, "$hash->{NAME}: Fehler beim Abrufen der Daten von $TTS_Ressource: $maryTTSResponseErr");
       return;
     }
 
-    $fh2 = new IO::File ">$file";
-    if ( !defined $fh2 ) {
-      Log3($hash->{NAME}, 2, "$hash->{NAME}: mp3 Datei <$file> konnte nicht angelegt werden.");
+    my $FileWav2 = $file . '.wav';
+    my $fh2 = new IO::File ">$FileWav2";
+    if ( !defined $FileWav2 ) {
+      Log3($hash->{NAME}, 2, "$hash->{NAME}: wav Datei <$FileWav2> konnte nicht angelegt werden.");
       return;
     }
 
     $fh2->print($maryTTSResponse);
-    Log3($hash->{NAME}, 4, "$hash->{NAME}: Schreibe mp3 in die Datei $file mit ".length $maryTTSResponse . ' Bytes');
-    return close $fh2;
+    Log3($hash->{NAME}, 4, "$hash->{NAME}: Schreibe wav in die Datei $FileWav2 mit ".length $maryTTSResponse . ' Bytes');
+    close $fh2;
+    $cmd = qq(lame "$FileWav2" "$file");
+    Log3($hash, 4, "$hash->{NAME}:$cmd");
+    system $cmd;
+    #return unlink $FileWav2;
+    return 1;
   }
 }
 
@@ -1436,7 +1422,7 @@ the result on a local or remote loudspeaker
        </code>
       </li>
       <li>maryTTS<br>
-        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> or <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Engine. Prerequisite: Installation of respective server, appropriate settings in <a href="#Text2Speech-attr-TTS_User">TTS_User</a> attribute (if other than default settings shall be applied).<br>
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> or <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Engine. Prerequisite: Installation of respective server and lame, appropriate settings in <a href="#Text2Speech-attr-TTS_User">TTS_User</a> attribute (if other than default settings shall be applied).<br>
         Both are open source software speech synthesizers for English and other languages.
       </li>
     </ul>
@@ -1736,7 +1722,7 @@ the result on a local or remote loudspeaker
        </code>
       </li>
       <li>maryTTS<br>
-        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> oder <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Sprachsynthesizer, der betr. Server muss separat installiert werden. Beides sind open source Lösungen für English und andere Sprachen.
+        <a target="_blank" href"https://github.com/marytts/marytts">maryTTS</a> oder <a target="_blank" href"https://github.com/MycroftAI/mimic3">Mimic 3</a> Sprachsynthesizer, der betr. Server sowie lame muss separat installiert werden. Beides sind open source Lösungen für English und andere Sprachen.
         Über das Attribut <a href="#Text2Speech-attr-TTS_User">TTS_User</a> können ergänzende Angaben zu Server, Port und verwendeten Stimme etc. gemacht werden.<br>
       </li>
     </ul>
