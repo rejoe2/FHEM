@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26176 2022-07-06 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26203 2022-07-09 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -52,6 +52,7 @@ BEGIN {
           InternalTimer RemoveInternalTimer
           FmtDateTime
           DevIo_OpenDev DevIo_CloseDev DevIo_SimpleRead DevIo_SimpleWrite
+          trim
           )
     );
 }
