@@ -36,8 +36,7 @@ BEGIN {
           readingsBeginUpdate readingsEndUpdate
           readingsBulkUpdate readingsBulkUpdateIfChanged
           readingsDelete
-          AttrVal
- InternalVal
+          AttrVal InternalVal
           ReadingsVal
           Log3
           InternalTimer RemoveInternalTimer
@@ -121,14 +120,15 @@ sub Attr {
     my $name  = shift;
     my $attr  = shift // return;
     my $value = shift;
-    return if !$init_done;
+    return if !$init_done && $attr ne 'amplifier' && $attr ne 'mr' && $attr ne 'soundMapping';
     my $hash = $defs{$name} // return;
     Log3( $name, 5, "$name Attr set: $attr, $value" );
     if ( $cmd eq 'set' ) {
         if ( $attr eq 'mr' ) {
             my $ret = OpenMultiroom_setNotifyDef( $hash, $value );
             return $ret if $ret;
-            OpenMultiroom_getReadings( $hash, $value );
+            OpenMultiroom_getReadings( $hash, $value ) if $init_done;
+            return;
         }
         if ( $attr eq 'soundMapping' ) {
             $hash->{soundMapping} = $value;
@@ -414,7 +414,7 @@ sub Set {
             $val = $number;
             $val = 100 if $val > 100;
         }
-        if ( $val < ReadingsVal( $name, 'mr_volume', 0 ) || !defined $hash->{amp} ) {
+        if ( $val > ReadingsVal( $name, 'mr_volume', 0 ) || !defined $hash->{amp} ) {
             CallFn( $mrname, 'SetFn', $defs{$mrname}, $mrname, 'volume', $val );
         }
         else {
