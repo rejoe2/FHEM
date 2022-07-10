@@ -977,8 +977,8 @@ sub Text2Speech_Download($$$) {
     Log3( $hash->{NAME}, 4, "$hash->{NAME}: Hole URL: $mTTSurl" );
     my $param = {     url         => $mTTSurl,
                       timeout     => 5,
-                      hash        => $hash, # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
-                      method      => 'POST'    # see https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L33
+                      hash        => $hash,     # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
+                      method      => 'GET'      # POST can be found in https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L33
                   };
     my ($maryTTSResponseErr, $maryTTSResponse) = HttpUtils_BlockingGet($param);
 
@@ -1000,8 +1000,8 @@ sub Text2Speech_Download($$$) {
     $cmd = qq(lame "$FileWav2" "$file");
     Log3($hash, 4, "$hash->{NAME}:$cmd");
     system $cmd;
-    #return unlink $FileWav2;
-    return 1;
+    return unlink $FileWav2;
+    #return 1;
   }
 }
 
