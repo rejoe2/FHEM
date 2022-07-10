@@ -1,6 +1,5 @@
-
 ##############################################
-# $Id: 98_Text2Speech.pm 25785 2022-07-07 Beta-User - Mimic 3 version $
+# $Id: 98_Text2Speech.pm 25785 2022-07-10 Beta-User - Mimic 3 version $
 #
 # 98_Text2Speech.pm
 #
@@ -969,7 +968,7 @@ sub Text2Speech_Download($$$) {
     $named->{host}     //= shift @{$unnamed} // '127.0.0.1';
     $named->{port}     //= shift @{$unnamed} // '59125';
     $named->{lang}     //= shift @{$unnamed} // !$TTS_Language || $TTS_Language eq 'Deutsch' ? 'de_DE' : $TTS_Language;
-    $named->{voice}    //= shift @{$unnamed} // 'thorsten_low';
+    $named->{voice}    //= shift @{$unnamed} // 'de_DE/thorsten_low';
     $named->{endpoint} //= shift @{$unnamed} // 'process';
 
     $mTTSurl = "http://$named->{host}:$named->{port}/$named->{endpoint}?INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=$named->{lang}&VOICE=$named->{voice}&INPUT_TEXT="; # https://github.com/marytts/marytts-txt2wav/blob/python/txt2wav.py#L21
@@ -1446,7 +1445,7 @@ the result on a local or remote loudspeaker
   <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
     Actual only used for maryTTS (and Mimic 3). Needed in case if a TTS Engine needs a username and an APIKey for a request. <br>
     <p>(Full) example for maryTTS (values are defaults and may be left out):</p>
-        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=thorsten_low</code></p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=de_DE/thorsten_low</code></p>
   </li>
 
   <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
@@ -1747,7 +1746,7 @@ the result on a local or remote loudspeaker
   <a id="Text2Speech-attr-TTS_User"></a><li>TTS_User<br>
     Derzeit nur für maryTTS (bzw. Mimic 3) genutzt. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.<br>
     <p>(Vollständiges) Beispiel für maryTTS (die angegebenen Werte entsprechen den defaults):</p>
-        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=thorsten_low</code></p>
+        <p><code>attr t2s TTS_User host=127.0.0.1 port=59125 lang=de_DE voice=de_DE/thorsten_low</code></p>
   </li>
 
   <a id="Text2Speech-attr-TTS_CacheFileDir"></a><li>TTS_CacheFileDir<br>
