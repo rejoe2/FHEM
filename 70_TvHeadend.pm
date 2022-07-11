@@ -1,17 +1,20 @@
 # based on https://forum.fhem.de/index.php/topic,85932.0.html
 # https://github.com/Quantum1337/70_Tvheadend.pm
 # tvheadend api is available at https://github.com/dave-p/TVH-API-docs/wiki
-# $Id: 70_TvHeadend.pm 2021-10-11 Beta-User$
+# $Id: 70_TvHeadend.pm 2022-07-11 Beta-User$
 
 package TvHeadend; ##no critic qw(Package)
 
 use strict;
 use warnings;
 use Carp qw(carp);
-use JSON qw(decode_json encode_json);
-use Encode;
+#use JSON qw(decode_json encode_json);
+#use Encode;
+use JSON ();
+use List::Util qw(max);
 use HttpUtils;
-use utf8;
+#use utf8;
+use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
 
 use GPUtils qw(:all);
@@ -29,8 +32,7 @@ my %sets = (
 my %gets = (
     EPGQuery        => [],
     ChannelQuery    => [qw(noArg)],
-    ConnectionQuery => [qw(noArg)],
-    InputQuery      => [qw(noArg)]
+    ConnectionQuery => [qw(noArg)]
 );
 
 BEGIN {
@@ -53,7 +55,6 @@ BEGIN {
     readingFnAttributes
     IsDisabled
     AttrVal
-    getAllAttr
     ReadingsVal
     devspec2array
     HttpUtils_BlockingGet
@@ -114,7 +115,7 @@ sub Define {
         $hash->{helper}{'.pw'} = $password if $password;
     }
 
-    return $init_done ? firstInit($hash) : InternalTimer(time+10, \&firstInit, $hash );
+    return $init_done ? firstInit($hash) : InternalTimer(gettimeofday()+10, \&firstInit, $hash );
 }
 
 sub firstInit {
@@ -122,7 +123,7 @@ sub firstInit {
 
     my $name = $hash->{NAME};
 
-    return InternalTimer(time+1, \&firstInit, $hash ) if !$init_done;
+    return InternalTimer(gettimeofday()+1, \&firstInit, $hash ) if !$init_done;
     RemoveInternalTimer($hash);
 
     $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
@@ -143,9 +144,6 @@ sub firstInit {
         my $interval = AttrVal($name,'PollingInterval',60);
         Log3( $hash,3,"$name - ConnectionQuery will be polled with an interval of $interval s");
     }
-    
-    # Timer für alles außer EPG
-    InternalTimer(time+AttrVal($name,'PollingInterval',60),\&TvHeadend_GetUpdate,$hash);
 
     return;
 }
@@ -173,7 +171,7 @@ sub Set {
         if !defined $sets{$command};
 
     if($command eq 'EPG'){
-        return InternalTimer(time,\&TvHeadend_EPG,$hash);
+        return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
     }
     if($command eq 'DVREntryCreate'){
         return 'EventId must be numeric' if $values[0] !~ m{\A[0-9]+\z};
@@ -218,7 +216,6 @@ sub Get {
     return EPGQuery($hash,@values)          if $command eq 'EPGQuery'; 
     return ChannelQuery($hash)              if $command eq 'ChannelQuery';
     return TvHeadend_ConnectionQuery($hash) if $command eq 'ConnectionQuery';
-    return InputQuery($hash)                if $command eq 'InputQuery';
     return;
 }
 
@@ -297,15 +294,6 @@ sub Delete {
     return;
 }
 
-sub TvHeadend_GetUpdate {
-    my $hash = shift // return;
-    my $name = $hash->{NAME};
-
-    RemoveInternalTimer($hash,\&TvHeadend_GetUpdate);
-    InternalTimer(time+AttrVal($name,'PollingInterval',60),\&TvHeadend_GetUpdate,$hash);
-    return &InputQuery($hash);
-}
-
 sub TvHeadend_EPG {
     my $hash = shift // return;
     my $name = $hash->{NAME};
@@ -334,7 +322,8 @@ sub TvHeadend_EPG {
             (Log3($cbhash->{NAME},3,"$cbhash->{NAME} - Requested interface not found"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
 
             my $entries;
-            if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+            #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+            if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
                 return Log3($cbhash, 1, "JSON decoding error: $@");
             }
 
@@ -342,12 +331,13 @@ sub TvHeadend_EPG {
                 Log3($cbhash, 4,"$cbhash->{NAME} - Skipping $channels->[$param->{id}]->{number}:$channels->[$param->{id}]->{name}. No current EPG information");
                 $count--;
             } else {
-                for my $item (qw(title subtitle summary description)) {
-                    $entries->[0]->{$item} = encode('UTF-8',$entries->[0]->{$item});
-                }
+                #for my $item (qw(title subtitle summary description)) {
+                #    $entries->[0]->{$item} = encode('UTF-8',$entries->[0]->{$item});
+                #}
 
                 for my $item (qw(subtitle summary description)) {
-                    @$entries[0]->{$item} = encode('UTF-8',"Keine Informationen verfügbar") if !defined $entries->[0]->{$item};
+                    #@$entries[0]->{$item} = encode('UTF-8',"Keine Informationen verfügbar") if !defined $entries->[0]->{$item};
+                    @$entries[0]->{$item} = 'Keine Informationen verfügbar' if !defined $entries->[0]->{$item};
                 }
 
                 $entries->[0]->{channelId} = $param->{id};
@@ -405,7 +395,8 @@ sub TvHeadend_EPG {
             (Log3($cbhash,3,"$cbhash->{NAME} - Requested interface not found"),$cbhash->{EPGQuery_state}=0,return) if $data =~ m{404\sNot\sFound}xms;
 
             my $entries;
-            if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+            #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+            if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
                 return Log3($cbhash, 1, "JSON decoding error: $@");
             }
             if ( !defined $entries->[0] ){
@@ -413,8 +404,8 @@ sub TvHeadend_EPG {
                 $count--;
             } else {
                 for my $items (qw( title subtitle summary description )) {
-                    $entries->[0]->{$items} = "Keine Informationen verfügbar" if !defined $entries->[0]->{$items} && $items ne 'title';
-                    $entries->[0]->{$items} = encode('UTF-8',$entries->[0]->{$items});
+                    $entries->[0]->{$items} = 'Keine Informationen verfügbar' if !defined $entries->[0]->{$items} && $items ne 'title';
+                    #$entries->[0]->{$items} = encode('UTF-8',$entries->[0]->{$items});
                 }
                 $entries->[0]->{channelId} = $param->{id};
                 push @entriesNext,$entries->[0];
@@ -446,7 +437,7 @@ sub TvHeadend_EPG {
 
     ## SET READINGS
     if ( $hash->{EPGQuery_state} == 3 ){
-        my $update = $hash->{helper}{epg}{update};
+        my $update = max($hash->{helper}{epg}{update}, gettimeofday() + AttrVal($name, 'PollingInterval', 60));
         my $entriesNow = $hash->{helper}{epg}{now};
         my $entriesNext = $hash->{helper}{epg}{next};
         my $channels = $hash->{helper}{epg}{channels};
@@ -474,9 +465,10 @@ sub TvHeadend_EPG {
                 readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}TimeNext", strftime("%H:%M:%S",localtime($entriesNext->[$i]->{lc $el}))) if $items =~ m{${el}Time};
             }
         }
+        readingsBulkUpdateIfChanged($hash, 'nextUpdate', strftime("%H:%M:%S",localtime($update)));
         readingsEndUpdate($hash, 1);
 
-        Log3($name,3,"$name - Next update: ".  strftime("%H:%M:%S",localtime($update)));
+        #Log3($name,3,"$name - Next update: ".  strftime("%H:%M:%S",localtime($update)));
         RemoveInternalTimer($hash,\&TvHeadend_EPG);
         InternalTimer($update + 1,\&TvHeadend_EPG,$hash);
         $hash->{EPGQuery_state} = 0;
@@ -505,15 +497,16 @@ sub ChannelQuery {
     ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
-    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
-    ($response = "No Channels available",Log3($hash,3,"$name - $response"),return $response) if !@{$entries};
+    ($response = 'No Channels available',Log3($hash,3,"$name - $response"),return $response) if !@{$entries};
 
     @{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
 
     for my $i (0..@$entries-1) {
-        $entries->[$i]->{name} = encode('UTF-8',$entries->[$i]->{name});
+        #$entries->[$i]->{name} = encode('UTF-8',$entries->[$i]->{name});
         $entries->[$i]->{id} = $i;
         push @channelNames, $entries->[$i]->{name};
     }
@@ -522,7 +515,7 @@ sub ChannelQuery {
     my $channelNames = join q{,}, @channelNames;
     $channelNames =~ s{ }{\_}g;
 
-    my $devattrs = $defs{$name}{'.AttrList'} // getAllAttr($name);
+    my $devattrs = getAllAttr($name);
     $devattrs =~ s{EPGChannelList:multiple-strict[\S]+}{EPGChannelList:multiple-strict,all,$channelNames};
 
     $defs{$name}{'.AttrList'} = $devattrs;
@@ -532,56 +525,6 @@ sub ChannelQuery {
 
     return join q{\n}, @channelNames;
 }
-
-sub InputQuery {                                                                 
-    my $hash = shift // return;
-    my $name = $hash->{NAME};
-    Log3($hash, 4,"$name - Get Input-Devices");
-
-    my $ip = $hash->{helper}{http}{ip};
-    my $port = $hash->{helper}{http}{port} // '9981';
-    my $response;
-    my @inputNames;
-
-    $hash->{helper}{input}{count} = 0;
-    delete $hash->{helper}{input}{devices} if defined $hash->{helper}{input}{devices};
-
-    $hash->{helper}{http}{url} = "http://${ip}:${port}/api/status/inputs";
-
-    my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
-    ($response = $err,Log3($hash, 3,"$name - $err"),return $err) if $err;
-    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
-    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
-
-    my $entries;
-    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
-        return Log3($hash, 1, "JSON decoding error: $@");
-    }
-    ($response = "No Input-Devices available",Log3($hash,3,"$name - $response"),return $response) if !@{$entries};
-
-    @{$entries} = sort {$a->{number} <=> $b->{number}} @{$entries};
-
-    for my $i (0..@$entries-1) {
-        $entries->[$i]->{name} = encode('UTF-8',$entries->[$i]->{input});
-        $entries->[$i]->{id} = $i;
-        push @inputNames, $entries->[$i]->{name};
-    }
-
-    return if !@inputNames;
-    my $inputNames = join q{,}, @inputNames;
-    $inputNames =~ s{ }{\_}g;
-
-    $defs{$name}{InputDevices} = $inputNames;
-
-    $hash->{helper}{input}{count} = @{$entries};
-    $hash->{helper}{input}{devices} = $entries;
-    readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash, 'activeInputDevices', @{$entries});
-    readingsEndUpdate($hash, 1);
-
-    return join q{\n}, @inputNames;
-}
-
 
 sub EPGQuery {
     my $hash = shift // return;
@@ -600,11 +543,12 @@ sub EPGQuery {
 
     my ($err, $data) = &TvHeadend_HttpGetBlocking($hash);
     return $err if $err;
-    ($response = "Server needs authentication",Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
-    ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
+    ($response = 'Server needs authentication',Log3($hash,3,"$name - $response"),return $response)  if $data =~ m{401\sUnauthorized}xms;
+    ($response = 'Requested interface not found',Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
-    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
@@ -612,15 +556,22 @@ sub EPGQuery {
 
     for my $i (0..@$entries-1) {
         for my $items (qw( subtitle summary description )) {
-            $entries->[$i]->{$items} = encode('UTF-8',"Keine Informationen verfügbar") if !defined $entries->[$i]->{$items};
+            #$entries->[$i]->{$items} = encode('UTF-8',"Keine Informationen verfügbar"
+            $entries->[$i]->{$items} //= 'Keine Informationen verfügbar';
         }
         $response .= "Channel: $entries->[$i]->{channelName}\n"
-                  ."Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{start})))." - "
-                  .strftime("%H:%M:%S]",localtime(encode('UTF-8',$entries->[$i]->{stop})))."\n"
-                  ."Titel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{title},80))."\n"
-                  ."Subtitel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{subtitle},80))."\n"
-                  ."Summary: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{summary},80)). "\n"
-                  ."Description: ".encode('UTF-8',&LewLineStringing(@$entries[$i]->{description},80)). "\n"
+                  #."Time: ".strftime("%d.%m [%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{start})))." - "
+                  #.strftime("%H:%M:%S]",localtime(encode('UTF-8',$entries->[$i]->{stop})))."\n"
+                  #."Titel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{title},80))."\n"
+                  #."Subtitel: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{subtitle},80))."\n"
+                  #."Summary: ".encode('UTF-8',&LewLineStringing($entries->[$i]->{summary},80)). "\n"
+                  #."Description: ".encode('UTF-8',&LewLineStringing(@$entries[$i]->{description},80)). "\n"
+                  .'Time: '.strftime("%d.%m [%H:%M:%S",localtime($entries->[$i]->{start})).' - '
+                  .strftime("%H:%M:%S]",localtime($entries->[$i]->{stop})).'\n'
+                  .'Titel: ' . &LewLineStringing($entries->[$i]->{title},80).'\n'
+                  .'Subtitel: ' . &LewLineStringing($entries->[$i]->{subtitle},80).'\n'
+                  .'Summary: ' . &LewLineStringing($entries->[$i]->{summary},80) . '\n'
+                  .'Description: ' . &LewLineStringing(@$entries[$i]->{description},80). '\n'
                   ."EventId: $entries->[$i]->{eventId}\n";
     }
 
@@ -646,14 +597,15 @@ sub TvHeadend_ConnectionQuery {
     ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
-    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
     if ( !defined $entries->[0] ){
         if(AttrVal($hash->{NAME},'PollingQueries','') =~ m{ConnectionQuery}){
             readingsBeginUpdate($hash);
-            readingsBulkUpdateIfChanged($hash, "connectionsTotal", "0");
+            readingsBulkUpdateIfChanged($hash, 'connectionsTotal', 0);
             for ( qw ( connectionsId connectionsUser connectionsStartTime connectionsPeer connectionsType ) ) {
                 readingsBulkUpdateIfChanged($hash, $_, '-');
             }
@@ -671,21 +623,30 @@ sub TvHeadend_ConnectionQuery {
                 ."-------------------------\n";
     for my $i (0..@$entries-1) {
         $response .= "Id: $entries->[$i]->{id} \n"
-                  ."User: ".encode('UTF-8',$entries->[$i]->{user})."\n"
-                  ."StartTime: ".strftime("%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{started}))) ." Uhr\n"
-                  ."Peer: ".encode('UTF-8',$entries->[$i]->{peer})."\n"
-                  ."Type: ".encode('UTF-8',$entries->[$i]->{type})."\n"
-                  ."-------------------------\n";
+                  #."User: ".encode('UTF-8',$entries->[$i]->{user})."\n"
+                  #."StartTime: ".strftime("%H:%M:%S",localtime(encode('UTF-8',$entries->[$i]->{started}))) ." Uhr\n"
+                  #."Peer: ".encode('UTF-8',$entries->[$i]->{peer})."\n"
+                  #."Type: ".encode('UTF-8',$entries->[$i]->{type})."\n"
+                  ."User: $entries->[$i]->{user}\n"
+                  .'StartTime: '.strftime("%H:%M:%S",localtime($entries->[$i]->{started})) .' Uhr\n'
+                  ."Peer: $entries->[$i]->{peer}\n"
+                  ."Type: $entries->[$i]->{type}\n"
+                  .'-------------------------\n';
     }
 
     if ( AttrVal($name,'PollingQueries','') =~ m{ConnectionQuery} ) {
         readingsBeginUpdate($hash);
         readingsBulkUpdateIfChanged( $hash, 'connectionsTotal', @{$entries} );
         readingsBulkUpdateIfChanged( $hash, 'connectionsId', join q{,}, my @ids = map {$_->{id}} @{$entries} );
-        readingsBulkUpdateIfChanged( $hash, 'connectionsUser', encode('UTF-8', join q{,}, my @users = map {$_->{user}} @{$entries} ) );
-        readingsBulkUpdateIfChanged( $hash, 'connectionsStartTime', encode('UTF-8', join q{,}, my @startTimes = map {$_->{started}} @{$entries} ));
-        readingsBulkUpdateIfChanged( $hash, 'connectionsPeer', encode('UTF-8',join q{,}, my @peer = map {$_->{peer}} @{$entries} ) );
-        readingsBulkUpdateIfChanged( $hash, 'connectionsType', encode('UTF-8',join q{,}, my @type = map {$_->{type}} @{$entries} ) );
+        #readingsBulkUpdateIfChanged( $hash, 'connectionsUser', encode('UTF-8', join q{,}, my @users = map {$_->{user}} @{$entries} ) );
+        #readingsBulkUpdateIfChanged( $hash, 'connectionsStartTime', encode('UTF-8', join q{,}, my @startTimes = map {$_->{started}} @{$entries} ));
+        #readingsBulkUpdateIfChanged( $hash, 'connectionsPeer', encode('UTF-8',join q{,}, my @peer = map {$_->{peer}} @{$entries} ) );
+        #readingsBulkUpdateIfChanged( $hash, 'connectionsType', encode('UTF-8',join q{,}, my @type = map {$_->{type}} @{$entries} ) );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsUser', join q{,}, my @users = map {$_->{user}} @{$entries} );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsStartTime', join q{,}, my @startTimes = map {$_->{started}} @{$entries} );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsPeer', join q{,}, my @peer = map {$_->{peer}} @{$entries} );
+        readingsBulkUpdateIfChanged( $hash, 'connectionsType', join q{,}, my @type = map {$_->{type}} @{$entries} );
+
         readingsEndUpdate($hash, 1);
 
         RemoveInternalTimer($hash,\&TvHeadend_ConnectionQuery);
@@ -712,7 +673,8 @@ sub DVREntryCreate {
     ($response = "Requested interface not found",Log3($hash,3,"$name - $response"),return $response) if $data =~ m{404\sNot\sFound}xms;
 
     my $entries;
-    if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    #if ( !eval { $entries  = decode_json($data)->{entries} ; 1 } ) {
+    if ( !eval { $entries  = JSON->new->decode($data)->{entries} ; 1 } ) {
         return Log3($hash, 1, "JSON decoding error: $@");
     }
 
@@ -734,13 +696,13 @@ sub DVREntryCreate {
     );
 
     my $jsonData;
-    if ( !eval { $jsonData  = encode_json(\%recording) ; 1 } ) {
+    #if ( !eval { $jsonData  = encode_json(\%recording) ; 1 } ) {
+    if ( !eval { $jsonData  = JSON->new->encode(\%recording) ; 1 } ) {
         return Log3($hash, 1, "JSON encoding error: $@");
     }
 
     $jsonData =~ s{\x20}{\%20}g;
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/dvr/entry/create?conf=$jsonData";
-    #($err, $data) = &TvHeadend_HttpGetBlocking($hash);
     return &TvHeadend_HttpGetBlocking($hash);
 }
 
