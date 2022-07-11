@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 75_MSG.pm 19215 2019-04-18 11:55:19Z loredo $
+# $Id: 75_MSG.pm 19215 2022-07-11 commandref Beta-User $
 #
 #TODO
 # - be able to use type "default" to let read from attr
@@ -26,7 +26,7 @@ use warnings;
 use Data::Dumper;
 use Time::HiRes qw(time);
 use Encode;
-use utf8;
+use utf8; #might need review, see https://forum.fhem.de/index.php/topic,109323.msg1033062.html#msg1033062
 
 # initialize ##################################################################
 sub MSG_Initialize($$) {
@@ -2463,47 +2463,26 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
 1;
 
-__END__
-
 =pod
 =item command
 =item summary dynamic routing of messages to FHEM devices and modules
 =item summary_DE dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module
 =begin html
 
-<a id="MSG"></a>
+<a name="MSG"></a>
 <h3>msg</h3>
-  <p>For documentation in german see <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a> or <a href="https://wiki.fhem.de/wiki/Msg">FHEM Wiki</a></p>
-  Syntax is:<br>
+<ul>
   <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
-  <br><br>
-  Except for <i>message</i> all parameters are optional, for configuration of the entire messageing logics see also <a href="#msgConfig">msgConfig</a>.<br>
   <br>
-  Basic idea behind the command (and msgConfig) is to establish a central logic for dispatching messages to be sent to the user, so e.g. in case an address of an recipient changes, you only have to change one single point in your entire configuration.<br><br>
-  Parameters are as follows:<br>
-  <ul>
-    <li>type<br>
-      Is optional and one of <i>text</i>, <i>audio</i>, <i>light</i> or <i>screen</i> (or one of the subtypes to <i>text</i> - <i>mail</i> and <i>push</i>). If ommitted, it defaults to <i>text</i>.<br>
-      You may provide more than one type by providing a comma-seperated list.
-    </li>
-    <li>@device or e-mail address<br>
-      For <i>@device</i> you may opt for any instance of a messenger service available in <i>mscConfig</i>, by default <a href="#Pushover">Pushover</a> will be used (if available). <br>
-      For emailing, per default <code>system()</code> command per <code>/usr/bin/mail</code> is issued.
-      You may provide more than one recipent by providing a comma-seperated list here (also mixed).
-    </li>
-    <li>priority<br>
-      Is also optional. You may any (nummeric) value understood by your addressed messaging device, good idea is to use values common in the Pushover API (-2 to 2). 
-    </li>
-    <li>title<br>
-      Is also optional, but when given, it has to be enclosed in <i>pipe</i> characters.
-    </li>
   <br>
-  </ul>
+  No documentation here yet, sorry.<br>
+  <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a>
+</ul>
 
 =end html
-=begin html_old_DE
+=begin html_DE
 
-<a id="MSG"></a>
+<a name="MSG"></a>
 <h3>msg</h3>
 <ul>
   <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
@@ -2514,7 +2493,7 @@ __END__
 </ul>
 
 
-=end html_old_DE
+=end html_DE
 
 =for :application/json;q=META.json 75_MSG.pm
 {
