@@ -1,5 +1,5 @@
 ﻿##############################################
-# $Id: 98_statistics.pm 20819 2022-05-25 Beta-User dst trial III + commandref$
+# $Id: 98_statistics.pm 26152 2022-07-11 Beta-User (commandref) $
 #
 #  98_statistic.pm
 # 
@@ -178,7 +178,7 @@ sub statistics_Define($$)
   $hash->{NOTIFYDEV} = "global,".$devName;
 
   $hash->{STATE} = "Waiting for notifications";
-  $hash->{fhem}{modulVersion} = '$Date: 2019-12-24 00:07:57 +0100 (Tue, 24 Dec 2019) $';
+  $hash->{fhem}{modulVersion} = '$Date: 2022-06-16 07:45:59 +0200 (Thu, 16 Jun 2022) $';
 
   RemoveInternalTimer($hash);
   
@@ -370,8 +370,8 @@ sub statistics_PeriodChange($)
       # Positiv Value if periode changes at full hour
       $periodSwitch = abs($periodSwitch)     if $dayChangeDelay % 3600 == 0;
    } else {
-      ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime($now);
-      ($dummy, $dummy, $hourNow , $dummy, $dummy, $dummy) = localtime($now + $periodChangePreset);
+      ($dummy, $dummy, $hourLast, $dummy, $dummy) = localtime($now);
+      ($dummy, $dummy, $hourNow , $dummy, $dummy) = localtime($now + $periodChangePreset);
       if (   $hourNow != $hourLast
           || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr + $periodChangePreset))[8]) {
          $periodSwitch = 1;
@@ -1169,10 +1169,7 @@ sub statistics_UpdateDevReading($$$$)
 
 __END__
 
-
 =pod
-
-=encoding utf8
 =item summary Calculates statistical values and adds them to the devices.
 =item summary_DE Berechnet statistische Werte und fügt sie dem Gerät hinzu.
 =item helper
@@ -1212,12 +1209,10 @@ __END__
   </ul>
    Further readings can be added via the <a href="#statisticsattr">attributes</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code>.
    This allows also to assign a reading to another statistic type.
-  <br>&nbsp;
-  <br>
-  
-  <b>Define</b>
+
+  <a id="statistics-define"></a>
+  <h4>Define</h4>
   <ul>
-  <br>
     <code>define &lt;name&gt; statistics &lt;deviceNameRegExp&gt; [Prefix]</code>
     <br>
     Example: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
@@ -1229,77 +1224,73 @@ __END__
     <li><code>[Prefix]</code>
       <br>
       Optional. Prefix set is place before statistical data. Default is <i>stat</i>
-    </li><br>
+    </li>
   </ul>
 
-  <br>
-  <b>Set</b>
+  <a id="statistics-set"></a>
+  <h4>Set</h4>
    <ul>
-      <br>
-      <li><code>resetStatistics &lt;All|DeviceName&gt;</code>
+      <a id="statistics-set-resetStatistics"></a><li><code>resetStatistics &lt;All|DeviceName&gt;</code>
       <br>
       Resets the statistic values of the selected device.
       </li><br>
-      <li><code>doStatistics</code>
+      <a id="statistics-set-doStatistics"></a><li><code>doStatistics</code>
       <br>
       Calculates the current statistic values of all monitored devices.
-      </li><br>
+      </li>
   </ul>
 
-  <br>
-  <b>Get</b>
+  <a id="statistics-get"></a>
+  <h4>Get</h4>
    <ul>not implemented yet
   </ul>
 
-  <br>
   <a id="statistics-attr"></a>
-   <b>Attributes</b>
+   <h4>Attributes</h4>
    <ul>
-      <br>
-      <li><code>dayChangeTime &lt;time&gt;</code>
+      <a id="statistics-attr-dayChangeTime"></a><li><code>dayChangeTime &lt;time&gt;</code>
          <br>
          Time of day change. Default is 00:00. For weather data the day change can be set e.g. to 06:50. 
       </li><br>
-      <li><code>deltaReadings &lt;readings&gt;</code>
+      <a id="statistics-attr-deltaReadings"></a><li><code>deltaReadings &lt;readings&gt;</code>
          <br>
          Comma separated list of reading names for which a delta statistic shall be calculated. 
       </li><br>
-      <li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
+      <a id="statistics-attr-durationPeriodHour"></a><li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
          <br>
          If set to 1, then duration readings will get hourly statistics too.
       </li><br>
-      <li><code>durationReadings &lt;readings&gt;</code>
+      <a id="statistics-attr-durationReadings"></a><li><code>durationReadings &lt;readings&gt;</code>
          <br>
          Comma separated list of reading names for which a duration statistic shall be calculated. 
       </li><br>
-      <li><code>excludedReadings &lt;DeviceRegExp:ReadingNameRegExp&gt;</code>
+      <a id="statistics-attr-excludedReadings"></a><li><code>excludedReadings &lt;DeviceRegExp:ReadingNameRegExp&gt;</code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
       The reading have to be entered in the form <i>deviceName:readingName</i>.
       <br>
       E.g. <code>FritzDect:current|Sensor_.*:humidity</code>
-      <br>
-    </li><br>
+    </li>
    
-   <li><code>ignoreDefaultAssignments <code>&lt; 0 | 1 &gt;</code></code>
+    <a id="statistics-attr-ignoreDefaultAssignments"></a><li><code>ignoreDefaultAssignments <code>&lt; 0 | 1 &gt;</code></code>
       <br>
       Ignores the default assignments of readings to a statistic type (see above).<br>
       So, only the readings that are listed in the specific attributes are evaluated.
       <br>
     </li><br>
      
-    <li><code>minAvgMaxReadings &lt;readings&gt;</code>
+    <a id="statistics-attr-minAvgMaxReadings"></a><li><code>minAvgMaxReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
     </li><br>
-    <li><code>periodChangePreset &lt;seconds&gt;</code>
+    <a id="statistics-attr-periodChangePreset"></a><li><code>periodChangePreset &lt;seconds&gt;</code>
       <br>
       Preponed start of the calculation of periodical data. Default is 5 second before each full hour.
       <br>
       Allows thus the correct timely assignment within plots. Should be adapted to the CPU speed or load of the server.
       <br>
     </li><br>
-    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</code>
+    <a id="statistics-attr-singularReadings"></a><li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</code>
       <ul>
          <li>statTypes: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
          <li>period: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
@@ -1313,7 +1304,7 @@ __END__
          <code>Badfenster:Window:(Open|Open_Count):Month</code>
       </dd>
     </li><br>
-   <li><code>specialDeltaPeriods &lt;Device:Reading:Period:count1:count2:...&gt;</code>
+    <a id="statistics-attr-specialDeltaPeriods"></a><li><code>specialDeltaPeriods &lt;Device:Reading:Period:count1:count2:...&gt;</code>
       <br>
       Creates for the given delta reading additional singular readings of the given numbers of a period (Hour, Day, Month)
       <br>
@@ -1329,12 +1320,12 @@ __END__
       <br>
       This will create 4 additional readings for the rain of the last 48 hours and the last 30 Days and the energy consumtion of the last 6 and 12 months.
       </dd>
-   </li><br>
-   <li><code>specialDeltaPeriodHours</code>
+    </li><br>
+    <a id="statistics-attr-specialDeltaPeriodHours"></a><li><code>specialDeltaPeriodHours</code>
       <br>
       depreciated
-   </li><br>
-    <li><code>tendencyReadings &lt;readings&gt;</code>
+    </li><br>
+    <a id="statistics-attr-tendencyReadings"></a><li><code>tendencyReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a tendendy statistic shall be calculated. 
     </li><br>
@@ -1377,13 +1368,11 @@ __END__
          <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Gerätewert gültig)</i>
       </li><br>
   </ul>
-  Über die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> können weitere Gerätewerte hinzugefügt oder einem anderen Statistik-Typ zugeordnet werden. 
-  <br>&nbsp;
-  <br>
+  Über die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> können weitere Gerätewerte hinzugefügt oder einem anderen Statistik-Typ zugeordnet werden.
   
-  <b>Define</b>
+  <a id="statistics-define"></a>
+  <h4>Define</h4>
   <ul>
-      <br>
       <code>define &lt;Name&gt; statistics &lt;GeräteNameRegExp&gt; [Prefix]</code>
       <br>
       Beispiel: <code>define Statistik statistics Wettersensor|Badsensor</code>
@@ -1395,57 +1384,54 @@ __END__
       <li><code>[Prefix]</code>
          <br>
          Optional. Der Prefix wird vor den Namen der statistischen Gerätewerte gesetzt. Standardmäßig <i>stat</i>
-      </li><br>
+      </li>
    </ul>
   
-   <br>
-   <b>Set</b>
+  <a id="statistics-set"></a>
+  <h4>Set</h4>
    <ul>
-      <br>
-      <li><code>resetStatistics &lt;All|Gerätename&gt;</code>
+      <a id="statistics-set-resetStatistics"></a><li><code>resetStatistics &lt;All|Gerätename&gt;</code>
          <br>
          Setzt die Statistiken der ausgewählten Geräte zurück.
       </li><br>
       <li><code>doStatistics</code>
          <br>
          Berechnet die aktuellen Statistiken aller beobachteten Geräte.
-      </li><br>
+      </li>
   </ul>
-  <br>
 
-  <b>Get</b>
-   <ul>nicht implementiert
-  </ul>
-  <br>
+  <a id="statistics-get"></a>
+  <h4>Get</h4>
+    <ul>nicht implementiert
+    </ul>
 
   <a id="statistics-attr"></a>
-   <b>Attributes</b>
+   <h4>Attribute</h4>
    <ul>
-      <br>
-      <li><code>dayChangeTime &lt;Zeit&gt;</code>
+      <a id="statistics-attr-dayChangeTime"></a><li><code>dayChangeTime &lt;Zeit&gt;</code>
          <br>
          Uhrzeit des Tageswechsels. Standardmäßig 00:00. Bei Wetterdaten kann der Tageswechsel z.B. auf 6:50 gesetzt werden. 
       </li><br>
-      <li><code>deltaReadings &lt;Gerätewerte&gt;</code>
+      <a id="statistics-attr-deltaReadings"></a><li><code>deltaReadings &lt;Gerätewerte&gt;</code>
          <br>
          Durch Kommas getrennte Liste von weiteren Gerätewerten, für welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
       </li><br>
-      <li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
+      <a id="statistics-attr-durationPeriodHour"></a><li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
          <br>
          Wenn auf 1 gesetzt, dann werden für "durationReadings" auch stündliche Statistiken gebildet.
       </li><br>
-      <li><code>durationReadings &lt;Gerätewerte&gt;</code>
+      <a id="statistics-attr-durationReadings"></a><li><code>durationReadings &lt;Gerätewerte&gt;</code>
          <br>
          Durch Kommas getrennte Liste von weiteren Gerätewerten, für welche die Dauer einzelner Gerätewerte innerhalb bestimmte Zeiträume (Stunde/Tag/Monat/Jahr) erfasst wird.
       </li><br>
-      <li><code>excludedReadings &lt;GerätenameRegExp:GerätewertRegExp&gt;</code>
+      <a id="statistics-attr-excludedReadings"></a><li><code>excludedReadings &lt;GerätenameRegExp:GerätewertRegExp&gt;</code>
          <br>
          Regulärer Ausdruck der Gerätewerte die nicht ausgewertet werden sollen.
          z.B. <code>FritzDect:current|Sensor_.*:humidity</code>
          <br>
       </li><br>
 
-   <li><code>ignoreDefaultAssignments <code>&lt;0 | 1&gt;</code></code>
+     <a id="statistics-attr-ignoreDefaultAssignments"></a><li><code>ignoreDefaultAssignments <code>&lt;0 | 1&gt;</code></code>
       <br>
       Ignoriert die Standardzuordnung von Gerätewerten zu Statistik-Typen..<br>
       D.h., nur die Gerätewerte, die über Attribute den Statistik-Typen zugeordnet sind, werden ausgewertet.
@@ -1456,18 +1442,18 @@ __END__
          <br>
          noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
       </li><br>
-      <li><code>minAvgMaxReadings &lt;Gerätewerte&gt;</code>
+      <a id="statistics-attr-minAvgMaxReadings"></a><li><code>minAvgMaxReadings &lt;Gerätewerte&gt;</code>
          <br>
          Durch Kommas getrennte Liste von Gerätewerten, für die in bestimmten Zeiträumen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
       </li><br>
-      <li><code>periodChangePreset &lt;Sekunden&gt;</code>
+      <a id="statistics-attr-periodChangePreset"></a><li><code>periodChangePreset &lt;Sekunden&gt;</code>
          <br>
          Start der Berechnung der periodischen Daten, standardmäßig 5 Sekunden vor der vollen Stunde,
          <br>
          Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergrößert werden.
          <br>
       </li><br>
-      <li><code>singularReadings &lt;GerätRegExp:GeräteWertRegExp:Statistiktyp:Zeitraum&gt;</code>
+      <a id="statistics-attr-singularReadings"></a><li><code>singularReadings &lt;GerätRegExp:GeräteWertRegExp:Statistiktyp:Zeitraum&gt;</code>
          <ul>
             <li>Statistik-Typ: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
             <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
@@ -1483,7 +1469,7 @@ __END__
             <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
          </dd>
        </li><br>
-      <li><code>specialDeltaPeriods &lt;Gerät:Gerätewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
+      <a id="statistics-attr-specialDeltaPeriods"></a><li><code>specialDeltaPeriods &lt;Gerät:Gerätewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
          <br>
          Erzeugt für die angegebenen "delta"-Gerätewerte zusätzliche Einzelwerte über die angegebene Anzahl eines Zeitraums (Hour, Day, Month).
          <br>
@@ -1500,11 +1486,11 @@ __END__
          Dies erzeugt 4 zusätzliche Werte für die Regenmenge in den letzten 48 Stunden und den letzten 30 Tagen und den Energieverbrauch der letzten 6 und 12 Monate.
          </dd>
       </li><br>
-      <li><code>specialDeltaPeriodHours</code>
+      <a id="statistics-attr-specialDeltaPeriodHours"></a><li><code>specialDeltaPeriodHours</code>
          <br>
          veraltet
       </li><br>
-      <li><code>tendencyReadings &lt;Gerätewerte&gt;</code>
+      <a id="statistics-attr-tendencyReadings"></a><li><code>tendencyReadings &lt;Gerätewerte&gt;</code>
          <br>
          Durch Kommas getrennte Liste von weiteren Gerätewerten, für die innerhalb bestimmter Zeiträume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
       </li><br>
