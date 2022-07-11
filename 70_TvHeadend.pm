@@ -38,7 +38,7 @@ my %gets = (
 BEGIN {
 
   GP_Import(qw(
-    addToAttrList
+    addToAttrList getAllAttr
     addToDevAttrList
     delFromDevAttrList
     readingsBeginUpdate
