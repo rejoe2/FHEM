@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26203 2022-07-09 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26203 2022-07-12 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -29,7 +29,7 @@ use warnings;
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use DevIo;
-use JSON;
+use JSON ();
 use GPUtils qw(GP_Import);
 
 
@@ -244,12 +244,12 @@ sub Read {
 
     my @lines = split m{\n}x, $buf;
     for my $line (@lines) {
-Log3( $name, 3, "Snapcast single line is: $line" );
+        Log3( $name, 4, "Snapcast single line is: $line" );
 
         # Hier die Results parsen
-        my $decoded_json;
+        my $update;
         if (!eval {
-                $decoded_json = decode_json($line);
+                $update = JSON->new->decode($line);
                 1;
             }
             )
@@ -259,9 +259,17 @@ Log3( $name, 3, "Snapcast single line is: $line" );
             readingsSingleUpdate( $hash, 'lastError', "Invalid JSON: $buf", 1 );
             return;
         }
-        my $update = $decoded_json;
+        if ( ref $update eq 'ARRAY' ) {
+            for my $elem ( @{$update} ) {
+                updateGroupClient($hash,$elem,0);
+            }
+            return;
+        }
         return if ref $update ne 'HASH';
-        if ( defined $hash->{IDLIST} && $update->{id} && defined $hash->{IDLIST}->{ $update->{id} } ) {
+
+        my $s = $update->{params}->{data};
+
+        if (  defined $hash->{IDLIST} && $update->{id} && defined $hash->{IDLIST}->{ $update->{id} } ) {
             my $id = $update->{id};
 
             #Log3 $name,2, "id: $id ";
@@ -277,7 +285,8 @@ Log3( $name, 3, "Snapcast single line is: $line" );
                 if ( $value eq $hash->{IDLIST}->{$id}->{method} && $key ne 'mute' ) {    #exclude mute here because muting is now integrated in SetVolume
                     my $client = $hash->{IDLIST}->{$id}->{params}->{id};
 
-                    $client =~ s/\://g;
+                    $client =~ s{:}{}g;
+                    $client =~ s{#}{_}g;
                     Log3( $name, 5, "client: $client, key: $key, value: $value" );
 
                     if ( $key eq 'volume' ) {
@@ -340,8 +349,8 @@ Log3( $name, 3, "Snapcast single line is: $line" );
             delete $hash->{IDLIST}->{$id};
             return;
         }
-        elsif ( $update->{method} =~ /Client\.OnDelete/ ) {
-            my $s = $update->{params}->{data};
+
+        if ( $update->{method} eq 'Client.OnDelete' ) {
 
             #fhem "deletereading $name clients.*";
             for my $reading (
@@ -357,23 +366,29 @@ Log3( $name, 3, "Snapcast single line is: $line" );
             Snapcast_getStatus($hash);
             return;
         }
-        elsif ( $update->{method} =~ /Client\./ ) {
-            my $c = $update->{params}->{data};
-            updateClient( $hash, $c, 0 );
+
+        if ( $update->{method} =~ m{\AClient\.}x ) {
+            updateClient( $hash, $s, 0 );
             return;
         }
-        elsif ( $update->{method} =~ /Stream\./ ) {
-            my $s = $update->{params}->{data};
+
+        if ( $update->{method} =~ m{\A(?:Stream|Group)\.}x ) {
             updateStream( $hash, $s, 0 );
             return;
         }
-        elsif ( $update->{method} =~ /Group\./ ) {
-            my $s = $update->{params}->{data};
-            updateStream( $hash, $s, 0 );
+#        elsif ( $update->{method} =~ m{\AGroup\.}x ) {
+#            updateStream( $hash, $s, 0 );
+#            return;
+#        }
+
+        if ( $update->{method} eq 'Server.OnUpdate' ) {
+            my $serverupdate->{result} = $update->{params};
+            parseStatus( $hash, $serverupdate );
             return;
         }
+
         Log3( $name, 2, "unknown JSON, please contact module maintainer: $buf" );
-        readingsSingleUpdate( $hash, 'lastError', "unknown JSON, please ontact module maintainer: $buf", 1 );
+        readingsSingleUpdate( $hash, 'lastError', "unknown JSON, please contact module maintainer: $buf", 1 );
         return 'unknown JSON received';
     }
     return;
@@ -423,7 +438,8 @@ sub updateClient {
     $hash->{STATUS}->{clients}->{$cnumber} = $c;
     my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
     my $orig_id = $id;
-    $id =~ s/://g;
+    $id =~ s{:}{}g;
+    $id =~ s{#}{_}g;
     $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
     $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
 
@@ -461,6 +477,44 @@ sub updateClient {
 
     my $maxvol = getVolumeConstraint($clienthash) // 100;
     _setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{config}->{volume}->{percent} > $maxvol;
+    return;
+}
+
+sub updateGroupClient {
+    my $hash    = shift // return;
+    my $c       = shift // return;
+    my $cnumber = shift // return;
+    if ( $cnumber == 0 ) {
+        $cnumber++;
+        while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{host}->{mac} ne $hash->{STATUS}->{clients}->{$cnumber}->{host}->{mac} ) {
+            $cnumber++;
+        }
+        if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
+            #Snapcast_getStatus($hash);
+            return;
+        }
+    }
+    #$hash->{STATUS}->{clients}->{$cnumber} = $c;
+    my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
+    my $orig_id = $id;
+    $id =~ s{:}{}g;
+    $id =~ s{#}{_}g;
+    $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
+    $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
+    return if !defined $c->{params} || ! defined $c->{params}->{volume};
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} );
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_muted",     $c->{params}->{volume}->{muted} ? 'true' : 'false' );
+    readingsEndUpdate( $hash, 1 );
+
+    return if !$hash->{$id};
+    my $clienthash = $defs{ $hash->{$id} } // return;
+
+    readingsBeginUpdate($clienthash);
+    readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{params}->{volume}->{percent} );
+    readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{params}->{volume}->{muted} ? 'true' : 'false' );
+    readingsEndUpdate( $clienthash, 1 );
     return;
 }
 
@@ -690,7 +744,8 @@ sub Snapcast_Encode {
     $request->{params}                  = $param if $param ne '';
     $hash->{IDLIST}->{ $request->{id} } = $request;
     $request->{id}                      = $request->{id} + 0;
-    $json                               = encode_json($request) . "\r\n";
+    #$json                               = encode_json($request) . "\r\n";
+    $json                               = JSON->new->encode($request) . "\r\n";
     $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
     $json =~ s/\"false\"/false/;
     return $json;
