@@ -244,6 +244,7 @@ sub Read {
 
     my @lines = split m{\n}x, $buf;
     for my $line (@lines) {
+Log3( $name, 3, "Snapcast single line is: $line" );
 
         # Hier die Results parsen
         my $decoded_json;
@@ -259,7 +260,8 @@ sub Read {
             return;
         }
         my $update = $decoded_json;
-        if ( defined $hash->{IDLIST} && defined $hash->{IDLIST}->{ $update->{id} } ) {
+        return if ref $update ne 'HASH';
+        if ( defined $hash->{IDLIST} && $update->{id} && defined $hash->{IDLIST}->{ $update->{id} } ) {
             my $id = $update->{id};
 
             #Log3 $name,2, "id: $id ";
@@ -440,6 +442,7 @@ sub updateClient {
     readingsBulkUpdateIfChanged( $hash, "clients_${id}_group",     $c->{config}->{group_id} );
     readingsEndUpdate( $hash, 1 );
 
+    return if !$hash->{$id};
     my $clienthash = $defs{ $hash->{$id} } // return;
 
     readingsBeginUpdate($clienthash);
