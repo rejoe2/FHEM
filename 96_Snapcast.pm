@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26203 2022-07-12 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26203 2022-07-13 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -261,7 +261,7 @@ sub Read {
         }
         if ( ref $update eq 'ARRAY' ) {
             for my $elem ( @{$update} ) {
-                updateGroupClient($hash,$elem,0);
+                updateClientInGroup($hash,$elem);
             }
             return;
         }
@@ -480,40 +480,35 @@ sub updateClient {
     return;
 }
 
-sub updateGroupClient {
+sub updateClientInGroup {
     my $hash    = shift // return;
     my $c       = shift // return;
-    my $cnumber = shift // return;
-    if ( $cnumber == 0 ) {
+
+    my $cnumber = 1;
+    while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{params}->{id} ne $hash->{STATUS}->{clients}->{$cnumber}->{origid} ) {
         $cnumber++;
-        while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{host}->{mac} ne $hash->{STATUS}->{clients}->{$cnumber}->{host}->{mac} ) {
-            $cnumber++;
-        }
-        if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
-            #Snapcast_getStatus($hash);
-            return;
-        }
     }
-    #$hash->{STATUS}->{clients}->{$cnumber} = $c;
-    my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
-    my $orig_id = $id;
+    if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
+        #Snapcast_getStatus($hash);
+        return;
+    }
+
+    return if !defined $c->{params};
+    my $id      = $c->{params}->{id} // return;    # recent version uses an ID.
     $id =~ s{:}{}g;
     $id =~ s{#}{_}g;
-    $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
-    $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
-    return if !defined $c->{params} || ! defined $c->{params}->{volume};
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_muted",     $c->{params}->{volume}->{muted} ? 'true' : 'false' );
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_muted",     $c->{params}->{volume}->{muted} ? 'true' : 'false' ) if defined $c->{params}->{volume}->{muted};
     readingsEndUpdate( $hash, 1 );
 
     return if !$hash->{$id};
     my $clienthash = $defs{ $hash->{$id} } // return;
 
     readingsBeginUpdate($clienthash);
-    readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{params}->{volume}->{percent} );
-    readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{params}->{volume}->{muted} ? 'true' : 'false' );
+    readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
+    readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{params}->{volume}->{muted} ? 'true' : 'false' ) if defined $c->{params}->{volume}->{muted};
     readingsEndUpdate( $clienthash, 1 );
     return;
 }
@@ -746,8 +741,9 @@ sub Snapcast_Encode {
     $request->{id}                      = $request->{id} + 0;
     #$json                               = encode_json($request) . "\r\n";
     $json                               = JSON->new->encode($request) . "\r\n";
-    $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
-    $json =~ s/\"false\"/false/;
+    $json =~ s{(":"(true|false|null)")}{":$2}gxms;
+#    $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
+#    $json =~ s/\"false\"/false/;
     return $json;
 }
 
