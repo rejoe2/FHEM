@@ -354,7 +354,7 @@ sub Read {
                         #Log3 $name,2, "group: $group ";
                         for my $i ( 1 .. ReadingsVal( $name, 'clients', 0 ) ) {
                             $client = $hash->{STATUS}->{clients}->{$i}->{id};
-                            my $client_group = ReadingsVal( $hash->{NAME}, "clients_${client}_group", '' );
+                            my $client_group = ReadingsVal( $name, "clients_${client}_group", '' );
 
                             #Log3 $name,2, "client_group: $client_group ";
                             my $clientmodule = $hash->{$client};
