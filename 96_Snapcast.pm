@@ -207,12 +207,19 @@ sub Set {
 
         if ( $client eq 'all' ) {
             for my $i ( 1 .. ReadingsVal( $name, 'clients', 0 ) ) {
-                my $sclient = $hash->{STATUS}->{clients}->{$i}->{host}->{mac};
-                $sclient =~ s/\://g;
+                #my $sclient = $hash->{STATUS}->{clients}->{$i}->{host}->{mac};
+                #$sclient =~ s/\://g; #$sclient =~ s{:}{}g; $client =~ s{#}{_}g;
+                my $sclient = $hash->{STATUS}->{clients}->{$i}->{id};
                 my $res = _setClient( $hash, $sclient, $opt, $value );
                 readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
             }
             return;
+        }
+        my @group = devspec2array("TYPE=Snapcast:FILTER=group=$client");
+        
+        if ( @group ) {
+            Log3($hash,3,"SNAP: Group command, might address @group");
+            return; #not yet ready...
         }
         my $res = _setClient( $hash, $client, $opt, $value );
         readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
@@ -285,8 +292,8 @@ sub Read {
                 if ( $value eq $hash->{IDLIST}->{$id}->{method} && $key ne 'mute' ) {    #exclude mute here because muting is now integrated in SetVolume
                     my $client = $hash->{IDLIST}->{$id}->{params}->{id};
 
-                    $client =~ s{:}{}g;
-                    $client =~ s{#}{_}g;
+                    $client =~ s{:}{}gxs;
+                    $client =~ s{#}{_}gxs;
                     Log3( $name, 5, "client: $client, key: $key, value: $value" );
 
                     if ( $key eq 'volume' ) {
@@ -354,7 +361,7 @@ sub Read {
 
             #fhem "deletereading $name clients.*";
             for my $reading (
-                grep {m{\A(?:clients)}m}
+                grep {m{\A(?:clients)}xms}
 
                 #keys %{$hash{READINGS}} ) {
                 keys %{ $hash->{READINGS} }
@@ -438,8 +445,8 @@ sub updateClient {
     $hash->{STATUS}->{clients}->{$cnumber} = $c;
     my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
     my $orig_id = $id;
-    $id =~ s{:}{}g;
-    $id =~ s{#}{_}g;
+    $id =~ s{:}{}gx;
+    $id =~ s{#}{_}gx;
     $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
     $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
 
@@ -495,8 +502,8 @@ sub updateClientInGroup {
 
     return if !defined $c->{params};
     my $id      = $c->{params}->{id} // return;    # recent version uses an ID.
-    $id =~ s{:}{}g;
-    $id =~ s{#}{_}g;
+    $id =~ s{:}{}gx;
+    $id =~ s{#}{_}gx;
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
@@ -662,7 +669,7 @@ sub _setClient {
         return if !$value;
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
-        if ( $value =~ /^([\+\-])(\d{1,2})$/ ) {
+        if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
             my $direction = $1;
             my $amount    = $2;
 
