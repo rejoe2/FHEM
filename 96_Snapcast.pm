@@ -239,6 +239,7 @@ sub Set {
                     $sparm->{volume}->{percent} = $vol;
                     my $payload = push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
                 }
+                return if !@paramset;
                 my $payload = q{[};
                 $payload .= join q{,},@paramset;
                 $payload .= q{]\r\n};
@@ -255,7 +256,7 @@ sub Set {
         readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
         return;
     }
-    return "$opt not implemented";
+    return "$opt not implemented yet!";
 }
 
 sub Read {
@@ -799,14 +800,17 @@ sub _getId {
     my $client = shift // return;
 
     my $name = $hash->{NAME} // return;
-    if ( $client =~ m/^([0-9a-f]{12}(\[#_]*\d*|$))$/i ) {    # client is  ID
+
+    # client is ID
+    if ( $client =~ m/^([0-9a-f]{12}(\[#_]*\d*|$))$/i ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
         }
     }
-    my $chash = $defs{$client};
-    if ( defined $chash && InternalVal($client,'TYPE','') eq 'Snapcast') {
+
+    # client is provided as device name?
+    if ( InternalVal($client,'TYPE','') eq 'Snapcast') {
         my $def = InternalVal($client,'DEF','');
         return ReadingsVal($name,"clients_${def}_origid",undef);
     }
