@@ -818,9 +818,12 @@ sub msgConfig_QueueReleaseMsgId($$) {
 __END__
 
 =pod
+
+=encoding utf8
+
 =item helper
 =item summary global settings and tools for FHEM command <a href="#MSG">msg</a>
-=item summary_DE globale Einstellungen und Tools f&uml;r das FHEM Kommando <a href="#MSG">msg</a>
+=item summary_DE globale Einstellungen und Tools für das FHEM Kommando <a href="#MSG">msg</a>
 =begin html
 
     <p>
@@ -884,6 +887,7 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
         <code>define &lt;name&gt; msgConfig</code><br>
       </ul><br>
       <br>
+      
       <a id="msgConfig-set"></a> <h4>Set</h4>
       <ul>
         <ul>
@@ -907,6 +911,25 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
           </li>
         </ul>
       </ul>
+      
+      <a id="msgConfig-attr"></a> <h4>Attribute</h4>
+      <ul>
+        <ul>
+          <li>
+            <a id="msgConfig-attr-msgContact" data-pattern="msgContact.*"></a><b>msgContact&lt;TYPE&gt;</b> <br>
+            FHEM Gerätename, welcher zur Übermittlung von Nachrichten des jeweiligen Typs angesprochen werden soll.
+            <ul>
+              <li>Muss bei Audio Nachrichten ohne eigene Definition von msgCmdAudio* ein Gerät vom Typ SONOSPLAYER sein.</li>
+              <li>Muss bei Screen Nachrichten ohne eigene Definition von msgCmdScreen* ein Gerät vom Typ ENIGMA2 sein.</li>
+              <li>Muss bei Light Nachrichten ohne eigene Definition von msgCmdLight* ein Gerät vom Typ HUEDevice sein.</li>
+              <li>Muss bei Push Nachrichten ohne eigene Definition von msgCmdPush* ein Gerät vom Typ Pushover sein.</li>
+              <li>Muss bei Mail Nachrichten eine oder mehrere gültige E-Mail Adressen enthalten.</li>
+            </ul>
+            Bei FHEM Gerätenamen, über die mehrere Empfänger adressiert werden können, kann der Empfänger mittels Doppelpunkt getrennt vom FHEM Gerätenamen angegeben werden. Je nach Modul ist das optional oder verbindlich.
+          </li>
+        </ul>
+      </ul>
+      
     </ul>
 
 =end html_DE
