@@ -31,6 +31,7 @@ use Time::HiRes qw(gettimeofday);
 use DevIo;
 use JSON ();
 use GPUtils qw(GP_Import);
+use List::Util qw( max min );
 
 
 #-- Run before package compilation
@@ -46,10 +47,11 @@ BEGIN {
           readingsBeginUpdate readingsEndUpdate
           readingsBulkUpdate readingsBulkUpdateIfChanged
           readingsDelete
-          AttrVal
-          ReadingsVal
+          AttrVal InternalVal
+          ReadingsVal ReadingsNum
           Log3
           InternalTimer RemoveInternalTimer
+          devspec2array
           FmtDateTime
           DevIo_OpenDev DevIo_CloseDev DevIo_SimpleRead DevIo_SimpleWrite
           trim
@@ -218,8 +220,36 @@ sub Set {
         my @group = devspec2array("TYPE=Snapcast:FILTER=group=$client");
         
         if ( @group ) {
-            Log3($hash,3,"SNAP: Group command, might address @group");
-            return; #not yet ready...
+            if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
+                Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
+                my @paramset;
+                my $grvol;
+                for my $sclient ( @group ) {
+                    $grvol += ReadingsNum( $sclient, 'volume', 0);
+                }
+                $grvol = int $grvol/@group;
+                my $change = $value - $grvol;
+                for my $sclient ( @group ) {
+                    my $sparm->{id} = _getId( $hash, $sclient) // next;
+                    my $vol = ReadingsNum( $sclient, 'volume', 0) + $change;
+                    $vol = max( 0, min( 100, $vol ) );
+                    my $muteState = ReadingsVal( $sclient, 'muted', 'false' );
+                    $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
+                    $sparm->{volume}->{muted} = $muteState;
+                    $sparm->{volume}->{percent} = $vol;
+                    my $payload = push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
+                }
+                my $payload = q{[};
+                $payload .= join q{,},@paramset;
+                $payload .= q{]\r\n};
+                Log3($hash,3,"SNAP: send batch $payload");
+                return DevIo_SimpleWrite( $hash, $payload, 2 );
+            }
+            for my $sclient ( @group ) {
+                my $res = _setClient( $hash, $sclient, $opt, $value );
+                readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
+            }
+            return;
         }
         my $res = _setClient( $hash, $client, $opt, $value );
         readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
@@ -675,8 +705,7 @@ sub _setClient {
 
             #$value = eval($currentVol. $direction. $amount);
             $value = eval { $currentVol . $direction . $amount };
-            $value = 100 if $value > 100;
-            $value = 0   if $value < 0;
+            $value = max( 0, min( 100, $value ) );
         }
 
         # if volume is given with up or down argument, then increase or decrease according to volumeStepSize
@@ -688,8 +717,7 @@ sub _setClient {
             else {
                 $value = $currentVol - $step;
             }
-            $value     = 100     if $value > 100;
-            $value     = 0       if $value < 0;
+            $value = max( 0, min( 100, $value ) );
             $muteState = 'false' if $value > 0 && ( $muteState eq 'true' || $muteState == 1 );
         }
         $volumeobject->{percent} = $value + 0;
@@ -725,6 +753,7 @@ sub Snapcast_Do {
     my $method  = shift // return;
     my $param   = shift // '';
     my $payload = Snapcast_Encode( $hash, $method, $param );
+    $payload .= "\r\n";
 
     #Log3($hash,5,"SNAP: Do $payload");
     return DevIo_SimpleWrite( $hash, $payload, 2 );
@@ -747,8 +776,9 @@ sub Snapcast_Encode {
     $hash->{IDLIST}->{ $request->{id} } = $request;
     $request->{id}                      = $request->{id} + 0;
     #$json                               = encode_json($request) . "\r\n";
-    $json                               = JSON->new->encode($request) . "\r\n";
-    $json =~ s{(":"(true|false|null)")}{":$2}gxms;
+    #$json                               = JSON->new->encode($request) . "\r\n";
+    $json                               = JSON->new->encode($request);
+    $json =~ s{("(true|false|null)")}{$2}gxms;
 #    $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
 #    $json =~ s/\"false\"/false/;
     return $json;
@@ -769,11 +799,16 @@ sub _getId {
     my $client = shift // return;
 
     my $name = $hash->{NAME} // return;
-    if ( $client =~ m/^([0-9a-f]{12}(\#*\d*|$))$/i ) {    # client is  ID
+    if ( $client =~ m/^([0-9a-f]{12}(\[#_]*\d*|$))$/i ) {    # client is  ID
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
         }
+    }
+    my $chash = $defs{$client};
+    if ( defined $chash && InternalVal($client,'TYPE','') eq 'Snapcast') {
+        my $def = InternalVal($client,'DEF','');
+        return ReadingsVal($name,"clients_${def}_origid",undef);
     }
     return 'unknown client';
 }
