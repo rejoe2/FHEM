@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: msgSchema.pm 21075 2022-07-13 Beta-User $
+# $Id: msgSchema.pm 21075 2022-07-13 II Beta-User $
 package main;
 sub msgSchema_Initialize() { }
 
@@ -306,22 +306,22 @@ my $db = {
             },
         },
 
-        'SignalBot' => {
-            'Normal' => 'set %DEVICE% %SignalBot_MTYPE% %RECIPIENT% %MSG%',
-            'High'   => 'set %DEVICE% %SignalBot_MTYPE% %RECIPIENT% %MSG%',
-            'Low'    => 'set %DEVICE% %SignalBot_MTYPE% %RECIPIENT% %MSG%',
+        'Signalbot' => {
+            'Normal' => 'set %DEVICE% %Signalbot_MTYPE% %RECIPIENT% %MSG%',
+            'High'   => 'set %DEVICE% %Signalbot_MTYPE% %RECIPIENT% %MSG%',
+            'Low'    => 'set %DEVICE% %Signalbot_MTYPE% %RECIPIENT% %MSG%',
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT'         => '',
-                    'SignalBot_MTYPE' => 'send',
+                    'Signalbot_MTYPE' => 'send',
                 },
                 'High' => {
                     'RECIPIENT'         => '',
-                    'SignalBot_MTYPE' => 'send',
+                    'Signalbot_MTYPE' => 'send',
                 },
                 'Low' => {
                     'RECIPIENT'         => '',
-                    'SignalBot_MTYPE' => 'send',
+                    'Signalbot_MTYPE' => 'send',
                 },
             },
         },

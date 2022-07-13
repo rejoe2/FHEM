@@ -1,7 +1,7 @@
 # based on https://forum.fhem.de/index.php/topic,85932.0.html
 # https://github.com/Quantum1337/70_Tvheadend.pm
 # tvheadend api is available at https://github.com/dave-p/TVH-API-docs/wiki
-# $Id: 70_TvHeadend.pm 2022-07-11 Beta-User$
+# $Id: 70_TvHeadend.pm 2022-07-13 Beta-User$
 
 package TvHeadend; ##no critic qw(Package)
 
