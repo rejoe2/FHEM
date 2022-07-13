@@ -355,29 +355,22 @@ sub Read {
                         for my $i ( 1 .. ReadingsVal( $name, 'clients', 0 ) ) {
                             $client = $hash->{STATUS}->{clients}->{$i}->{id};
                             my $client_group = ReadingsVal( $name, "clients_${client}_group", '' );
+                            next if $group ne $client_group;
 
-                            #Log3 $name,2, "client_group: $client_group ";
-                            my $clientmodule = $hash->{$client};
-                            my $clienthash   = $defs{$clientmodule};
-                            if ( $group eq $client_group ) {
-                                readingsBeginUpdate($hash);
-                                readingsBulkUpdateIfChanged( $hash, "clients_${client}_stream_id", $update->{result}->{stream_id} );
-                                readingsEndUpdate( $hash, 1 );
-                                if ( defined $clientmodule ) {
-                                    readingsBeginUpdate($clienthash);
-                                    readingsBulkUpdateIfChanged( $clienthash, 'stream_id', $update->{result}->{stream_id} );
-                                    readingsEndUpdate( $clienthash, 1 );
-                                }
-                            }
+                            readingsBeginUpdate($hash);
+                            readingsBulkUpdateIfChanged( $hash, "clients_${client}_stream_id", $update->{result}->{stream_id} );
+                            readingsEndUpdate( $hash, 1 );
+                            my $clienthash   = $defs{$hash->{$client}} // next;
+                            readingsBeginUpdate($clienthash);
+                            readingsBulkUpdateIfChanged( $clienthash, 'stream_id', $update->{result}->{stream_id} );
+                            readingsEndUpdate( $clienthash, 1 );
                         }
                     }
                     else {
                         readingsBeginUpdate($hash);
                         readingsBulkUpdateIfChanged( $hash, "clients_${client}_$key", $update->{result} );
                         readingsEndUpdate( $hash, 1 );
-                        my $clientmodule = $hash->{$client};
-                        my $clienthash   = $defs{$clientmodule} // return;
-                        return if !defined $clienthash;
+                        my $clienthash   = $defs{$hash->{$client}} // return;
                         readingsBeginUpdate($clienthash);
                         readingsBulkUpdateIfChanged( $clienthash, $key, $update->{result} );
                         readingsEndUpdate( $clienthash, 1 );
