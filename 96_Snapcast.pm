@@ -266,7 +266,7 @@ sub Read {
     $buf = DevIo_SimpleRead($hash);
     return '' if !defined $buf;
     $buf = $hash->{PARTIAL} . $buf;
-    $buf =~ s/\r//g;
+    $buf =~ s{\r}{}gx;
     my $lastchr = substr( $buf, -1, 1 );
 
     if ( $lastchr ne "\n" ) {
@@ -337,7 +337,7 @@ sub Read {
                         readingsEndUpdate( $hash, 1 );
                         my $clientmodule = $hash->{$client};
                         my $clienthash   = $defs{$clientmodule};
-                        my $maxvol       = getVolumeConstraint($clienthash);
+                        my $maxvol       = getVolumeConstraint($clienthash) // 100;
 
                         if ( defined $clientmodule ) {
                             readingsBeginUpdate($clienthash);
@@ -665,8 +665,8 @@ sub _setClient {
              #$match = '_global_';
              #}
         for ( my $i = 0; $i < @values; $i += 2 ) {
-            return 'wrong timeformat 00:00 - 24:00 for time/volume pair' if $values[$i]       !~ /^(([0-1]?[0-9]|2[0-3]):[0-5][0-9])|24:00$/;
-            return 'wrong volumeformat 0 - 100 for time/volume pair'     if $values[ $i + 1 ] !~ /^(0?[0-9]?[0-9]|100)$/;
+            return 'wrong timeformat 00:00 - 24:00 for time/volume pair' if $values[$i]       !~ m{^(?:(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9])|24:00$}x;
+            return 'wrong volumeformat 0 - 100 for time/volume pair'     if $values[ $i + 1 ] !~ m{^(?:0?[0-9]?[0-9]|100)$}x;
         }
         return;
     }
@@ -795,7 +795,7 @@ sub _getId {
     my $name = $hash->{NAME} // return;
 
     # client is ID
-    if ( $client =~ m/^([0-9a-f]{12}(\[#_]*\d*|$))$/i ) {
+    if ( $client =~ m{^([0-9a-f]{12}(?:[#_]*\d*|$))$}ix ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
