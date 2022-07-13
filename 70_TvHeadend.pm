@@ -15,6 +15,7 @@ use List::Util qw(max);
 use HttpUtils;
 #use utf8;
 use Time::HiRes qw(gettimeofday);
+use Scalar::Util qw(looks_like_number);
 use POSIX qw(strftime);
 
 use GPUtils qw(:all);
@@ -102,14 +103,14 @@ sub Define {
     return "The specified ip address is not valid" if $addr[0] !~ m{\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z}xms;
     $hash->{helper}{http}{ip} = $addr[0];
 
-    if ( defined $addr[1]){
-        return "The specified port is not valid" if $addr[1] !~ m{\A[0-9]+\z};
+    if ( defined $addr[1] ) {
+        return 'The specified port is not valid' if !looks_like_number($addr[1]);
         $hash->{helper}{http}{port} = $addr[1];
     } else {
         $hash->{helper}{http}{port} = '9981';
     }
 
-    if ( defined $user ){
+    if ( defined $user ) {
         $hash->{DEF} = "baseUrl=$address";
         CommandAttr($hash, "$name Username $user");
         $hash->{helper}{'.pw'} = $password if $password;
@@ -174,7 +175,7 @@ sub Set {
         return InternalTimer(gettimeofday(),\&TvHeadend_EPG,$hash);
     }
     if($command eq 'DVREntryCreate'){
-        return 'EventId must be numeric' if $values[0] !~ m{\A[0-9]+\z};
+        return 'EventId must be numeric' if !looks_like_number($values[0]);
         return DVREntryCreate($hash,@values);
     }
     
@@ -231,12 +232,12 @@ sub Attr {
         if ( $attribute eq 'EPGVisibleItems' ) {
             return if !$init_done;
             for my $items ( qw( Title Subtitle Summary Description StartTime StopTime ) ) {
-                next if $value !~ m{$items};
+                next if $value !~ m{$items}x;
                 CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Next");
                 CommandDeleteReading($hash, "$name -q epg[0-9]+${items}Now");
             }
-            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelName")   if $value !~ m{ChannelName};
-            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelNumber") if $value !~ m{ChannelNumber};
+            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelName")   if $value !~ m{ChannelName}x;
+            CommandDeleteReading($hash, "$name -q epg[0-9]+ChannelNumber") if $value !~ m{ChannelNumber}x;
             return;
         }
 
@@ -372,7 +373,7 @@ sub TvHeadend_EPG {
         for my $i (0..$count-1){
             $hash->{helper}{http}{id} = $channels->[$i]->{id};
             $channelName = $channels->[$i]->{name};
-            $channelName =~ s{\x20}{\%20}g;
+            $channelName =~ s{\x20}{\%20}gx;
             $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=1&channel=$channelName";
             TvHeadend_HttpGetNonblocking($hash);
         }
@@ -450,19 +451,19 @@ sub TvHeadend_EPG {
         }
         for my $i (0..@{$entriesNow}-1) {
             for my $el (qw( Title Subtitle Summary Description )) {
-                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}Now",$entriesNow->[$i]->{lc $el}) if $items =~ m{$el};
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}Now",$entriesNow->[$i]->{lc $el}) if $items =~ m{$el}x;
             }
             for my $el (qw( Start Stop )) {
-                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}TimeNow", strftime("%H:%M:%S",localtime($entriesNow->[$i]->{lc $el}))) if $items =~ m{${el}Time};
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNow->[$i]->{channelId})."${el}TimeNow", strftime("%H:%M:%S",localtime($entriesNow->[$i]->{lc $el}))) if $items =~ m{${el}Time}x;
             }
         }
 
         for my $i (0..@$entriesNext-1) {
             for my $el (qw( Title Subtitle Summary Description )) {
-                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}Next", $entriesNext->[$i]->{lc $el}) if $items =~ m{$el};
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}Next", $entriesNext->[$i]->{lc $el}) if $items =~ m{$el}x;
             }
             for my $el (qw( Start Stop )) {
-                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}TimeNext", strftime("%H:%M:%S",localtime($entriesNext->[$i]->{lc $el}))) if $items =~ m{${el}Time};
+                readingsBulkUpdateIfChanged($hash, "epg".sprintf("%03d", $entriesNext->[$i]->{channelId})."${el}TimeNext", strftime("%H:%M:%S",localtime($entriesNext->[$i]->{lc $el}))) if $items =~ m{${el}Time}x;
             }
         }
         readingsBulkUpdateIfChanged($hash, 'nextUpdate', strftime("%H:%M:%S",localtime($update)));
@@ -516,7 +517,7 @@ sub ChannelQuery {
     $channelNames =~ s{ }{\_}g;
 
     my $devattrs = getAllAttr($name);
-    $devattrs =~ s{EPGChannelList:multiple-strict[\S]+}{EPGChannelList:multiple-strict,all,$channelNames};
+    $devattrs =~ s{EPGChannelList:multiple-strict[\S]+}{EPGChannelList:multiple-strict,all,$channelNames}x;
 
     $defs{$name}{'.AttrList'} = $devattrs;
 
@@ -537,7 +538,7 @@ sub EPGQuery {
 
     @args = split q{:},join q{%20}, @args;
     ($args[1] = $args[0], $args[0] = 1) if !defined $args[1];
-    $args[0] = 1 if defined $args[1] && $args[0] !~ m{\A[0-9]+\z};
+    $args[0] = 1 if defined $args[1] && !looks_like_number($args[0]); # !~ m{\A[0-9]+\z};
 
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/epg/events/grid?limit=$args[0]&title=$args[1]";
 
@@ -701,7 +702,7 @@ sub DVREntryCreate {
         return Log3($hash, 1, "JSON encoding error: $@");
     }
 
-    $jsonData =~ s{\x20}{\%20}g;
+    $jsonData =~ s{\x20}{\%20}gx;
     $hash->{helper}{http}{url} = "http://${ip}:${port}/api/dvr/entry/create?conf=$jsonData";
     return &TvHeadend_HttpGetBlocking($hash);
 }
