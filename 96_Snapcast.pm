@@ -242,7 +242,7 @@ sub Set {
                 return if !@paramset;
                 my $payload = q{[};
                 $payload .= join q{,},@paramset;
-                $payload .= q{]\r\n};
+                $payload .= q{]}; #q{]\r\n};
                 Log3($hash,3,"SNAP: send batch $payload");
                 return DevIo_SimpleWrite( $hash, $payload, 2 );
             }
@@ -323,8 +323,8 @@ sub Read {
                 if ( $value eq $hash->{IDLIST}->{$id}->{method} && $key ne 'mute' ) {    #exclude mute here because muting is now integrated in SetVolume
                     my $client = $hash->{IDLIST}->{$id}->{params}->{id};
 
-                    $client =~ s{:}{}gxs;
-                    $client =~ s{#}{_}gxs;
+                    $client =~ s{:}{}gx;
+                    $client =~ s{[#]}{_}gx;
                     Log3( $name, 5, "client: $client, key: $key, value: $value" );
 
                     if ( $key eq 'volume' ) {
@@ -470,7 +470,7 @@ sub updateClient {
     my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
     my $orig_id = $id;
     $id =~ s{:}{}gx;
-    $id =~ s{#}{_}gx;
+    $id =~ s{[#]}{_}gx;
     $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
     $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
 
@@ -527,7 +527,7 @@ sub updateClientInGroup {
     return if !defined $c->{params};
     my $id      = $c->{params}->{id} // return;    # recent version uses an ID.
     $id =~ s{:}{}gx;
-    $id =~ s{#}{_}gx;
+    $id =~ s{[#]}{_}gx;
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
@@ -749,7 +749,7 @@ sub Snapcast_Do {
     my $payload = Snapcast_Encode( $hash, $method, $param );
     $payload .= "\r\n";
 
-    #Log3($hash,5,"SNAP: Do $payload");
+    #Log3($hash,3,"SNAP: Do $payload");
     return DevIo_SimpleWrite( $hash, $payload, 2 );
 }
 
@@ -773,8 +773,6 @@ sub Snapcast_Encode {
     #$json                               = JSON->new->encode($request) . "\r\n";
     $json                               = JSON->new->encode($request);
     $json =~ s{("(true|false|null)")}{$2}gxms;
-#    $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
-#    $json =~ s/\"false\"/false/;
     return $json;
 }
 
@@ -795,7 +793,8 @@ sub _getId {
     my $name = $hash->{NAME} // return;
 
     # client is ID
-    if ( $client =~ m{^([0-9a-f]{12}(?:[#_]*\d*|$))$}ix ) {
+    #if ( $client =~ m{^([0-9a-f]{12}(\#*\d*|$))$}ix ) {
+    if ( $client =~ m/^([0-9a-f]{12}([#_]*\d*|$))$/i ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
@@ -804,7 +803,7 @@ sub _getId {
 
     # client is provided as device name?
     if ( InternalVal($client,'TYPE','') eq 'Snapcast') {
-        my $def = InternalVal($client,'DEF','');
+        my $def = InternalVal($client,'ID','');
         return ReadingsVal($name,"clients_${def}_origid",undef);
     }
     return 'unknown client';
