@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26203 2022-07-13 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26203 2022-07-14 package version Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -217,23 +217,32 @@ sub Set {
             }
             return;
         }
-        my @group = devspec2array("TYPE=Snapcast:FILTER=group=$client");
-        
+        my @ids = grep {m{\A(?:clients_.+_group)\z}xms}
+                keys %{ $hash->{READINGS} };
+        my @group;
+        for my $sid ( @ids ) {
+            #= devspec2array("TYPE=Snapcast:FILTER=group=$client");
+            next if ReadingsVal($name, $_, '') ne $client;
+            #clients_84a93e695051#2_group 207ff3bc-5082-789c-c444-29471f4ce57e
+            if ( $sid =~ m{\Aclients_(.+)_group\z}xms ) {
+                push @group, $1;
+            }
+        }
         if ( @group ) {
             if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
                 Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
                 my @paramset;
                 my $grvol;
                 for my $sclient ( @group ) {
-                    $grvol += ReadingsNum( $sclient, 'volume', 0);
+                    $grvol += ReadingsNum( $name, "client_${sclient}_volume", 0);
                 }
                 $grvol = int $grvol/@group;
                 my $change = $value - $grvol;
                 for my $sclient ( @group ) {
-                    my $sparm->{id} = _getId( $hash, $sclient) // next;
-                    my $vol = ReadingsNum( $sclient, 'volume', 0) + $change;
+                    my $sparm->{id} = ReadingsVal( $name, "sclient_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
+                    my $vol = ReadingsNum( $name, "client_${sclient}_volume", 0) + $change;
                     $vol = max( 0, min( 100, $vol ) );
-                    my $muteState = ReadingsVal( $sclient, 'muted', 'false' );
+                    my $muteState = ReadingsVal( $name, "sclient_${sclient}_muted", 'false' );
                     $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
                     $sparm->{volume}->{muted} = $muteState;
                     $sparm->{volume}->{percent} = $vol;
@@ -247,6 +256,8 @@ sub Set {
                 return DevIo_SimpleWrite( $hash, $payload, 2 );
             }
             for my $sclient ( @group ) {
+                $sclient =~ s{:}{}gx;
+                $sclient =~ s{[#]}{_}gx; 
                 my $res = _setClient( $hash, $sclient, $opt, $value );
                 readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
             }
@@ -386,8 +397,6 @@ sub Read {
             #fhem "deletereading $name clients.*";
             for my $reading (
                 grep {m{\A(?:clients)}xms}
-
-                #keys %{$hash{READINGS}} ) {
                 keys %{ $hash->{READINGS} }
                 )
             {
@@ -572,7 +581,7 @@ sub Client_Register_Server {
         InternalTimer( gettimeofday() + 30, \&Client_Register_Server, $hash, 1 );    # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
         return;
     }
-    $server = $defs{$server};         # get the server hash
+    $server = $defs{$server};               # get the server hash
     $server->{ $hash->{ID} } = $name;
     Snapcast_getStatus($server);
     return;
@@ -583,7 +592,7 @@ sub Client_Unregister_Server {
     return if $hash->{MODE} ne 'client';
     my $name   = $hash->{NAME};
     my $server = $hash->{SERVER};
-    $server = $defs{$server} // return;                                                       # get the server hash
+    $server = $defs{$server} // return;      # get the server hash
     readingsSingleUpdate( $server, "clients_$hash->{ID}_module", $name, 1 );
     delete $server->{ $hash->{ID} };
     return;
@@ -638,7 +647,6 @@ sub parseStatus {
         readingsEndUpdate( $hash, 1 );
     }
 
-    #readingsEndUpdate($hash,1) if defined $groups || defined $streams;
     InternalTimer( gettimeofday() + 300, \&Snapcast_getStatus, $hash, 1 );    # every 5 Minutes, get the full update, also to apply changed vol constraints.
     return;
 }
@@ -689,7 +697,6 @@ sub _setClient {
 
     if ( $param eq 'volume' ) {
 
-        #return undef unless defined($currentVol);
         return if !$value;
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
@@ -769,8 +776,6 @@ sub Snapcast_Encode {
     $request->{params}                  = $param if $param ne '';
     $hash->{IDLIST}->{ $request->{id} } = $request;
     $request->{id}                      = $request->{id} + 0;
-    #$json                               = encode_json($request) . "\r\n";
-    #$json                               = JSON->new->encode($request) . "\r\n";
     $json                               = JSON->new->encode($request);
     $json =~ s{("(true|false|null)")}{$2}gxms;
     return $json;
@@ -793,7 +798,6 @@ sub _getId {
     my $name = $hash->{NAME} // return;
 
     # client is ID
-    #if ( $client =~ m{^([0-9a-f]{12}(\#*\d*|$))$}ix ) {
     if ( $client =~ m/^([0-9a-f]{12}([#_]*\d*|$))$/i ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
@@ -842,14 +846,16 @@ sub getVolumeConstraint {
     return $value;    # der aktuelle Auto-Wert wird zurückgegeben
 }
 
-
 1;
 
 __END__
 
 =pod
+
+=encoding utf8
+=item device
 =item summary    control and monitor Snapcast Servers and Clients
-=item summary_DE steuert und überwacht Snapcast Servers und Clients
+=item summary_DE Steuert und überwacht Snapcast Server und Clients
 
 =begin html
 
