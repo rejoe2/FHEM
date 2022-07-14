@@ -234,15 +234,15 @@ sub Set {
                 my @paramset;
                 my $grvol;
                 for my $sclient ( @group ) {
-                    $grvol += ReadingsNum( $name, "client_${sclient}_volume", 0);
+                    $grvol += ReadingsNum( $name, "clients_${sclient}_volume", 0);
                 }
                 $grvol = int $grvol/@group;
                 my $change = $value - $grvol;
                 for my $sclient ( @group ) {
-                    my $sparm->{id} = ReadingsVal( $name, "sclient_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
-                    my $vol = ReadingsNum( $name, "client_${sclient}_volume", 0) + $change;
+                    my $sparm->{id} = ReadingsVal( $name, "clients_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
+                    my $vol = ReadingsNum( $name, "clients_${sclient}_volume", 0) + $change;
                     $vol = max( 0, min( 100, $vol ) );
-                    my $muteState = ReadingsVal( $name, "sclient_${sclient}_muted", 'false' );
+                    my $muteState = ReadingsVal( $name, "clients_${sclient}_muted", 'false' );
                     $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
                     $sparm->{volume}->{muted} = $muteState;
                     $sparm->{volume}->{percent} = $vol;
