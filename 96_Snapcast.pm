@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26203 2022-07-14 package version Beta-User $
+#  $Id: 96_Snapcast.pm 26230 2022-07-15 reviewed Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -87,6 +87,51 @@ my %_clientmethods = (
     stream  => 'Group.SetStream',
     latency => 'Client.SetLatency'
 );
+
+=pod 
+https://github.com/badaix/snapcast/blob/develop/doc/json_rpc_api/control.md (v. 0.26.0)
+Requests
+
+    Client
+        Client.GetStatus
+        Client.SetVolume
+        Client.SetLatency
+        Client.SetName
+    Group
+        Group.GetStatus
+        Group.SetMute
+        Group.SetStream
+        Group.SetClients
+        Group.SetName
+    Server
+        Server.GetRPCVersion
+        Server.GetStatus
+        Server.DeleteClient
+    Stream
+        Stream.AddStream
+        Stream.RemoveStream
+        Stream.Control
+        Stream.SetProperty
+
+Notifications
+
+    Client
+        Client.OnConnect
+        Client.OnDisconnect
+        Client.OnVolumeChanged
+        Client.OnLatencyChanged
+        Client.OnNameChanged
+    Group
+        Group.OnMute
+        Group.OnStreamChanged
+        Group.OnNameChanged
+    Stream
+        Stream.OnProperties
+        Stream.OnUpdate
+    Server
+        Server.OnUpdate
+
+=cut
 
 sub Initialize {
     my $hash = shift // return;
@@ -464,10 +509,11 @@ sub onConnect {
 sub updateClient {
     my $hash    = shift // return;
     my $c       = shift // return;
-    my $cnumber = shift // return;
+    my $cnumber = shift // 0; #return;
     if ( $cnumber == 0 ) {
         $cnumber++;
-        while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{host}->{mac} ne $hash->{STATUS}->{clients}->{$cnumber}->{host}->{mac} ) {
+        #while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{host}->{mac} ne $hash->{STATUS}->{clients}->{$cnumber}->{host}->{mac} ) {
+        while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{id} ne $hash->{STATUS}->{clients}->{$cnumber}->{id} ) {
             $cnumber++;
         }
         if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
@@ -483,37 +529,39 @@ sub updateClient {
     $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
     $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
 
+    my $rvs->{online} = defined $c->{connected} ? 
+                        $c->{connected} ? 'true' : 'false' : undef;
+    $rvs->{name}      = $c->{config}->{name} // $c->{host}->{name};
+    $rvs->{latency}   = $c->{config}->{latency};
+    $rvs->{stream_id} = $c->{config}->{stream_id};
+    $rvs->{volume}    = $c->{config}->{volume}->{percent};
+    $rvs->{muted}     = defined $c->{config}->{volume}->{muted} ? 
+                        $c->{config}->{volume}->{muted} ? 'true' : 'false' : undef;
+    $rvs->{ip}        = $c->{host}->{ip};
+    $rvs->{mac}       = $c->{host}->{mac};
+    $rvs->{id}        = $id;
+    $rvs->{origid}    = $orig_id;
+    $rvs->{nr}        = $cnumber;
+    $rvs->{group}     = $c->{config}->{group_id};
+
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_online",    $c->{connected}      ? 'true'               : 'false' );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_name",      $c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_latency",   $c->{config}->{latency} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_stream_id", $c->{config}->{stream_id} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{config}->{volume}->{percent} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_muted",     $c->{config}->{volume}->{muted} ? 'true' : 'false' );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_ip",        $c->{host}->{ip} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_mac",       $c->{host}->{mac} );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_id",        $id );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_origid",    $orig_id );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_nr",        $cnumber );
-    readingsBulkUpdateIfChanged( $hash, "clients_${id}_group",     $c->{config}->{group_id} );
+    for my $kw ( keys %{$rvs} ) {
+        next if !defined $rvs->{$kw};
+        readingsBulkUpdateIfChanged( $hash, "clients_${id}_${kw}", $rvs->{$kw} ) ;
+    }
     readingsEndUpdate( $hash, 1 );
 
     return if !$hash->{$id};
     my $clienthash = $defs{ $hash->{$id} } // return;
 
     readingsBeginUpdate($clienthash);
-    readingsBulkUpdateIfChanged( $clienthash, 'online',    $c->{connected}      ? 'true'               : 'false' );
-    readingsBulkUpdateIfChanged( $clienthash, 'name',      $c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name} );
-    readingsBulkUpdateIfChanged( $clienthash, 'latency',   $c->{config}->{latency} );
-    readingsBulkUpdateIfChanged( $clienthash, 'stream_id', $c->{config}->{stream_id} );
-    readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{config}->{volume}->{percent} );
-    readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{config}->{volume}->{muted} ? 'true' : 'false' );
-    readingsBulkUpdateIfChanged( $clienthash, 'ip',        $c->{host}->{ip} );
-    readingsBulkUpdateIfChanged( $clienthash, 'mac',       $c->{host}->{mac} );
-    readingsBulkUpdateIfChanged( $clienthash, 'id',        $id );
-    readingsBulkUpdateIfChanged( $clienthash, 'origid',    $orig_id );
-    readingsBulkUpdateIfChanged( $clienthash, 'group',     $c->{config}->{group_id} );
+    for my $kw ( keys %{$rvs} ) {
+        next if !defined $rvs->{$kw};
+        readingsBulkUpdateIfChanged( $clienthash, $kw, $rvs->{$kw} );
+    }
     readingsEndUpdate( $clienthash, 1 );
+
+    return if !defined $c->{config} || !defined $c->{config}->{volume} || !defined $c->{config}->{volume}->{percent};
 
     my $maxvol = getVolumeConstraint($clienthash) // 100;
     _setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{config}->{volume}->{percent} > $maxvol;
@@ -528,6 +576,9 @@ sub updateClientInGroup {
     while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{params}->{id} ne $hash->{STATUS}->{clients}->{$cnumber}->{origid} ) {
         $cnumber++;
     }
+
+    delete $hash->{IDLIST}->{ $c->{id} } if defined $hash->{IDLIST} && $c->{id} && defined $hash->{IDLIST}->{ $c->{id} };
+
     if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
         #Snapcast_getStatus($hash);
         return;
@@ -550,6 +601,11 @@ sub updateClientInGroup {
     readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
     readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{params}->{volume}->{muted} ? 'true' : 'false' ) if defined $c->{params}->{volume}->{muted};
     readingsEndUpdate( $clienthash, 1 );
+
+    return if !defined $c->{params} || !defined $c->{params}->{volume} || !defined $c->{params}->{volume}->{percent};
+
+    my $maxvol = getVolumeConstraint($clienthash) // 100;
+    _setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{params}->{volume}->{percent} > $maxvol;
     return;
 }
 
