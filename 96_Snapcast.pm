@@ -266,76 +266,7 @@ sub Set {
                 keys %{ $hash->{READINGS} };
         my @group;
         for my $sid ( @ids ) {
-            push @group, $sid if ReadingsVal($name, "clients_${sid}_group", '') eq $client;
-=pod
-defmod Snapcast Snapcast 192.168.2.64
-attr Snapcast room Steuerung->Multimedia
-
-setstate Snapcast opened
-setstate Snapcast 2022-07-25 08:22:35 clients 4
-setstate Snapcast 2022-07-15 08:09:43 clients_008cfad3bf32_group 373b51d8-4e2a-7aea-5784-7b181a1b2087
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_id 008cfad3bf32
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_ip 192.168.2.72
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_latency 0
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_mac 00:8c:fa:d3:bf:32
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_muted false
-setstate Snapcast 2022-07-16 06:41:24 clients_008cfad3bf32_name hpthin2
-setstate Snapcast 2022-07-15 08:09:43 clients_008cfad3bf32_nr 4
-setstate Snapcast 2022-07-18 08:51:42 clients_008cfad3bf32_online false
-setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_origid 00:8c:fa:d3:bf:32
-setstate Snapcast 2022-07-15 08:11:53 clients_008cfad3bf32_stream_id kind1
-setstate Snapcast 2022-07-23 14:22:51 clients_008cfad3bf32_volume 69
-setstate Snapcast 2022-07-15 08:06:53 clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_id 84a93e695051_2
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_ip 127.0.0.1
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_latency 0
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_mac 84:a9:3e:69:50:51
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_muted false
-setstate Snapcast 2022-07-16 06:41:24 clients_84a93e695051_2_name wozi2020
-setstate Snapcast 2022-07-15 08:09:43 clients_84a93e695051_2_nr 3
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_online false
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_origid 84:a9:3e:69:50:51#2
-setstate Snapcast 2022-07-15 08:05:25 clients_84a93e695051_2_stream_id wohn
-setstate Snapcast 2022-07-23 14:22:37 clients_84a93e695051_2_volume 57
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_group a269028b-7078-210f-0e75-54acd507faaa
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_id 84a93e695051
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_ip 127.0.0.1
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_latency 0
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_mac 84:a9:3e:69:50:51
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_muted false
-setstate Snapcast 2022-07-16 06:41:24 clients_84a93e695051_name wozi2020
-setstate Snapcast 2022-07-15 08:06:53 clients_84a93e695051_nr 2
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_online true
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_origid 84:a9:3e:69:50:51
-setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_stream_id wohn
-setstate Snapcast 2022-07-23 14:22:51 clients_84a93e695051_volume 90
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_group a269028b-7078-210f-0e75-54acd507faaa
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_id b66531c4-2763-410f-b446-7f90657d69c1
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_ip 192.168.2.82
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_latency 0
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_mac 00:00:00:00:00:00
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_muted false
-setstate Snapcast 2022-07-16 06:41:24 clients_b66531c4-2763-410f-b446-7f90657d69c1_name Moto X4
-setstate Snapcast 2022-07-15 08:06:53 clients_b66531c4-2763-410f-b446-7f90657d69c1_nr 1
-setstate Snapcast 2022-07-15 08:09:33 clients_b66531c4-2763-410f-b446-7f90657d69c1_online false
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_origid b66531c4-2763-410f-b446-7f90657d69c1
-setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_stream_id wohn
-setstate Snapcast 2022-07-23 14:22:16 clients_b66531c4-2763-410f-b446-7f90657d69c1_volume 70
-setstate Snapcast 2022-07-23 13:35:50 state opened
-setstate Snapcast 2022-07-14 09:02:18 streams 5
-setstate Snapcast 2022-07-14 09:02:18 streams_1_id default
-setstate Snapcast 2022-07-14 09:02:18 streams_1_status idle
-setstate Snapcast 2022-07-14 09:02:18 streams_2_id kind1
-setstate Snapcast 2022-07-14 09:02:18 streams_2_status idle
-setstate Snapcast 2022-07-14 09:02:18 streams_3_id kind2
-setstate Snapcast 2022-07-14 09:02:18 streams_3_status idle
-setstate Snapcast 2022-07-14 09:02:18 streams_4_id wohn
-setstate Snapcast 2022-07-25 08:09:58 streams_4_status playing
-setstate Snapcast 2022-07-14 09:02:18 streams_5_id kueche
-setstate Snapcast 2022-07-14 09:02:18 streams_5_status idle
-
-=cut
-
+            push @group, $sid if $client eq ReadingsVal($name, "clients_${sid}_group", '');
             #clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
         }
         Log3( $hash, 3, "Snap: group members for arg. $client are @group within @ids");
