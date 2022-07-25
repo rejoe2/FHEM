@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26230 2022-07-15 reviewed Beta-User $
+#  $Id: 96_Snapcast.pm 26230 2022-07-16 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -266,16 +266,82 @@ sub Set {
                 keys %{ $hash->{READINGS} };
         my @group;
         for my $sid ( @ids ) {
-            #= devspec2array("TYPE=Snapcast:FILTER=group=$client");
-            next if ReadingsVal($name, $_, '') ne $client;
-            #clients_84a93e695051#2_group 207ff3bc-5082-789c-c444-29471f4ce57e
-            if ( $sid =~ m{\Aclients_(.+)_group\z}xms ) {
-                push @group, $1;
-            }
+            push @group, $sid if ReadingsVal($name, "clients_${sid}_group", '') eq $client;
+=pod
+defmod Snapcast Snapcast 192.168.2.64
+attr Snapcast room Steuerung->Multimedia
+
+setstate Snapcast opened
+setstate Snapcast 2022-07-25 08:22:35 clients 4
+setstate Snapcast 2022-07-15 08:09:43 clients_008cfad3bf32_group 373b51d8-4e2a-7aea-5784-7b181a1b2087
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_id 008cfad3bf32
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_ip 192.168.2.72
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_latency 0
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_mac 00:8c:fa:d3:bf:32
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_muted false
+setstate Snapcast 2022-07-16 06:41:24 clients_008cfad3bf32_name hpthin2
+setstate Snapcast 2022-07-15 08:09:43 clients_008cfad3bf32_nr 4
+setstate Snapcast 2022-07-18 08:51:42 clients_008cfad3bf32_online false
+setstate Snapcast 2022-07-14 09:02:18 clients_008cfad3bf32_origid 00:8c:fa:d3:bf:32
+setstate Snapcast 2022-07-15 08:11:53 clients_008cfad3bf32_stream_id kind1
+setstate Snapcast 2022-07-23 14:22:51 clients_008cfad3bf32_volume 69
+setstate Snapcast 2022-07-15 08:06:53 clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_id 84a93e695051_2
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_ip 127.0.0.1
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_latency 0
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_mac 84:a9:3e:69:50:51
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_muted false
+setstate Snapcast 2022-07-16 06:41:24 clients_84a93e695051_2_name wozi2020
+setstate Snapcast 2022-07-15 08:09:43 clients_84a93e695051_2_nr 3
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_online false
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_2_origid 84:a9:3e:69:50:51#2
+setstate Snapcast 2022-07-15 08:05:25 clients_84a93e695051_2_stream_id wohn
+setstate Snapcast 2022-07-23 14:22:37 clients_84a93e695051_2_volume 57
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_group a269028b-7078-210f-0e75-54acd507faaa
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_id 84a93e695051
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_ip 127.0.0.1
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_latency 0
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_mac 84:a9:3e:69:50:51
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_muted false
+setstate Snapcast 2022-07-16 06:41:24 clients_84a93e695051_name wozi2020
+setstate Snapcast 2022-07-15 08:06:53 clients_84a93e695051_nr 2
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_online true
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_origid 84:a9:3e:69:50:51
+setstate Snapcast 2022-07-14 09:02:18 clients_84a93e695051_stream_id wohn
+setstate Snapcast 2022-07-23 14:22:51 clients_84a93e695051_volume 90
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_group a269028b-7078-210f-0e75-54acd507faaa
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_id b66531c4-2763-410f-b446-7f90657d69c1
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_ip 192.168.2.82
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_latency 0
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_mac 00:00:00:00:00:00
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_muted false
+setstate Snapcast 2022-07-16 06:41:24 clients_b66531c4-2763-410f-b446-7f90657d69c1_name Moto X4
+setstate Snapcast 2022-07-15 08:06:53 clients_b66531c4-2763-410f-b446-7f90657d69c1_nr 1
+setstate Snapcast 2022-07-15 08:09:33 clients_b66531c4-2763-410f-b446-7f90657d69c1_online false
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_origid b66531c4-2763-410f-b446-7f90657d69c1
+setstate Snapcast 2022-07-14 09:02:18 clients_b66531c4-2763-410f-b446-7f90657d69c1_stream_id wohn
+setstate Snapcast 2022-07-23 14:22:16 clients_b66531c4-2763-410f-b446-7f90657d69c1_volume 70
+setstate Snapcast 2022-07-23 13:35:50 state opened
+setstate Snapcast 2022-07-14 09:02:18 streams 5
+setstate Snapcast 2022-07-14 09:02:18 streams_1_id default
+setstate Snapcast 2022-07-14 09:02:18 streams_1_status idle
+setstate Snapcast 2022-07-14 09:02:18 streams_2_id kind1
+setstate Snapcast 2022-07-14 09:02:18 streams_2_status idle
+setstate Snapcast 2022-07-14 09:02:18 streams_3_id kind2
+setstate Snapcast 2022-07-14 09:02:18 streams_3_status idle
+setstate Snapcast 2022-07-14 09:02:18 streams_4_id wohn
+setstate Snapcast 2022-07-25 08:09:58 streams_4_status playing
+setstate Snapcast 2022-07-14 09:02:18 streams_5_id kueche
+setstate Snapcast 2022-07-14 09:02:18 streams_5_status idle
+
+=cut
+
+            #clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
         }
+        Log3( $hash, 3, "Snap: group members for arg. $client are @group within @ids");
         if ( @group ) {
             if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
-                Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
+                #Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
                 my @paramset;
                 my $grvol;
                 for my $sclient ( @group ) {
@@ -296,8 +362,8 @@ sub Set {
                 return if !@paramset;
                 my $payload = q{[};
                 $payload .= join q{,},@paramset;
-                $payload .= q{]}; #q{]\r\n};
-                Log3($hash,3,"SNAP: send batch $payload");
+                $payload .= "]\r\n";
+                #Log3($hash,3,"SNAP: send batch $payload");
                 return DevIo_SimpleWrite( $hash, $payload, 2 );
             }
             for my $sclient ( @group ) {
@@ -354,6 +420,7 @@ sub Read {
             return;
         }
         if ( ref $update eq 'ARRAY' ) {
+            Log3( $name, 4, "Snap JSON array is $line" );
             for my $elem ( @{$update} ) {
                 updateClientInGroup($hash,$elem);
             }
@@ -531,7 +598,7 @@ sub updateClient {
 
     my $rvs->{online} = defined $c->{connected} ? 
                         $c->{connected} ? 'true' : 'false' : undef;
-    $rvs->{name}      = $c->{config}->{name} // $c->{host}->{name};
+    $rvs->{name}      = $c->{config}->{name} ? $c->{config}->{name} : $c->{host}->{name};
     $rvs->{latency}   = $c->{config}->{latency};
     $rvs->{stream_id} = $c->{config}->{stream_id};
     $rvs->{volume}    = $c->{config}->{volume}->{percent};
@@ -572,12 +639,14 @@ sub updateClientInGroup {
     my $hash    = shift // return;
     my $c       = shift // return;
 
+    delete $hash->{IDLIST}->{ $c->{id} } if defined $hash->{IDLIST} && $c->{id} && defined $hash->{IDLIST}->{ $c->{id} };
+
+    my $id      = $c->{params}->{id} // return Snapcast_getStatus($hash);    # recent version uses an ID.
+
     my $cnumber = 1;
     while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{params}->{id} ne $hash->{STATUS}->{clients}->{$cnumber}->{origid} ) {
         $cnumber++;
     }
-
-    delete $hash->{IDLIST}->{ $c->{id} } if defined $hash->{IDLIST} && $c->{id} && defined $hash->{IDLIST}->{ $c->{id} };
 
     if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
         #Snapcast_getStatus($hash);
@@ -585,7 +654,6 @@ sub updateClientInGroup {
     }
 
     return if !defined $c->{params};
-    my $id      = $c->{params}->{id} // return;    # recent version uses an ID.
     $id =~ s{:}{}gx;
     $id =~ s{[#]}{_}gx;
 
@@ -757,11 +825,11 @@ sub _setClient {
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
         if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
-            my $direction = $1;
-            my $amount    = $2;
+            #my $direction = $1;
+            #my $amount    = $2;
 
             #$value = eval($currentVol. $direction. $amount);
-            $value = eval { $currentVol . $direction . $amount };
+            $value += $currentVol;
             $value = max( 0, min( 100, $value ) );
         }
 
