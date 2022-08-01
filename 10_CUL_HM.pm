@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25298 2022-04-03 frank + Beta-User "uninitialized" 2022-06-15 $
+# $Id: 10_CUL_HM.pm 25298 2022-04-03 frank + Beta-User "uninitialized" 2022-08-01 $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
@@ -4813,8 +4813,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "regTable") {  ################################################
+    return 'not supported w/o HMinfo' if !defined &HMinfo_GetFn;
     return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
-  }       
+  }
   elsif($cmd eq "regList") {  #################################################
     return CUL_HM_getRegInfo($name) ;
   }
