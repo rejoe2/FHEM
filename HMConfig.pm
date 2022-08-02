@@ -1,7 +1,7 @@
-
 ##############################################
-# $Id: HMConfig.pm 24773 2021-07-18 18:18:13Z martinp876 $
+# $Id: HMConfig.pm 25160 2022-08-02 Beta-User $
 # CUL HomeMatic device configuration data
+# referencies: https://forum.fhem.de/index.php/topic,128447.msg1229363.html#msg1229363
 
 #####################################################
 # configuration data for CUL_HM -used to split code and configuration
@@ -289,7 +289,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D6" => {name=>"HM-RC-KEY4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
  ,"00D7" => {name=>"HM-ES-PMSW1-PL-DN-R1"    ,alias=>"HM-ES-PMSW1-PL"}
  ,"00D8" => {name=>"HM-LC-SW1-PL-DN-R1"      ,alias=>"HM-LC-SW1-SM"}
- ,"00D9" => {name=>"HM-MOD-EM-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'l'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
+ ,"00D9" => {name=>"HM-MOD-EM-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DB" => {name=>"HM-SEN-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
  ,"00DC" => {name=>"HM-SEN-DB-PCB"           ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}
@@ -1706,7 +1706,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getRegRaw     => "(List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]"
                       ,getConfig     => ""
                       ,regSet        => "[(prep|{exec})] -regName- -value- [-peerChn-]"
-                      ,clear         => "[(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]"
+                      ,clear         => "[({msgErrors}|msgEvents|rssi|attack|trigger|register|oldRegs|readings|all)]"
                       ,tplDel        => "-tplDel-"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1863,7 +1863,7 @@ $culHmModelSets{"HM-ES-TX-WM"}           = $culHmModelSets{"HM-PB-4DIS-WM-2"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
-#$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"}; #Beta-User: no statusrequest possible?, see frank https://forum.fhem.de/index.php/topic,120833.msg1154087.html#msg1154087
+#$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### reference subtype sets
 
 
