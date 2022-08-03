@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26230 2022-07-16 Beta-User $
+#  $Id: 96_Snapcast.pm 26230 2022-08-03 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -26,11 +26,12 @@ package FHEM::Media::Snapcast;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;
-use Scalar::Util qw(looks_like_number);
-use Time::HiRes qw(gettimeofday);
+use Scalar::Util qw( looks_like_number );
+use Time::HiRes qw( gettimeofday );
 use DevIo;
 use JSON ();
-use GPUtils qw(GP_Import);
+use Encode qw ( encode );
+use GPUtils qw( GP_Import );
 use List::Util qw( max min );
 
 
@@ -266,7 +267,11 @@ sub Set {
                 keys %{ $hash->{READINGS} };
         my @group;
         for my $sid ( @ids ) {
-            push @group, $sid if $client eq ReadingsVal($name, "clients_${sid}_group", '');
+            my $engr; # or utf-8 ?!?
+            if ( !eval{ $engr = encode('UTF-8', ReadingsVal($name, "clients_${sid}_group", ''), Encode::FB_CROAK); 1;} ){
+                return;
+            }
+            push @group, $sid if $client eq $engr;
             #clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
         }
         Log3( $hash, 3, "Snap: group members for arg. $client are @group within @ids");
