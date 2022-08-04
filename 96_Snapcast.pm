@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26230 2022-08-03 Beta-User $
+#  $Id: 96_Snapcast.pm 26284 2022-08-04 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -30,9 +30,8 @@ use Scalar::Util qw( looks_like_number );
 use Time::HiRes qw( gettimeofday );
 use DevIo;
 use JSON ();
-use Encode qw ( encode );
 use GPUtils qw( GP_Import );
-use List::Util qw( max min );
+use List::Util 1.45 qw( max min uniq );
 
 
 #-- Run before package compilation
@@ -86,7 +85,9 @@ my %_clientmethods = (
     volume  => 'Client.SetVolume',
     mute    => 'Client.SetVolume',
     stream  => 'Group.SetStream',
-    latency => 'Client.SetLatency'
+    latency => 'Client.SetLatency',
+    groupM  => 'Group.SetClients',
+    groupN  => 'Group.SetName'
 );
 
 =pod 
@@ -263,38 +264,46 @@ sub Set {
             }
             return;
         }
-        my @ids = grep {m{\A(?:clients_.+_group)\z}xms}
-                keys %{ $hash->{READINGS} };
-        my @group;
-        for my $sid ( @ids ) {
-            my $engr; # or utf-8 ?!?
-            if ( !eval{ $engr = encode('UTF-8', ReadingsVal($name, "clients_${sid}_group", ''), Encode::FB_CROAK); 1;} ){
-                return;
-            }
-            push @group, $sid if $client eq $engr;
-            #clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
-        }
-        Log3( $hash, 3, "Snap: group members for arg. $client are @group within @ids");
-        if ( @group ) {
+        
+        my $grp = _getGroupMembers($hash, $client);
+        if ( @{$grp} ) {
+            my $sparm;
+            my @paramset;
             if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
                 #Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
-                my @paramset;
                 my $grvol;
-                for my $sclient ( @group ) {
+                for my $sclient ( @{$grp} ) {
                     $grvol += ReadingsNum( $name, "clients_${sclient}_volume", 0);
                 }
-                $grvol = int $grvol/@group;
+                $grvol = int $grvol/@{$grp};
                 my $change = $value - $grvol;
-                for my $sclient ( @group ) {
-                    my $sparm->{id} = ReadingsVal( $name, "clients_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
+                for my $sclient ( @{$grp} ) {
+                    $sparm->{id} = ReadingsVal( $name, "clients_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
                     my $vol = ReadingsNum( $name, "clients_${sclient}_volume", 0) + $change;
                     $vol = max( 0, min( 100, $vol ) );
                     my $muteState = ReadingsVal( $name, "clients_${sclient}_muted", 'false' );
                     $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
                     $sparm->{volume}->{muted} = $muteState;
                     $sparm->{volume}->{percent} = $vol;
-                    my $payload = push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
+                    push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
                 }
+
+                if ( $opt eq 'group' ) {
+                    Log3( $hash, 3, "Snap: $opt command received for @{$grp}" );
+                    my $opt2 = shift @param;
+                    my $clnt = shift @param // return 'group commands require two additional arguments!';
+                    $sparm->{id}      = $client;
+                    
+                    if ( $opt2 eq 'name' ) {
+                        $sparm->{name} = $clnt;
+                        return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, $_clientmethods{groupN}, $sparm), 2 );
+                    }
+                    push @{$grp}, $clnt if $opt2 eq 'add';
+                    @{$grp} = grep { $_ !~ m{\A$clnt\z}x } @{$grp} if $opt2 eq 'remove';
+                    $sparm->{clients} = uniq(@{$grp});
+                    return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, $_clientmethods{groupM}, $sparm), 2 );
+                }
+
                 return if !@paramset;
                 my $payload = q{[};
                 $payload .= join q{,},@paramset;
@@ -302,7 +311,7 @@ sub Set {
                 #Log3($hash,3,"SNAP: send batch $payload");
                 return DevIo_SimpleWrite( $hash, $payload, 2 );
             }
-            for my $sclient ( @group ) {
+            for my $sclient ( @{$grp} ) {
                 $sclient =~ s{:}{}gx;
                 $sclient =~ s{[#]}{_}gx; 
                 my $res = _setClient( $hash, $sclient, $opt, $value );
@@ -316,6 +325,20 @@ sub Set {
     }
     return "$opt not implemented yet!";
 }
+
+=pod
+
+                  For <i>client</i> type devices, you may use a single group id as argument to add the client to the given group or the keyword <code>remove</code> to singularize that client.
+                  Options for <i>server</i> type devices:
+                  <ul>
+                    <li><code>name &lt;group id&gt; &lt;new name&gt;</code></li>
+                    <li><code> add &lt;client&gt; &lt;group id&gt;</code> add that client to the given group</li>
+                    <li><code>remove &lt;client&gt; &lt;group id&gt;</code></li>
+                  </ul>
+
+Group.SetClients
+{"id":3,"jsonrpc":"2.0","method":"Group.SetClients","params":{"clients":["00:21:6a:7d:74:fc#2","00:21:6a:7d:74:fc"],"id":"4dcc4e3b-c699-a04b-7f0c-8260d23c43e1"}}
+=cut
 
 sub Read {
     my $hash = shift // return;
@@ -761,10 +784,6 @@ sub _setClient {
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
         if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
-            #my $direction = $1;
-            #my $amount    = $2;
-
-            #$value = eval($currentVol. $direction. $amount);
             $value += $currentVol;
             $value = max( 0, min( 100, $value ) );
         }
@@ -779,8 +798,9 @@ sub _setClient {
                 $value = $currentVol - $step;
             }
             $value = max( 0, min( 100, $value ) );
-            $muteState = 'false' if $value > 0 && ( $muteState eq 'true' || $muteState == 1 );
+            $muteState = 'false' if ( $value > 0 && ( $muteState eq 'true' || $muteState == 1 ));
         }
+        return if !looks_like_number($value);
         $volumeobject->{percent} = $value + 0;
         $value = $volumeobject;
     }
@@ -849,6 +869,25 @@ sub _getStreamNumber {
         return $i if $id eq ReadingsVal( $name, "streams_${i}_id", '' );
     }
     return;
+}
+
+sub _getGroupMembers {
+    my $hash = shift         // return;
+    my $grid = shift         // return;
+    my $name = $hash->{NAME} // return;
+
+    my @ids = grep {m{\A(?:clients_.+_group)\z}xms}
+                keys %{ $hash->{READINGS} };
+    my @group;
+    for my $sid ( @ids ) {
+        my $gr = ReadingsVal($name, $sid, ''); 
+        if ( $grid eq $gr ) {
+             $sid =~ m{\Aclients_(.+)_group\z}xms;
+             push @group, $1; 
+        };
+    }
+    Log3( $hash, 5, "Snap: group members for arg. $grid are @group within @ids");
+    return \@group;
 }
 
 sub _getId {
@@ -958,9 +997,14 @@ __END__
               <a id="Snapcast-set-update"></a><li><i>update</i><br>
                   Perform a full update of the Snapcast Status including streams and servers. Only needed if something is not working. Server module only</li>
               <a id="Snapcast-set-volume"></a><li><i>volume</i><br>
-                  Set the volume of a client. For this and all the following 4 options, give client as second parameter (only for the server module), either as name, IP , or MAC and the desired value as third parameter. 
-                  Client can be given as "all", in that case all clients are changed at once (only for server module)<br>
-                  Volume can be given in 3 ways: Range between 0 and 100 to set volume directly. Increment or Decrement given between -100 and +100. Keywords <em>up</em> and <em>down</em> to increase or decrease with a predifined step size. 
+                  Set the volume of a client. For this and all the following 4 options, give <i>target</i> as second parameter (only for the server module) and the desired value as third parameter. 
+                  <i>target</i> can be given as
+                  <ul>
+                    <li><i>client</i> either as name, IP or MAC</li>
+                    <li><i>all</i> to change volume of all clients at once (only for server module)</li>
+                    <li><i>group id</i> to change volume of all clients belonging to that group at once</li>
+                  </ul>
+                  <i>volume</i> can be given in 3 ways: Range between 0 and 100 to set volume directly. Increment or Decrement given between -100 and +100. Keywords <em>up</em> and <em>down</em> to increase or decrease with a predifined step size. 
                   The step size can be defined in the attribute <em>volumeStepSize</em><br>
                   The step size can be defined smaller for the lower volume range, so that finetuning is possible in this area.
                   See the description of the attributes <em>volumeStepSizeSmall</em> and <em>volumeStepThreshold</em>
@@ -974,6 +1018,14 @@ __END__
               <a id="Snapcast-set-stream"></a><li><i>stream</i><br>
                   Change the stream that the client is listening to. Snapcast uses one or more streams which can be unterstood as virtual audio channels. Each client/room can subscribe to one of them. 
                   By using next as value, you can cycle through the avaialble streams</li>
+              <a id="Snapcast-set-group"></a><li><i>group</i><br>
+                  For <i>client</i> type devices, you may use a single group id as argument to add the client to the given group or the keyword <code>remove</code> to singularize that client.
+                  Options for <i>server</i> type devices:
+                  <ul>
+                    <li><code>&lt;group id&gt; name &lt;new name&gt;</code></li>
+                    <li><code>&lt;group id&gt; add &lt;client&gt;</code> add that client to the given group</li>
+                    <li><code>&lt;group id&gt; remove &lt;client&gt; </code></li>
+                  </ul>
         </ul>
 </ul>
  <br><br>
