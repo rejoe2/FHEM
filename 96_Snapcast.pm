@@ -86,8 +86,7 @@ my %_clientmethods = (
     mute    => 'Client.SetVolume',
     stream  => 'Group.SetStream',
     latency => 'Client.SetLatency',
-    groupM  => 'Group.SetClients',
-    groupN  => 'Group.SetName'
+    group   => 'Group.SetClients'
 );
 
 =pod 
@@ -285,23 +284,7 @@ sub Set {
                     $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
                     $sparm->{volume}->{muted} = $muteState;
                     $sparm->{volume}->{percent} = $vol;
-                    push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
-                }
-
-                if ( $opt eq 'group' ) {
-                    Log3( $hash, 3, "Snap: $opt command received for @{$grp}" );
-                    my $opt2 = shift @param;
-                    my $clnt = shift @param // return 'group commands require two additional arguments!';
-                    $sparm->{id}      = $client;
-                    
-                    if ( $opt2 eq 'name' ) {
-                        $sparm->{name} = $clnt;
-                        return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, $_clientmethods{groupN}, $sparm), 2 );
-                    }
-                    push @{$grp}, $clnt if $opt2 eq 'add';
-                    @{$grp} = grep { $_ !~ m{\A$clnt\z}x } @{$grp} if $opt2 eq 'remove';
-                    $sparm->{clients} = uniq(@{$grp});
-                    return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, $_clientmethods{groupM}, $sparm), 2 );
+                    push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm, 1);
                 }
 
                 return if !@paramset;
@@ -311,6 +294,29 @@ sub Set {
                 #Log3($hash,3,"SNAP: send batch $payload");
                 return DevIo_SimpleWrite( $hash, $payload, 2 );
             }
+            if ( $opt eq 'group' ) {
+                Log3( $hash, 3, "Snap: $opt command received for @{$grp}" );
+                my $opt2 = shift @param;
+                my $clnt = shift @param // return 'group commands require two additional arguments!';
+                $clnt = _getId( $hash, $clnt) // $clnt;
+                $sparm->{id} = $client; #needs group2id function as well
+                
+                if ( $opt2 eq 'name' ) {
+                    $sparm->{name} = $clnt;
+
+                    return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, 'Group.SetName', $sparm), 2 );
+                }
+                push @{$grp}, $clnt if $opt2 eq 'add';
+                my @grIds;
+                for ( @{$grp} ) {
+                    push @grIds, _getId( $hash, $_) // $_;
+                }
+                @grIds = grep { $_ !~ m{\A$clnt\z}x } @grIds if $opt2 eq 'remove';
+                @grIds = uniq(@grIds);
+                $sparm->{clients} = \@grIds;
+                return DevIo_SimpleWrite( $hash, Snapcast_Encode( $hash, 'Group.SetClients', $sparm), 2 );
+            }
+
             for my $sclient ( @{$grp} ) {
                 $sclient =~ s{:}{}gx;
                 $sclient =~ s{[#]}{_}gx; 
@@ -452,10 +458,12 @@ sub Read {
                         readingsBeginUpdate($hash);
                         readingsBulkUpdateIfChanged( $hash, "clients_${client}_$key", $update->{result} );
                         readingsEndUpdate( $hash, 1 );
-                        my $clienthash   = $defs{$hash->{$client}} // return;
-                        readingsBeginUpdate($clienthash);
-                        readingsBulkUpdateIfChanged( $clienthash, $key, $update->{result} );
-                        readingsEndUpdate( $clienthash, 1 );
+                        if ( defined $hash->{$client} ) {
+                            my $clienthash   = $defs{$hash->{$client}} // return;
+                            readingsBeginUpdate($clienthash);
+                            readingsBulkUpdateIfChanged( $clienthash, $key, $update->{result} );
+                            readingsEndUpdate( $clienthash, 1 );
+                        }
                     }
                 }
             }
@@ -798,7 +806,7 @@ sub _setClient {
                 $value = $currentVol - $step;
             }
             $value = max( 0, min( 100, $value ) );
-            $muteState = 'false' if ( $value > 0 && ( $muteState eq 'true' || $muteState == 1 ));
+            $muteState = 'false' if ( $value > 0 && ( $muteState eq 'true' || $muteState ne '1' ));
         }
         return if !looks_like_number($value);
         $volumeobject->{percent} = $value + 0;
@@ -834,8 +842,7 @@ sub Snapcast_Do {
     my $method  = shift // return;
     my $param   = shift // '';
     my $payload = Snapcast_Encode( $hash, $method, $param );
-    $payload .= "\r\n";
-
+    
     #Log3($hash,3,"SNAP: Do $payload");
     return DevIo_SimpleWrite( $hash, $payload, 2 );
 }
@@ -844,7 +851,8 @@ sub Snapcast_Encode {
     my $hash   = shift // return;
     my $method = shift // return;
     my $param  = shift // '';
-
+    my $nonl   = shift;
+    
     if   ( defined( $hash->{helper}{REQID} ) ) { $hash->{helper}{REQID}++; }
     else                                       { $hash->{helper}{REQID} = 1; }
     $hash->{helper}{REQID} = 1 if $hash->{helper}{REQID} > 16383;    # not sure if this is needed but we better dont let this grow forever
@@ -858,6 +866,7 @@ sub Snapcast_Encode {
     $request->{id}                      = $request->{id} + 0;
     $json                               = JSON->new->encode($request);
     $json =~ s{("(true|false|null)")}{$2}gxms;
+    $json .= "\r\n" if !$nonl;
     return $json;
 }
 
