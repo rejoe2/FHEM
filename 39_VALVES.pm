@@ -1,4 +1,4 @@
-# $Id: 39_VALVES.pm 2022-07-06 Beta-User $
+# $Id: 39_VALVES.pm 2022-08-05 Beta-User $
 ####################################################################################################
 #
 #   39_VALVES.pm
@@ -35,9 +35,9 @@ package FHEM::Automation::VALVES;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
-use List::Util qw(sum);
-use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw( gettimeofday );
+use List::Util qw( sum );
+use Scalar::Util qw( looks_like_number );
 
 use GPUtils qw(GP_Import);
 
@@ -92,11 +92,11 @@ sub Define {
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, 'state', 'initialized' );
     readingsBulkUpdate( $hash, 'busy',  0 + gettimeofday() );    #waiting for attr check
-    readingsEndUpdate( $hash, 1 );
+    readingsEndUpdate( $hash, $init_done );
 
     #first run after 61 seconds, wait for other devices
     InternalTimer( gettimeofday() + AttrVal( $name, 'valvesInitialDelay', 61 ), \&VALVES_GetUpdate, $hash, 0 ) if !$init_done;
-    VALVES_GetUpdate($hash)                                                                                    if $init_done && !AttrVal( $name, 'disable', 0 );
+    VALVES_GetUpdate($hash) if $init_done && !AttrVal( $name, 'disable', 0 );
     return;
 }
 
@@ -155,7 +155,7 @@ sub Attr {
         if ( length($attrVal) > 2 ) {
             Log3( $name, 4, "VALVES $name attribute-value [$attrName] = $attrVal changed" );
             for ( devspec2array($attrVal) ) {    # split m{,}x,$attrVal ) {
-                                                 #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
+                #addToDevAttrList("$name","valves".$_."Gewichtung",'VALVES');
                 addToDevAttrList( "$name", "valves" . $_ . "Weighting", 'VALVES' );
             }
             VALVES_GetUpdate($hash) if $init_done && !IsDisabled($name);
@@ -244,7 +244,7 @@ sub VALVES_GetUpdate {
     if ( ReadingsVal( $name, 'busy', 'done' ) ne 'done' ) {    #"waiting for attr check"
         if ( ( gettimeofday() - AttrVal( $name, 'valvesInitialDelay', 61 ) ) > ReadingsVal( $name, 'busy', 0 ) ) {
             for ( devspec2array( AttrVal( $name, 'valvesDeviceList', '' ) ) ) {    # split m{,}x, AttrVal($name,'valvesDeviceList','') ) {
-                                                                                   #addToDevAttrList("$name",'valves'.$_.'Gewichtung','VALVES');
+                #addToDevAttrList("$name",'valves'.$_.'Gewichtung','VALVES');
                 addToDevAttrList( "$name", 'valves' . $_ . 'Weighting', 'VALVES' );
             }
             CommandDeleteReading( undef, "$name busy" );
