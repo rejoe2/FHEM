@@ -1,6 +1,6 @@
 ###########################################
 ###########################################
-# $Id: mqtt2.template 26203 2022-07-09 12:04:51Z Beta-User $
+# $Id: mqtt2.template 26293 2022-08-06 15:50:53Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -594,25 +594,24 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}); return $ret }
 attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 
 attr DEVICE setList \
-  on:noArg $\DEVICETOPIC/1/set {"state_l1":"ON"}\
-  off:noArg $\DEVICETOPIC/1/set {"state_l1":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/1/set {"state_l1":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/set {"state_l1":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l1":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l1":"TOGGLE"}
 attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
-attr DEVICE_CH2 setList \
-  on:noArg $\DEVICETOPIC/l2/set {"state_l2":"ON"}\
-  off:noArg $\DEVICETOPIC/l2/set {"state_l2":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/l2/set {"state_l2":"TOGGLE"}
+loop:#:2:3
+defmod DEVICE_CH# MQTT2_\DEVICE
+attr DEVICE_CH# setList \
+  on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l#":"TOGGLE"}
+loop:END
 attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
-attr DEVICE_CH3 setList \
-  on:noArg $\DEVICETOPIC/l3/set {"state_l3":"ON"}\
-  off:noArg $\DEVICETOPIC/l3/set {"state_l3":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/l3/set {"state_l3":"TOGGLE"}
-attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220622
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220806
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
@@ -5297,6 +5296,64 @@ attr DEVICE comment NOTE: additional code has been downloaded from svn (contrib)
 farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>This is in early development stage, there may be room for improvement! Please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html. To see more info about the provided code, issue <i>help attrT_go_e_Utils</i>.
 attr DEVICE model go_eCharger
 setreading DEVICE attrTemplateVersion 20210804
+
+###########################################
+name:hoymiles_microinverter_hub_bridge
+filter:TYPE=MQTT2_DEVICE
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778.
+order:W_05
+farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|devcontrol/[0-8]+/[0-8]+</i>.
+par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+attr DEVICE icon ICON
+attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"
+attr DEVICE autocreate 1
+attr DEVICE readingList BASE_ID/version:.* version\
+  BASE_ID/free_heap:.* free_heap\
+  BASE_ID/uptime:.* uptime\
+  BASE_ID/device:.* device
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_microinverter_hub_bridge
+setreading DEVICE attrTemplateVersion 20200808
+{ AttrTemplate_Initialize() }
+
+
+name:hoymiles_microinverter_inverter
+prereq:{my @devices=devspec2array('model=hoymiles_microinverter_hub_bridge');return 1 if $devices[0];return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/ch0/U_AC.*
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778<br>Represents a single microinverter.
+order:order:W_051
+par:INVERTERLONG_ID;INVERTERLONG_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+/[^/]+)/ch0/U_AC:, ? $1 : undef }
+par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)/[^/]+/ch0/U_AC:, ? $1 : undef }
+par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts with "0";{ AttrVal('DEVICE','setList','') =~ m,/devcontrol/([0-9]+)/[0-9]+, ? $1 : undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+attr DEVICE icon ICON
+deletereading -q DEVICE .*_.*
+attr DEVICE readingList \
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+  INVERTERLONG_ID/ch0/I_AC:.* I_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
+  INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
+  INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
+  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
+attr DEVICE setList\
+  on:noArg BASE_ID/devcontrol/INVERTER_NR/0 on\
+  off:noArg BASE_ID/devcontrol/INVERTER_NR/1 off\
+  limit BASE_ID/devcontrol/INVERTER_NR/11 $EVTPART1\
+  reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_microinverter_inverter
+setreading DEVICE attrTemplateVersion 20200808
+
 
 
 ###########################################
