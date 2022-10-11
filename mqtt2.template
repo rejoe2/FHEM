@@ -1,6 +1,6 @@
 ###########################################
 ###########################################
-# $Id: mqtt2.template 26392 2022-09-10 14:34:03Z Beta-User $
+# $Id: mqtt2.template 26510 2022-10-09 09:05:10Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -238,7 +238,7 @@ par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light
 attr DEVICE icon ICON
 attr DEVICE webCmd toggle:on:off:brightness:ct
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
@@ -248,7 +248,7 @@ attr DEVICE setList \
 attr DEVICE jsonMap color_temp:ct color_temp_startup:ct_startup
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_cct
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221002
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
@@ -378,18 +378,20 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devi
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal('DEVICE','icon','hue_filled_white_and_color_e27_b22') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE webCmd toggle:on:off:brightness:ct:color
+attr DEVICE webCmd toggle:on:off:brightness:ct:rgb
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE jsonMap color_temp:ct
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
-  color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  rgb:colorpicker,RGB {"$DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20220913
+setreading DEVICE attrTemplateVersion 20221011
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -612,6 +614,42 @@ attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220913
+
+#provided by laberlaib, https://forum.fhem.de/index.php/topic,94495.msg1238330.html#msg1238330
+# zigbee2mqtt 5 channel device
+name:zigbee2mqtt_5channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt 5 channel device like UseeLink Steckerleiste SM-0306E-2W. <br>NOTE: Four additional devices will be created for further channels.<br>NOTE: Might need a FHEM restart to work properly.
+order:L_05g
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','message_socket') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 state_l4:0 state_l5:0
+attr DEVICE setList \
+  on:noArg $\DEVICETOPIC/set {"state_l1":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l1":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l1":"TOGGLE"}
+attr DEVICE setStateList on off toggle
+deletereading -q DEVICE (?!associatedWith|IODev).*
+set DEVICE attrTemplate set_associatedWith \CHANNELS=5 \MAKECOPIES=1
+loop:#:2:3:4:5
+defmod DEVICE_CH# MQTT2_\DEVICE
+attr DEVICE_CH# setList \
+  on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l#":"TOGGLE"}
+loop:END
+attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state_l4:0 state_l5:0 state:0
+attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state_l4:0 state_l5:0 state:0
+attr DEVICE_CH4 jsonMap state_l4:state state_l1:0 state_l2:0 state_l3:0 state_l5:0 state:0
+attr DEVICE_CH5 jsonMap state_l5:state state_l1:0 state_l2:0 state_l3:0 state_l4:0 state:0
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplate speechcontrol_type_switch
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 model zigbee2mqtt_5channel_split
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplateVersion 20221007
+
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
@@ -3289,6 +3327,40 @@ attr DEVICE devStateIcon 0:off 1:on
 attr DEVICE model shelly_ix3
 setreading DEVICE attrTemplateVersion 20210108
 
+# shellyTRV using original firmware
+name:shelly_TRV
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*,TYPE=MQTT2_DEVICE:FILTER=devicetopic=.*shellies.*
+desc:shelly-TRV using original firmware <br>see https://forum.fhem.de/index.php/topic,129394.0.html for details
+order:A_16d
+par:DEV_TPC;"shellies/" and Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+)> ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic DEV_TPC
+attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/settings:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/online:.* online\
+  $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  accelerated_heating:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
+  schedule:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
+  schedule_profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
+  desired-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/target_t $EVTPART1\
+  external-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/ext_t $EVTPART1\
+  valve:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_pos $EVTPART1\
+  valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
+  boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
+  set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent 
+attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE setStateList on off
+attr DEVICE model shelly_TRV
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20221004
+
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
 # shellyrgbw2 color mode
@@ -4004,18 +4076,18 @@ name:ems-esp_heater_device
 filter:TYPE=MQTT2_DEVICE
 desc:EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
 order:E_02a
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : 'ems-esp' }
+par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal('DEVICE','icon','sani_boiler_temp') }
 attr DEVICE icon ICON
 modify DEVICE DEV_ID
 attr DEVICE bridgeRegexp \
   DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
-  DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"
-attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime_sec",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
+  DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* 'ems_esp_boiler'
+attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,'uptime_sec',0)/60; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365; my $y = $d / 365;; $d %= 365; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
 attr DEVICE  readingList DEV_ID/status:.* LWT\
-  DEV_ID/heartbeat:.* { json2nameValue($EVENT) }\
-  DEV_ID/info:.* { json2nameValue($EVENT) }\
-  DEV_ID/status:.* { json2nameValue($EVENT) }
+  DEV_ID/heartbeat:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  DEV_ID/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  DEV_ID/status:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE stateFormat Interface: \
 LWT\
 Signal: \
@@ -4027,19 +4099,19 @@ attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan
 attr DEVICE autocreate 1
 attr DEVICE webCmd restart
 attr DEVICE model ems-esp_heater_device
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20221008
 
 name:ems-esp_boiler
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a boiler device for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a> with Firmware 2.1.0.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
 order:E_02b
 par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : 'ems-esp' }
-attr DEVICE readingList DEV_ID/boiler_data:.* { json2nameValue($EVENT) }\
-  DEV_ID/shower_data:.* { json2nameValue($EVENT) }\
-  DEV_ID/mixing_data:.* { json2nameValue($EVENT) }\
+attr DEVICE readingList DEV_ID/boiler_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  DEV_ID/shower_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  DEV_ID/mixing_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   DEV_ID/tapwater_active:.* tapwater_active\
   DEV_ID/heating_active:.* heating_active\
-  DEV_ID/boiler_data_ww:.* { json2nameValue($EVENT) }\
+  DEV_ID/boiler_data_ww:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE stateFormat \
   Vorlauf: curFlowTemp C\
   Rücklauf: retTemp C \
@@ -4048,20 +4120,20 @@ attr DEVICE stateFormat \
   Wasserspeicher: wwStorageTemp2 C \
   Status: BoilerStatus \
   Status-Code: serviceCode serviceCodeNumber\
-  Temp Außen: outdoorTemp C\
+  Temp Außen: outdoorTemp C
 attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
 attr DEVICE userReadings BoilerStatus:serviceCode.* {BoilerStatus(ReadingsVal($name,'serviceCode',''),ReadingsVal($name,'serviceCodeNumber',''))}
 attr DEVICE comment userReadings need additional code, see https://forum.fhem.de/index.php/topic,104968.msg1180136.html#msg1180136
 attr DEVICE model ems-esp_boiler
-setreading DEVICE attrTemplateVersion 20211017
+setreading DEVICE attrTemplateVersion 20221008
 
 #ems-esp thermostat device
 name:ems-esp_thermostat_read-only
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a simple read-only thermostat (e.g. CT200) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a> with Firmware 2.1.0.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
 order:E_02c
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : 'ems-esp' }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon auto:time_automatic manual:time_manual_mode
 attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
@@ -4070,45 +4142,46 @@ attr DEVICE stateFormat mode\
 desired-temp °C
 attr DEVICE webCmd :
 attr DEVICE model ems-esp_thermostat_read-only
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20221008
 
 name:ems-esp_thermostat_simple
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a simple thermostat (e.g. RC300) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a> with Firmware 2.1.0.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
 order:E_02c1
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon set.auto:edit_settings:mode+manual set.manual:edit_settings:mode+auto auto:time_automatic:mode+manual manual:time_manual_mode:mode+auto  set.*°C:edit_settings
 attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
 attr DEVICE readingList DEV_ID/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }
-attr DEVICE setList mode:uzsuSelectRadio,auto,manual DEV_ID/thermostat_cmd_mode1 $EVTPART1\
-  desired-temp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat_cmd_temp1 $EVTPART1
+attr DEVICE setList mode:uzsuSelectRadio,auto,manual DEV_ID/thermostat { "cmd":"hc1_mode","data":"$EVTPART1" }\
+  desired-temp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat { "cmd":"hc1_seltemp","data":$EVTPART1 }
 attr DEVICE setStateList on off
 attr DEVICE stateFormat mode\
 desired-temp °C
 attr DEVICE webCmd mode:desired-temp
 set DEVICE attrTemplate speechcontrol_type_thermostat
 attr DEVICE model ems-esp_thermostat_simple
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20221009
 
 name:ems-esp_thermostat_RC35_type
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a thermostat comparable to RC35 for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a> with Firmware 2.1.0<br>.<a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
 order:E_02c1
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-attr DEVICE readingList DEV_ID/thermostat_data:.* { json2nameValue($EVENT) } \
-  DEV_ID/thermostat_data1:.* { json2nameValue($EVENT) } \
-  DEV_ID/thermostat_data_hc1:.* { json2nameValue($EVENT) } \
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : 'ems-esp' }
+attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
+attr DEVICE readingList DEV_ID/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }\
+  DEV_ID/thermostat_data1:.* { json2nameValue($EVENT, '', $JSONMAP) }\
+  DEV_ID/thermostat_data_hc1:.* { json2nameValue($EVENT, '', $JSONMAP) }
 attr DEVICE setList mode:uzsuSelectRadio,auto,manual DEV_ID/thermostat_cmd_mode1 $EVTPART1 \
-  desired-temp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat_cmd_temp1 $EVTPART1 \
-  daytemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat_cmd_daytemp1 $EVTPART1 \
-  nighttemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat_cmd_nighttemp1 $EVTPART1 \
-  holidaytemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat_cmd_holidayttemp1 $EVTPART1
+  desired-temp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat { "cmd":"hc1_seltemp","data":$EVTPART1 }\
+  daytemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat { "cmd":"hc1_daytemp","data":$EVTPART1 }\
+  nighttemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat  { "cmd":"hc1_nighttemp","data":$EVTPART1 }\
+  holidaytemp:slider,15.0,0.5,30.0,1 DEV_ID/thermostat  { "cmd":"hc1_holidayttemp","data":$EVTPART1 }
 attr DEVICE model ems-esp_thermostat_RC35_type
 attr DEVICE stateFormat mode\
 seltemp °C
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20221009
 
 
 ###############
@@ -4467,7 +4540,7 @@ deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
 attr OMG_BT_ID devicetopic DEV_TPC
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1, $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1; $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
 attr OMG_BT_ID getList batteryPercent:noArg batteryPercent { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX"}) }
 attr OMG_BT_ID setList beep:noArg { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX","immediate":true}) }
 attr OMG_BT_ID event-on-change-reading .*
@@ -4478,7 +4551,7 @@ attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq 'FHEMWEB') }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220705
+setreading OMG_BT_ID attrTemplateVersion 20220929
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
