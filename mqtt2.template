@@ -3338,12 +3338,12 @@ attr DEVICE icon ICON
 attr DEVICE devicetopic DEV_TPC
 attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  $\DEVICETOPIC/settings:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/settings:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); if (defined $ret->{mode}) { $ret->{mode}=$ret->{mode} eq 'true' ? 'auto' : 'manual' }; for (qw(accelerated_heating boost)) { next if !defined $ret->{$_}; $ret->{$_}=$ret->{$_} eq 'true' ? 'on' : 'off' }; return $ret }\
   $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   accelerated_heating:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
-  schedule:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
+  mode:auto,manual {my $val=$EVTPART1 eq 'auto'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
   schedule_profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
   desired-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/target_t $EVTPART1\
   external-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/ext_t $EVTPART1\
@@ -3351,7 +3351,7 @@ attr DEVICE setList \
   valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
-attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent 
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_schedule:mode thermostats_1_valve_min_percent:valve_min_percent 
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
@@ -3359,7 +3359,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221004
+setreading DEVICE attrTemplateVersion 20221012
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
