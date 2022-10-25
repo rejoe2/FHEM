@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 96_Snapcast.pm 26284 2022-08-04 Beta-User $
+#  $Id: 96_Snapcast.pm 26284 2022-10-25 Beta-User $
 #
 #  Originally initiated by Sebatian Stuecker / FHEM Forum: unimatrix
 #
@@ -773,7 +773,7 @@ sub _setClient {
     if ( $param eq 'stream' ) {
         $paramset->{id} = ReadingsVal( $name, "clients_${id}_group", "" );    # for setting stream we now use group id instead of client id in snapcast 0.11 JSON format
         $param = 'stream_id';
-        if ( $value eq "next" ) {                                             # just switch to the next stream, if last stream, jump to first one. This way streams can be cycled with a button press
+        if ( $value eq 'next' ) {                                             # just switch to the next stream, if last stream, jump to first one. This way streams can be cycled with a button press
             my $totalstreams  = ReadingsVal( $name, 'streams', 0 );
             my $currentstream = _getStreamNumber( $hash, ReadingsVal( $name, "clients_${id}_stream_id", '' ) );
             my $newstream     = $currentstream + 1;
@@ -807,6 +807,7 @@ sub _setClient {
             }
             $value = max( 0, min( 100, $value ) );
             $muteState = 'false' if ( $value > 0 && ( $muteState eq 'true' || $muteState ne '1' ));
+            $volumeobject->{muted} = $muteState;
         }
         return if !looks_like_number($value);
         $volumeobject->{percent} = $value + 0;
@@ -815,14 +816,16 @@ sub _setClient {
 
     if ( $param eq 'mute' ) {
         $volumeobject->{percent} = $currentVol + 0;
-        $value = $volumeobject;
-
-        if ( !defined $value->{muted} || $value->{muted} eq '' ) {
-            $value                   = $muteState eq 'true' || $muteState == 1 ? 'false' : 'true';
+        if ( $value eq 'true' || $value eq 'false' ) { 
             $volumeobject->{muted}   = $value;
-            $volumeobject->{percent} = $currentVol + 0;
-            $value                   = $volumeobject;
+        } else {
+            $value = $volumeobject;
+            if ( !defined $value->{muted} || $value->{muted} eq '' ) {
+                $value                   = $muteState eq 'true' || $muteState == 1 ? 'false' : 'true';
+                $volumeobject->{muted}   = $value;
+            }
         }
+        $value = $volumeobject;
         $param = 'volume';    # change param to "volume" to match new format
     }
 
@@ -906,7 +909,7 @@ sub _getId {
     my $name = $hash->{NAME} // return;
 
     # client is ID
-    if ( $client =~ m/^([0-9a-f]{12}([#_]*\d*|$))$/i ) {
+if ( $client =~ m{\A(?:[[:xdigit:]]{8}-(?:[[:xdigit:]]{4}-){3}[[:xdigit:]]{12}(?:[#_]*\d*)|[[:xdigit:]]{12}(?:[#_]*\d*))\z}i ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
