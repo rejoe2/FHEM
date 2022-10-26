@@ -1038,6 +1038,7 @@ __END__
                     <li><code>&lt;group id&gt; add &lt;client&gt;</code> add that client to the given group</li>
                     <li><code>&lt;group id&gt; remove &lt;client&gt; </code></li>
                   </ul>
+                  </li>
         </ul>
 </ul>
  <br><br>
