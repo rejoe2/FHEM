@@ -21,7 +21,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id: 10_MYSENSORS_DEVICE.pm 24446 2022-02-09 STATE Beta-User $
+# $Id: 10_MYSENSORS_DEVICE.pm 25664 2022-11-02 RSSI Beta-User $
 #
 ##############################################
 
@@ -700,7 +700,7 @@ sub Attr {
         for my $type (keys %$readingsForId) {
           if (($readingsForId->{$type}->{name} // "") eq $1) {
             delete $readingsForId->{$type};
-            if !(keys %$readingsForId) {
+            if (!keys %$readingsForId) {
               delete $readingMappings->{$id};
             }
           last FIND;
@@ -821,7 +821,7 @@ sub onPresentationMessage {
           $idStr =~ s/[^A-Za-z\d_\.-]+/_/gx;
         }
         if (defined $hash->{sets}->{"$typeStr$idStr"}) {
-          next if !defined ($hash->{getCommentReadings}) || $hash->{getCommentReadings} ne '2');
+          next if !defined ($hash->{getCommentReadings}) || $hash->{getCommentReadings} ne '2';
         }
         if ($hash->{IODev}->{'inclusion-mode'}) {
           my @values = ();
@@ -1070,13 +1070,13 @@ sub onInternalMessage {
                               );
           } else {
             delete $hash->{I_RSSI}; 
-            if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq "RSSI" ) {
+            if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'RSSI' ) {
               RemoveInternalTimer($hash->{asyncGet});
               my $uq = $msg->{payload};
               my $topar = ReadingsVal($hash->{NAME},'R_RSSI_to_Parent','unknown');
               my $frompar = ReadingsVal($hash->{NAME},'R_RSSI_from_Parent','unknown');
               my $snr2par = ReadingsVal($hash->{NAME},'R_SNR_to_Parent','unknown');
-              my $snrfpar = ReadingsVal($hash->{NAME},'R_RSSI_from_Parent','unknown');
+              my $snrfpar = ReadingsVal($hash->{NAME},'R_SNR_from_Parent','unknown');
               my $powpct = ReadingsVal($hash->{NAME},'R_TX_Powerlevel_Pct','unknown');
               my $powdbm = ReadingsVal($hash->{NAME},'R_TX_Powerlevel_dBm','unknown');
               asyncOutput($hash->{asyncGet}{CL}, "RSSI info:\n----------------------------\nto parent:     $topar\nfrom parent: $frompar\nSNR to parent:    $snr2par\nSNR from parent: $snrfpar\nPower level %:   $powpct\nPower level dBm: powdbm\nUplink Quality: $uq");
@@ -1085,13 +1085,16 @@ sub onInternalMessage {
 
           }
           return;
-       } elsif( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq "RSSI" ) {
+       } elsif( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'RSSI' ) {
           RemoveInternalTimer($hash->{asyncGet});
-          asyncOutput($hash->{asyncGet}{CL}, "Your transport type seems to be RS485, so asking for RSSI values is not possible");
+          if ($msg->{payload} == -256) {
+            asyncOutput($hash->{asyncGet}{CL}, 'Your transport type seems to be RS485, so asking for RSSI values is not possible');
+          } else {
+            asyncOutput($hash->{asyncGet}{CL}, "Got $msg->{payload} as (unexpected) response for RSSI value request");
+          }
           delete($hash->{asyncGet});
        }
     }
-    
     return;
 }
 
