@@ -1,6 +1,6 @@
 ###########################################
 ###########################################
-# $Id: mqtt2.template 26563 2022-10-19 19:08:07Z Beta-User $
+# $Id: mqtt2.template 26677 2022-11-09 09:06:31Z Otto123 $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -372,14 +372,14 @@ setreading DEVICE attrTemplateVersion 20220913
 name:zigbee2mqtt_light_rgbcct_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02e1
-desc: A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as HEX value<br>remove color_temp in setlist command <b>on</b> if default white is not desired<br>Tested with:<br><a href="https://www.zigbee2mqtt.io/devices/HG08008.html" target="_blank">Livarno Home LED ceiling light</a><br><a href="https://www.zigbee2mqtt.io/devices/404000_404005_404012_404019.html#m%25C3%25BCller%2520licht-404000%252F404005%252F404012%252F404019" target="_blank">Mueller Light tint RGBW bulb</a>
+desc: <a href="https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935" target="_blank">Forum Thread</a><br>A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as HEX value<br>remove color_temp in setlist command <b>on</b> if default white is not desired<br>Tested with:<br><a href="https://www.zigbee2mqtt.io/devices/HG08008.html" target="_blank">Livarno Home LED ceiling light,&nbsp;</a><a href="https://www.zigbee2mqtt.io/devices/404000_404005_404012_404019.html#m%25C3%25BCller%2520licht-404000%252F404005%252F404012%252F404019" target="_blank">Mueller Light tint RGBW bulb,&nbsp;</a><a href="https://www.zigbee2mqtt.io/devices/HG08010.html" target="_blank">Livarno Home outdoor spotlight</a>
 farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:BRIGHTNESS;default brightness in <b>brightness</b>-command (numeric, 0-255, e.g. 120);undef
-par:CTVALUE;default color temp (ct) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
-par:CTWARMVALUE;default ct value in <b>warm</b>-command (e.g. 320);undef
-par:CTWHITEVALUE;default ct value in <b>white</b>-command (e.g. 250);undef
+par:BRIGHTNESS;brightness in <b>all</b> specific commands (numeric, 0-255, e.g. 120);undef
+par:CTVALUE;ct (color temp) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
+par:CTWARMVALUE;ct value in <b>warm</b>-command (e.g. 320);undef
+par:CTWHITEVALUE;ct value in <b>white</b>-command (e.g. 250);undef
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal('DEVICE','icon','hue_filled_white_and_color_e27_b22') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
@@ -399,7 +399,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221019
+setreading DEVICE attrTemplateVersion 20221116
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -685,6 +685,30 @@ set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
 setreading DEVICE attrTemplateVersion 20211113
 
+# Aqara Curtain Driver E1
+# contributed by drhirn, https://forum.fhem.de/index.php/topic,94495.msg1241895.html#msg1241895
+name:zigbee2mqtt_curtain_driver
+desc:E.g. for Aqara curtain driver E1 via zigbee2mqtt.<br>Tested with: <a href="https://www.zigbee2mqtt.io/devices/ZNCLBL01LM.html">ZNCLBL01LM</a>.
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_05f1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC/availability:.* availability\
+  $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE event-on-change-reading .*
+attr DEVICE setList open:noArg $\DEVICETOPIC/set {"state": "OPEN"}\
+  close:noArg $\DEVICETOPIC/set {"state": "CLOSE"}\
+  stop:noArg $\DEVICETOPIC/set {"state": "STOP"}\
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position": "$EVTPART1"}
+attr DEVICE jsonMap position:pct
+attr DEVICE stateFormat pct
+attr DEVICE devStateIcon 0:fts_shutter_100 (\d|1\d):fts_shutter_90 2\d:fts_shutter_80 3\d:fts_shutter_70 4\d:fts_shutter_60 5\d:fts_shutter_50 6\d:fts_shutter_40 7\d:fts_shutter:30 8\d:fts_shutter_20 9\d:fts_shutter_10 100:fts_window_2w
+attr DEVICE webCmd open:close:stop:pct
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_curtain_driver
+setreading DEVICE attrTemplateVersion 20221101
+
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
@@ -929,6 +953,28 @@ attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_AlarmSensor
 setreading DEVICE attrTemplateVersion 20200904
+
+# contributed by JJ_Pamoux, https://forum.fhem.de/index.php/topic,94495.msg1243613.html#msg1243613
+# NEO AB02B2 Alarm Sound
+name:zigbee2mqtt_alarm_sound
+desc: Alarm sound controller via zigbee2mqtt <br>Tested with: Tuya Neo NAS-AB02B2 sound device
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_15a
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to audio_volume_mid;{ AttrVal('DEVICE','icon','audio_volume_mid') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Alarm: alarm  Volume: volume  Duration: duration  Melody: melody  Batterie: battpercentage %  Linkquality: linkquality
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  alarm:true,false $\DEVICETOPIC/set {"alarm": "$EVTPART1"}\
+  volume:low,medium,high $\DEVICETOPIC/set {"volume": "$EVTPART1"}\
+  duration:slider,0,1,1800 $\DEVICETOPIC/set {"duration": "$EVTPART1"}\
+  melody:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 $\DEVICETOPIC/set {"melody": "$EVTPART1"}
+attr DEVICE model zigbee2mqtt_alarm_sound
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20221106
 
 # SYMFONSIK sound controller
 #contributed by KurtK: https://forum.fhem.de/index.php/topic,94495.msg1056562.html#msg1056562
@@ -3291,11 +3337,11 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellydw using original firmware. <br>Note: can be configered als two- or three-state sensor.
 order:A_16b
 par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal("DEVICE","icon","fts_window_1w_open") }
+par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal('DEVICE','icon','fts_window_1w_open') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon open:fts_window_1w_open@red tilted:fts_window_1w_tilt@yellow closed:fts_window_1w@green
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/sensor/state:.* doorWindow\
+  shellies/DEVNAME/sensor/state:.* { doorWindow => $EVENT eq 'close' ? 'closed' : $EVENT }\
   shellies/DEVNAME/sensor/tilt:.* tilt\
   shellies/DEVNAME/sensor/vibration:.* vibration\
   shellies/DEVNAME/sensor/lux:.* lux\
@@ -3304,9 +3350,9 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
-attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt",1) > 0 ? 'tilted' :'open' }
+attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,'doorWindow','') eq 'closed' ? 'closed' : ReadingsNum($name,'tilt',1) > 0 ? 'tilted' :'open' }
 attr DEVICE model shellydw
-setreading DEVICE attrTemplateVersion 20200812
+setreading DEVICE attrTemplateVersion 20221116
 
 # shelly ix3 using original firmware
 # source info: https://forum.fhem.de/index.php/topic,114973.msg1092039.html#msg1092039
@@ -3360,7 +3406,7 @@ attr DEVICE setList \
   boost:on,off {my $val=$EVTPART1 eq 'on'?5:0; qq($\DEVICETOPIC/thermostat/0/command/boost_minutes $val)}\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
-attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode thermostats_1_pos:valve
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
@@ -3368,7 +3414,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221019
+setreading DEVICE attrTemplateVersion 20221106
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
@@ -4751,7 +4797,7 @@ attr DEVICE getList\
 attr DEVICE setList  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":$EVTPART1}\
   config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
   waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  mode:Quite,Manual,Significant,Move { my %h=(Quite=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}})) }\
+  mode:Quiet,Manual,Significant,Move { my %h=(Quiet=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}})) }\
   x_raw_payload:textField { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload) }
 attr DEVICE userReadings\
   location:lat.* {ReadingsNum($name,'latitude',0).','.ReadingsNum($name,'longitude',0)},\
@@ -4861,12 +4907,14 @@ setreading DEVICE attrTemplateVersion 20210510
 # new valetudo Template contributed by Otto123, should replace the old valetudo/rockrobo Template
 name:valetudo
 filter:TYPE=MQTT2_DEVICE
-desc:use this to control a rooted vacuum with valetudo V2. For further details visit <a href="https://github.com/Hypfer/Valetudo">Hypfer/Valetudo</a><br><br>NOTE: tested with Dreame L10pro, Xiaomi Vacuum Gen1, details: <a href="https://forum.fhem.de/index.php/topic,121017.0.html">Forum Thread</a>
+desc:use this to control a rooted vacuum with valetudo V2. For further details visit <a href="https://github.com/Hypfer/Valetudo">Hypfer/Valetudo</a><br>NOTE: tested with Dreame L10pro, Xiaomi Vacuum Gen1, details: <a href="https://forum.fhem.de/index.php/topic,121017.0.html">Forum Thread</a>
 order:X_03b
 par:BASE_TOPIC;BASE_TOPIC typically is valetudo;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,([^\/:]+)[\/].*, ? $1 : undef }
 par:DEV_ID;DEV_ID is random by Firmware;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^\/]+\/([^\/:]+).*, ? $1 : undef }
+par:IP4;Device IP Adress;{(split q{,}, ReadingsVal("DEVICE",'ips',undef))[0] || (split q{_}, InternalVal("DEVICE",ReadingsVal("DEVICE",'IODev',undef).'_CONN',undef))[-2] || undef }
 { $data{f}='99_valetudoUtils.pm';\
-$data{u}="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/AttrTemplate/$data{f}?format=txt";\
+# Svn_GetFile() works asynch #{ Svn_GetFile("contrib/AttrTemplate/$data{f}", $data{f}, sub(){CommandReload(undef, $data{f})}) }\
+{$data{u}="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/AttrTemplate/$data{f}?format=txt"}\
 qx(wget -qO FHEM/$data{f} $data{u}); CommandReload(undef, $data{f});\
 delete $data{f};delete $data{u};''}
 attr DEVICE alias DEV_ID
@@ -4874,42 +4922,33 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE icon vacuum_top
 attr DEVICE readingList \
   $\DEVICETOPIC/\x24state:.* _state\
-  $\DEVICETOPIC/(Att.*|Basic.*|Consum.*|Curr.*|Loc.*|Wifi.*)/[a-zA-Z\-_]+:.* { $TOPIC =~ m,$\DEVICETOPIC\/.*\/([a-zA-Z\-_]+),; $1 eq 'ips'? {"ip4"=> (split ',',$EVENT)[0]}:{"$1"=>$EVENT} }\
-  $\DEVICETOPIC/BatteryStateAttribute/level:.* batteryPercent\
-  $\DEVICETOPIC/BatteryStateAttribute/status:.* batteryState\
-  $\DEVICETOPIC/FanSpeedControlCapability/preset:.* fanSpeed\
-  $\DEVICETOPIC/GoToLocationCapability/presets:.* .locationsPresets\
-  $\DEVICETOPIC/GoToLocationCapability/go:.* {}\
-  $\DEVICETOPIC/MapData/map-data:.* {}\
-  $\DEVICETOPIC/MapData/segments:.* .segments\
-  $\DEVICETOPIC/StatusStateAttribute/status:.* { {"state"=>$EVENT,"cleanerState"=>$EVENT} }\
-  $\DEVICETOPIC/StatusStateAttribute/detail:.* stateDetail\
-  $\DEVICETOPIC/StatusStateAttribute/error:.* stateError\
-  $\DEVICETOPIC/WaterUsageControlCapability/preset:.* waterUsage\
-  $\DEVICETOPIC/ZoneCleaningCapability/presets:.* .zonesPresets\
-  $\DEVICETOPIC/ZoneCleaningCapability/start:.* {}
+  $\DEVICETOPIC/.*/[a-zA-Z\-_]+:.* { $TOPIC =~ m,$\DEVICETOPIC\/(.*)\/([a-zA-Z\-_]+),; valetudo_r($NAME,$1,$2,$EVENT) }
 attr DEVICE setList \
   pause:noArg $\DEVICETOPIC/BasicControlCapability/operation/set PAUSE\
   start:noArg $\DEVICETOPIC/BasicControlCapability/operation/set START\
   stop:noArg $\DEVICETOPIC/BasicControlCapability/operation/set STOP\
   charge:noArg $\DEVICETOPIC/BasicControlCapability/operation/set HOME\
   clean_zone:{valetudo_w($name,'zones')} { valetudo_c($NAME,$EVENT) }\
-  fanSpeed:off,min,low,medium,high,turbo,max $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
-  waterUsage:off,min,low,medium,high,turbo,max $\DEVICETOPIC/WaterUsageControlCapability/preset/set $EVTPART1\
+  fanSpeed:min,low,medium,high,max $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
   locate:PERFORM   $\DEVICETOPIC/LocateCapability/locate/set $EVTPART1\
-  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }
+  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }\
+  delete:zones,locations {fhem("deletereading $NAME .$EVTPART1");;return undef}\
+  zoneNew:textField { valetudo_z($NAME,$EVENT) }\
+  zoneRename:textField { valetudo_z($NAME,$EVENT) }\
+  get:segments,release,ip { valetudo_g($NAME,$EVENT) }
 attr DEVICE event-on-change-reading .*
 attr DEVICE timestamp-on-change-reading .*
 attr DEVICE setStateList operation clean_segment clean_zone goto fanSpeed waterUsage locate x_raw_payload
 attr DEVICE model valetudoV2
-attr DEVICE stateFormat <a href="http://ip4" target="_blank">state</a>
-setreading DEVICE attrTemplateVersion 20220121
-option:{valetudo_f('DEVICE','MapSegmentation')}
-{ CommandAttr_multiline( 'DEVICE','setList',q(  clean_segment:{'multiple-strict,'.valetudo_w($name,'segments')} { valetudo_c($NAME,$EVENT) }) ) }
-option:{valetudo_f('DEVICE','GoToLocation')}
-{ CommandAttr_multiline( 'DEVICE','setList',q(  goto:{valetudo_w($name,'locations')} { valetudo_c($NAME,$EVENT) }) ) }
+attr DEVICE devStateIcon docked:rc_PLAY:start (moving|cleaning):rc_PLAY@blue:pause (idle|paused):rc_PAUSE@red:start returning:refresh:pause 
+attr DEVICE stateFormat cleanerState\
+<a href="http://ip4" target="_blank">cleanerState</a>
+setreading DEVICE attrTemplateVersion 20221101
 option:{1}
-deletereading -q DEVICE (?!associatedWith|IODev).*
+deletereading -q DEVICE \.{0,1}segments|map-data.*|.*_.*_.*|_.*
+{valetudo_s('DEVICE')}
+set DEVICE get ip IP4
+set DEVICE get release
 
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
@@ -4928,7 +4967,7 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE readingList $\DEVICETOPIC/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:SerialNumber\
 dat_le:mowerErrorIndex dat_ls:mowerStatusIndex\
-cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection\
+cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection cfg_tq:torqueSetting\
 dat_bt_t:batteryTemperature dat_bt_v:batteryVoltage dat_bt_p:batteryPercent dat_bt_nr:batteryChargeCycle dat_bt_c:batteryCharging\
 dat_st_b:totalBladeTime dat_st_d:totalDistance dat_st_wt:totalTime dat_st_bl:borderLength\
 dat_dmp_1:directionPitch dat_dmp_2:directionRoll dat_dmp_3:directionYaw
@@ -4939,6 +4978,7 @@ attr DEVICE setList mowerRainDelay:slider,0,30,1440 $\DEVICETOPIC/commandIn {"rd
   startMower:noArg $\DEVICETOPIC/commandIn {"cmd":1}\
   pauseMower:noArg $\DEVICETOPIC/commandIn {"cmd":2}\
   stopMower:noArg $\DEVICETOPIC/commandIn {"cmd":3}\
+  torqueSetting:slider,-50,1,50 $\DEVICETOPIC/commandIn {"tq":$EVTPART1}\
   PartyTime:slider,0,10,2880 $\DEVICETOPIC/commandIn {"sc":{"distm":$EVTPART1}}\
   PartyMode:on,off { my %hash = ( 'on' => 2, 'off' => 1);qq($\DEVICETOPIC/commandIn {"sc":{"m":$hash{$EVTPART1}}})}\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq($\DEVICETOPIC/commandIn $payload)}
@@ -4989,7 +5029,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  17 => "Battery temp out of range"\
 ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
 attr DEVICE model worx_landroid_mower
-setreading DEVICE attrTemplateVersion 20210602
+setreading DEVICE attrTemplateVersion 20221101
 
 
 ###########################################
