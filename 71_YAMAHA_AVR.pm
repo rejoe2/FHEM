@@ -1,4 +1,4 @@
-# $Id: 71_YAMAHA_AVR.pm 26596 2022-11-18 Beta-User prototype massacre$
+# $Id: 71_YAMAHA_AVR.pm 26596 2022-12-01 Beta-User prototype massacre 2 $
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -1236,9 +1236,13 @@ YAMAHA_AVR_Undefine #($$)
 #############################
 # sends a command to the receiver via HTTP
 sub
-YAMAHA_AVR_SendCommand($$$$;$)
+YAMAHA_AVR_SendCommand #($$$$;$)
 {
-    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
+    my $hash = shift // return;
+    my $data = shift // return;
+    my $cmd  = shift // return;
+    my $arg  = shift // return;
+    my $additional_args = shift; #if set, this should be HASH type arg
     my $name = $hash->{NAME};
     my $options;
     
@@ -1254,12 +1258,12 @@ YAMAHA_AVR_SendCommand($$$$;$)
     
     map {$param->{$_} = $additional_args->{$_}} keys %{$additional_args};
     
-    $options = $additional_args->{options} if(exists($additional_args->{options}));
+    $options = $additional_args->{options} if exists $additional_args->{options};
     
     my $device = $hash;
        
     # if device is not mainzone and mainzone is defined via defptr
-    if(exists($hash->{SYSTEM_ID}) and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} ne "mainzone" and exists($modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone}))
+    if( exists $hash->{SYSTEM_ID} && exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} ne 'mainzone' && exists $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone} )
     {
         $hash->{MAIN_ZONE} = $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone}->{NAME};
         
@@ -1273,7 +1277,7 @@ YAMAHA_AVR_SendCommand($$$$;$)
     }
     else
     {
-        delete($hash->{MAIN_ZONE}) if(exists($hash->{MAIN_ZONE}));
+        delete($hash->{MAIN_ZONE}) if exists $hash->{MAIN_ZONE};
     }
     
     if($options->{unless_in_queue} and grep( ($_->{cmd} eq $cmd and ( (not(defined($arg) or defined($_->{arg}))) or  $_->{arg} eq $arg)) ,@{$device->{helper}{CMD_QUEUE}}))
@@ -1450,9 +1454,11 @@ sub YAMAHA_AVR_getNextRequestHash #($)
 #############################
 # parses the receiver response
 sub
-YAMAHA_AVR_ParseResponse($$$)
+YAMAHA_AVR_ParseResponse #($$$)
 {
-    my ( $param, $err, $data ) = @_;    
+    my $param = shift // return;
+    my $err   = shift // q{};
+    my $data  = shift // q{};
     
     my $hash = $param->{hash};
     my $queue_hash = $param->{hash};
@@ -1461,19 +1467,16 @@ YAMAHA_AVR_ParseResponse($$$)
     my $arg = $param->{arg};
     my $options = $param->{options};
 
-    $data = "" unless(defined($data));
-    $err = "" unless(defined($err));
-    
     $hash->{helper}{RUNNING_REQUEST} = 0;
-    delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
+    delete($hash->{helper}{".HTTP_CONNECTION"}) if !$param->{keepalive};
     
     # if request is from an other definition (zone2, zone3, ...)
-    $hash = $param->{original_hash} if(exists($param->{original_hash}));
+    $hash = $param->{original_hash} if exists $param->{original_hash};
 
     my $name = $hash->{NAME};
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
-    if(exists($param->{code}))
+    if( exists $param->{code} )
     {
         Log3 $name, 4, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
         
@@ -1506,15 +1509,15 @@ YAMAHA_AVR_ParseResponse($$$)
         }
     }
     
-    if($err ne "" and not $options->{can_fail})
+    if( $err ne '' && !$options->{can_fail} )
     {
         Log3 $name, 4, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
 
-        if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
+        if( !exists $hash->{helper}{AVAILABLE} || ( exists $hash->{helper}{AVAILABLE} && $hash->{helper}{AVAILABLE} eq 1) )
         {
             Log3 $name, 3, "YAMAHA_AVR ($name) - could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
-            readingsSingleUpdate($hash, "presence", "absent", 1);
-            readingsSingleUpdate($hash, "state", "absent", 1);
+            readingsSingleUpdate($hash, 'presence', 'absent', 1);
+            readingsSingleUpdate($hash, 'state', 'absent', 1);
         }  
 
         $hash->{helper}{AVAILABLE} = 0;
@@ -1522,7 +1525,7 @@ YAMAHA_AVR_ParseResponse($$$)
     
     if($data ne "")
     {
-        Log3 $name, 4, "YAMAHA_AVR ($name) - got response for \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $data";
+        Log3 $name, 4, "YAMAHA_AVR ($name) - got response for \"$cmd".( defined $arg ? " ".(split("\\|", $arg))[0] : "")."\": $data";
     
          # add a dummy queue entry to wait a specific time before next command starts
         if($options->{wait_after_response})
