@@ -26,17 +26,48 @@
 #
 ##############################################################################
 
-package main;
+package FHEM::YAMAHA_AVR;
 
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday sleep);
 use Encode qw(decode encode);
 use HttpUtils;
+use Carp qw(carp);
+use GPUtils qw(GP_Import);
+
+use List::Util qw(max min);
+#use Scalar::Util qw(looks_like_number);
+#use FHEM::Meta;
+
+sub ::YAMAHA_AVR_Initialize { goto &Initialize }
+
+BEGIN {
+
+  GP_Import( qw(
+    readingsSingleUpdate
+    readingsBeginUpdate
+    readingsBulkUpdate
+    readingsEndUpdate
+    Log3
+    modules
+    init_done
+    InternalTimer
+    RemoveInternalTimer
+    readingFnAttributes
+    IsDisabled
+    AttrVal
+    InternalVal
+    ReadingsVal
+    ReadingsNum
+    HttpUtils_NonblockingGet
+    trim
+  ) )
+};
 
 ###################################
 sub
-YAMAHA_AVR_Initialize
+Initialize
 {
     my $hash = shift;
 
@@ -1263,7 +1294,6 @@ YAMAHA_AVR_SendCommand #($$$$;$)
         if(YAMAHA_AVR_isModel_DSP($hash))
         {
             $device = $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone};
-
             $param->{original_hash} = $hash;
         }
     }
@@ -1323,8 +1353,8 @@ YAMAHA_AVR_HandleCmdQueue #($)
         {
             # still request in queue, but not mentioned to be executed now
             Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
-            RemoveInternalTimer($hash, "YAMAHA_AVR_HandleCmdQueue");
-            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash);
+            RemoveInternalTimer($hash, \&YAMAHA_AVR_HandleCmdQueue);
+            InternalTimer(gettimeofday()+1,\&YAMAHA_AVR_HandleCmdQueue, $hash);
             return;
         }
         
@@ -1351,10 +1381,10 @@ YAMAHA_AVR_HandleCmdQueue #($)
         Log3 $name, 4, "YAMAHA_AVR ($name) - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\"".(exists($request->{data}) ? ": ".$request->{data} : "");
         HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
     }
-    
+
     $hash->{CMDs_pending} = @{$hash->{helper}{CMD_QUEUE}};
     delete($hash->{CMDs_pending}) unless($hash->{CMDs_pending}); 
-    
+
     return;
 }
 
@@ -2502,23 +2532,18 @@ sub YAMAHA_AVR_ResetTimer #($;$)
     my $interval = shift;
     my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "YAMAHA_AVR_GetStatus");
+    RemoveInternalTimer($hash, \&YAMAHA_AVR_GetStatus);
     
     return if IsDisabled($name);
     if ( defined $interval )
     {
-        InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
+        return InternalTimer(gettimeofday()+$interval, \&YAMAHA_AVR_GetStatus, $hash);
     }
-    elsif(ReadingsVal($name, "presence", "absent") eq "present" and ReadingsVal($name, "power", "off") eq "on")
+    if ( ReadingsVal($name, 'presence', 'absent') eq 'present' && ReadingsVal($name, 'power', 'off') eq 'on' )
     {
-        InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
+        return InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, \&YAMAHA_AVR_GetStatus, $hash);
     }
-    else
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
-    }
-
-    return;
+    return InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, \&YAMAHA_AVR_GetStatus, $hash);
 }
 
 #############################
