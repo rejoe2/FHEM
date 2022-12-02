@@ -48,6 +48,7 @@ BEGIN {
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
+    readingsBulkUpdateIfChanged
     readingsEndUpdate
     Log3
     modules attr defs
@@ -313,54 +314,51 @@ YAMAHA_AVR_Set #($@)
     }
 
     # get all available inputs if nothing is available
-    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
-    {
-        YAMAHA_AVR_getInputs($hash);
-    }
-    
+    YAMAHA_AVR_getInputs($hash) if !defined $hash->{helper}{INPUTS} || !length $hash->{helper}{INPUTS};
+
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
-    my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
-    my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
+    my $inputs_piped = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : '' ;
+    my $inputs_comma = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : '' ;
 
-    my $scenes_piped = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 0) : "" ;
-    my $scenes_comma = defined($hash->{helper}{SCENES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 1) : "" ;
+    my $scenes_piped = defined $hash->{helper}{SCENES} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 0) : '' ;
+    my $scenes_comma = defined $hash->{helper}{SCENES} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SCENES}), 1) : '' ;
     
-    my $dsp_modes_piped = defined($hash->{helper}{DSP_MODES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 0) : "" ;
-    my $dsp_modes_comma = defined($hash->{helper}{DSP_MODES}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 1) : "" ;
+    my $dsp_modes_piped = defined $hash->{helper}{DSP_MODES} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 0) : '' ;
+    my $dsp_modes_comma = defined $hash->{helper}{DSP_MODES} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{DSP_MODES}), 1) : '' ;
     
-    my $decoders_piped = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 0) : "" ;
-    my $decoders_comma = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 1) : "" ;
+    my $decoders_piped = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 0) : '' ;
+    my $decoders_comma = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 1) : '' ;
        
-    return "No Argument given" if(!defined($a[1]));     
+    return 'No Argument given' if !defined $a[1];     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of ". "on:noArg ".
-                                                          "off:noArg ".
-                                                          "volumeStraight:slider,-80,1,16 ".
-                                                          "volume:slider,0,1,100 ".
-                                                          (defined(ReadingsVal($name, "volume", undef)) ? "volumeUp volumeDown " : "").
-                                                          (exists($hash->{helper}{INPUTS}) ? "input:".$inputs_comma." " : "").
-                                                          "mute:on,off,toggle ".
-                                                          "remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".
-                                                          (exists($hash->{helper}{SCENES}) ? "scene:".$scenes_comma." " : "").
-                                                          ((exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? 
-                                                            "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".
-                                                            (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
-                                                            (exists($hash->{helper}{SURROUND_DECODERS}) ? "surroundDecoder:".$decoders_comma." " : "").
-                                                            ($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} ? "displayBrightness:slider,-4,1,0 " : "").
-                                                            (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "").
-                                                            "enhancer:on,off ".
-                                                            ($hash->{helper}{SUPPORT_HDMI_OUT} ? "hdmiOut1:on,off hdmiOut2:on,off " : "")
-                                                          :"").
-                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? 
-                                                            "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
-                                                            "preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
-                                                            "presetUp:noArg presetDown:noArg ".
-                                                            (($hash->{helper}{SUPPORT_SHUFFLE_REPEAT}) ? "shuffle:on,off repeat:off,one,all " : "") 
-                                                          :"").
-                                                          "sleep:off,30min,60min,90min,120min,last ".
-                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
+    my $usage = "Unknown argument $what, choose one of ". 'on:noArg '.
+                                                          'off:noArg '.
+                                                          'volumeStraight:slider,-80,1,16 '.
+                                                          'volume:slider,0,1,100 '.
+                                                          (defined ReadingsVal($name, 'volume', undef) ? 'volumeUp volumeDown ' : '').
+                                                          (exists $hash->{helper}{INPUTS} ? "input:$inputs_comma " : '').
+                                                          'mute:on,off,toggle '.
+                                                          'remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter '.
+                                                          ( exists $hash->{helper}{SCENES} ? "scene:$scenes_comma " : '').
+                                                          ( exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} eq 'mainzone' ? 
+                                                            'straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto '.
+                                                            (exists $hash->{helper}{DIRECT_TAG} ? 'direct:on,off ' : '').
+                                                            (exists $hash->{helper}{SURROUND_DECODERS} ? "surroundDecoder:$decoders_comma " : '').
+                                                            ($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} ? 'displayBrightness:slider,-4,1,0 ' : '').
+                                                            (exists $hash->{helper}{DSP_MODES} ? "dsp:$dsp_modes_comma " : '').
+                                                            'enhancer:on,off '.
+                                                            ($hash->{helper}{SUPPORT_HDMI_OUT} ? 'hdmiOut1:on,off hdmiOut2:on,off ' : '')
+                                                          :'').
+                                                          (exists $hash->{helper}{CURRENT_INPUT_TAG} ? 
+                                                            'navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward '.
+                                                            'preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 '.
+                                                            'presetUp:noArg presetDown:noArg '.
+                                                            ( $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} ? 'shuffle:on,off repeat:off,one,all ' : '' )
+                                                          :'').
+                                                          'sleep:off,30min,60min,90min,120min,last '.
+                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} &&  exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} eq 'mainzone' ? 'bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 ' : '').
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
                                                           ($hash->{helper}{SUPPORT_PARTY_MODE} ? "partyMode:on,off " : "").
@@ -368,23 +366,23 @@ YAMAHA_AVR_Set #($@)
                                                           ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? "ypaoVolume:off,auto " : "").
                                                           ($hash->{helper}{SUPPORT_DAB} ? "tunerFrequencyBand:FM,DAB " : "").
                                                           "tunerFrequency ".
-                                                          "displayBrightness:slider,-4,1,0 ".
-                                                          "statusRequest:noArg";
-                           
+                                                          'displayBrightness:slider,-4,1,0 '.
+                                                          'statusRequest:noArg';
+    return $usage if $what eq '?';
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
     my $powerCmdDelay = YAMAHA_AVR_isModel_DSP($hash) ? 3 : 2;
 
-    Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a) if _Log3Demand($hash,5);
+    Log3( $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a) ) if _Log3Demand($hash,5);
 
-    if($what eq "on")
+    if($what eq 'on')
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what, undef, {options => {wait_after_response => $powerCmdDelay}});
+        return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what, undef, {options => {wait_after_response => $powerCmdDelay}});
     }
-    elsif($what eq "off")
+    if($what eq 'off')
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef,{options => {wait_after_response => $powerCmdDelay}});
+        return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef,{options => {wait_after_response => $powerCmdDelay}});
     }
-    elsif($what eq "input")
+    if($what eq "input")
     {
         if(defined($a[2]))
         {
@@ -396,7 +394,7 @@ YAMAHA_AVR_Set #($@)
                     if(defined($command) and length($command) > 0)
                     {
                          YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>", $what, $a[2]);
-                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {no_playinfo => 1}});
+                         return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {no_playinfo => 1}});
                     }
                     else
                     {
@@ -418,7 +416,7 @@ YAMAHA_AVR_Set #($@)
             return (($inputs_piped eq "") ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given");
         }
     }
-    elsif($what eq "scene")
+    if($what eq "scene")
     {
         if(defined($a[2]))
         {
@@ -431,7 +429,7 @@ YAMAHA_AVR_Set #($@)
                     
                     if(defined($command) and length($command) > 0)
                     {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>", $what, $a[2]);
+                        return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Scene><Scene_Sel>".$command."</Scene_Sel></Scene></$zone></YAMAHA_AV>", $what, $a[2]);
                     }
                     else
                     {
@@ -1258,14 +1256,14 @@ YAMAHA_AVR_Undefine #($$)
 #############################
 # sends a command to the receiver via HTTP
 sub
-YAMAHA_AVR_SendCommand #($$$$;$)
+YAMAHA_AVR_SendCommand ($$$$;$)
 {
-    #my ($hash, $data,$cmd,$arg,$additional_args) = @_;
-    my $hash = shift // return;
-    my $data = shift // return;
-    my $cmd  = shift // return;
-    my $arg  = shift // return;
-    my $additional_args = shift; #if set, this should be HASH type arg
+    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
+    #my $hash = shift // return;
+    #my $data = shift // return;
+    #my $cmd  = shift // return;
+    #my $arg  = shift // return;
+    #my $additional_args = shift; #if set, this should be HASH type arg
     my $name = $hash->{NAME};
     my $options;
     
@@ -1383,7 +1381,7 @@ YAMAHA_AVR_HandleCmdQueue #($)
     }
 
     $hash->{CMDs_pending} = @{$hash->{helper}{CMD_QUEUE}};
-    delete($hash->{CMDs_pending}) unless($hash->{CMDs_pending}); 
+    delete $hash->{CMDs_pending} if !$hash->{CMDs_pending}; 
 
     return;
 }
@@ -1476,7 +1474,7 @@ sub YAMAHA_AVR_getNextRequestHash #($)
 #############################
 # parses the receiver response
 sub
-YAMAHA_AVR_ParseResponse #($$$)
+YAMAHA_AVR_ParseResponse($$$)
 {
     my $param = shift // return;
     my $err   = shift // q{};
