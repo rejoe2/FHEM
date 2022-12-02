@@ -50,7 +50,7 @@ BEGIN {
     readingsBulkUpdate
     readingsEndUpdate
     Log3
-    modules
+    modules attr defs
     init_done
     InternalTimer
     RemoveInternalTimer
@@ -374,7 +374,7 @@ YAMAHA_AVR_Set #($@)
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
     my $powerCmdDelay = YAMAHA_AVR_isModel_DSP($hash) ? 3 : 2;
 
-    Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
+    Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a) if _Log3Demand($hash,5);
 
     if($what eq "on")
     {
@@ -1609,7 +1609,7 @@ YAMAHA_AVR_ParseResponse #($$$)
                     $hash->{FIRMWARE} = $3;
                 }
                 
-                $attr{$name}{"model"} = $hash->{MODEL};
+                $attr{$name}{model} = $hash->{MODEL};
             }
             elsif($arg eq "getInputs")
             {
@@ -2618,7 +2618,14 @@ sub YAMAHA_AVR_isModel_DSP #($)
     return 0;
 }
 
+sub _Log3Demand {
+    my $hash = shift // return 0;
+    my $lvl  = shift // 3;
 
+    my $lcllvl = AttrVal($hash->{NAME}, 'verbose', undef);
+    return $lcllvl <= $lvl if defined $lcllvl;
+    return $lvl <= AttrVal('global', 'verbose', 0);
+}
 
 1;
 
