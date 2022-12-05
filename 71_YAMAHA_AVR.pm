@@ -1,4 +1,4 @@
-# $Id: 71_YAMAHA_AVR.pm 26762 no more mixed precedents, fixed set 05.12.2022 Beta-User $
+# $Id: 71_YAMAHA_AVR.pm 26762 no more mixed recedents, fixed set 3 05.12.2022 Beta-User $
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -334,43 +334,43 @@ YAMAHA_AVR_Set #($@)
        
     return 'No Argument given' if !defined $a[1];
 
-    (my $what, $a[2]) = split m{\W+}xms, $a[1], 2;
-    my $usage = "Unknown argument $what, choose one of ". 'on:noArg '.
-                                                          'off:noArg '.
-                                                          'volumeStraight:slider,-80,1,16 '.
-                                                          'volume:slider,0,1,100 '.
-                                                          (defined ReadingsVal($name, 'volume', undef) ? 'volumeUp volumeDown ' : '').
-                                                          (exists $hash->{helper}{INPUTS} ? "input:$inputs_comma " : '').
-                                                          'mute:on,off,toggle '.
-                                                          'remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter '.
-                                                          ( exists $hash->{helper}{SCENES} ? "scene:$scenes_comma " : '').
-                                                          ( exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} eq 'mainzone' ? 
-                                                            'straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto '.
-                                                            (exists $hash->{helper}{DIRECT_TAG} ? 'direct:on,off ' : '').
-                                                            (exists $hash->{helper}{SURROUND_DECODERS} ? "surroundDecoder:$decoders_comma " : '').
-                                                            ($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} ? 'displayBrightness:slider,-4,1,0 ' : '').
-                                                            (exists $hash->{helper}{DSP_MODES} ? "dsp:$dsp_modes_comma " : '').
-                                                            'enhancer:on,off '.
-                                                            ($hash->{helper}{SUPPORT_HDMI_OUT} ? 'hdmiOut1:on,off hdmiOut2:on,off ' : '')
-                                                          :'').
-                                                          (exists $hash->{helper}{CURRENT_INPUT_TAG} ? 
-                                                            'navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward '.
-                                                            'preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 '.
-                                                            'presetUp:noArg presetDown:noArg '.
-                                                            ( $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} ? 'shuffle:on,off repeat:off,one,all ' : '' )
-                                                          :'').
-                                                          'sleep:off,30min,60min,90min,120min,last '.
-                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} &&  exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} eq 'mainzone' ? 'bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 ' : '').
-                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} && exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} ne 'mainzone' && YAMAHA_AVR_isModel_DSP($hash) ? 'bass:slider,-10,1,10 treble:slider,-10,1,10 ' : '').
-                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} && exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} ne 'mainzone' && !YAMAHA_AVR_isModel_DSP($hash) ? 'bass:slider,-10,2,10 treble:slider,-10,2,10 ' : '').
-                                                          ($hash->{helper}{SUPPORT_PARTY_MODE} ? 'partyMode:on,off ' : '').
-                                                          ($hash->{helper}{SUPPORT_EXTRA_BASS} ? 'extraBass:off,auto ' : '').
-                                                          ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? 'ypaoVolume:off,auto ' : '').
-                                                          ($hash->{helper}{SUPPORT_DAB} ? 'tunerFrequencyBand:FM,DAB ' : '').
-                                                          'tunerFrequency '.
-                                                          'displayBrightness:slider,-4,1,0 '.
-                                                          'statusRequest:noArg';
-                                                          
+    #(my $what, $a[2]) = split m{\W+}xms, $a[1], 2;
+    my $what = $a[1];
+    my $usage = "Unknown argument $what, choose one of ". "on:noArg ".
+                                                          "off:noArg ".
+                                                          "volumeStraight:slider,-80,1,16 ".
+                                                          "volume:slider,0,1,100 ".
+                                                          (defined(ReadingsVal($name, "volume", undef)) ? "volumeUp volumeDown " : "").
+                                                          (exists($hash->{helper}{INPUTS}) ? "input:".$inputs_comma." " : "").
+                                                          "mute:on,off,toggle ".
+                                                          "remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".
+                                                          (exists($hash->{helper}{SCENES}) ? "scene:".$scenes_comma." " : "").
+                                                          ((exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? 
+                                                            "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".
+                                                            (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
+                                                            (exists($hash->{helper}{SURROUND_DECODERS}) ? "surroundDecoder:".$decoders_comma." " : "").
+                                                            ($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} ? "displayBrightness:slider,-4,1,0 " : "").
+                                                            (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "").
+                                                            "enhancer:on,off ".
+                                                            ($hash->{helper}{SUPPORT_HDMI_OUT} ? "hdmiOut1:on,off hdmiOut2:on,off " : "")
+                                                          :"").
+                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? 
+                                                            "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
+                                                            "preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
+                                                            "presetUp:noArg presetDown:noArg ".
+                                                            (($hash->{helper}{SUPPORT_SHUFFLE_REPEAT}) ? "shuffle:on,off repeat:off,one,all " : "") 
+                                                          :"").
+                                                          "sleep:off,30min,60min,90min,120min,last ".
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
+                                                          ($hash->{helper}{SUPPORT_PARTY_MODE} ? "partyMode:on,off " : "").
+                                                          ($hash->{helper}{SUPPORT_EXTRA_BASS} ? "extraBass:off,auto " : "").
+                                                          ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? "ypaoVolume:off,auto " : "").
+                                                          ($hash->{helper}{SUPPORT_DAB} ? "tunerFrequencyBand:FM,DAB " : "").
+                                                          "tunerFrequency ".
+                                                          "displayBrightness:slider,-4,1,0 ".
+                                                          "statusRequest:noArg";                                                          
     return $usage if $what eq '?';
 
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
@@ -808,7 +808,7 @@ YAMAHA_AVR_Set #($@)
     {
         # the RX-Vx71, RX-Vx73, RX-Ax10, RX-Ax20 series use a different tag name to access the remoteControl commands
         my $control_tag = exists $hash->{MODEL} && $hash->{MODEL} =~ /^RX-V\d{1,2}7(1|3)|RX-A\d{1,2}(1|2)0$/ ? 'List_Control' : 'Cursor_Control';
-        Log3($name, 3, "YAMAHA_AVR ($name) - set remoteControl called with arg $a[2]");
+        #Log3($name, 3, "YAMAHA_AVR ($name) - set remoteControl called with arg $a[2]");
         
         if($a[2] eq "up")
         {
