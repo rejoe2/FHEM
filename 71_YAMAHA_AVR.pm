@@ -1,4 +1,4 @@
-# $Id: 71_YAMAHA_AVR.pm 26762 no more mixed precedents Beta-User $
+# $Id: 71_YAMAHA_AVR.pm 26762 no more mixed precedents, fixed set 05.12.2022 Beta-User $
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -304,11 +304,12 @@ sub
 YAMAHA_AVR_Set #($@)
 {
     my ($hash, @a) = @_;
+
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     
     # get the model informations and available zones if no informations are available
-    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}))
+    if( !defined $hash->{ACTIVE_ZONE} || !defined $hash->{helper}{ZONES} )
     {
         YAMAHA_AVR_getModel($hash);
     }
@@ -316,8 +317,9 @@ YAMAHA_AVR_Set #($@)
     # get all available inputs if nothing is available
     YAMAHA_AVR_getInputs($hash) if !defined $hash->{helper}{INPUTS} || !length $hash->{helper}{INPUTS};
 
-    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
-    
+    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES}) 
+        // Log3( $name, 3, "YAMAHA_AVR ($name) - could not determine addressed zone!") && return;
+
     my $inputs_piped = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : '' ;
     my $inputs_comma = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : '' ;
 
@@ -330,9 +332,9 @@ YAMAHA_AVR_Set #($@)
     my $decoders_piped = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 0) : '' ;
     my $decoders_comma = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 1) : '' ;
        
-    return 'No Argument given' if !defined $a[1];     
-    
-    my $what = $a[1];
+    return 'No Argument given' if !defined $a[1];
+
+    (my $what, $a[2]) = split m{\W+}xms, $a[1], 2;
     my $usage = "Unknown argument $what, choose one of ". 'on:noArg '.
                                                           'off:noArg '.
                                                           'volumeStraight:slider,-80,1,16 '.
@@ -359,16 +361,18 @@ YAMAHA_AVR_Set #($@)
                                                           :'').
                                                           'sleep:off,30min,60min,90min,120min,last '.
                                                           ( $hash->{helper}{SUPPORT_TONE_STATUS} &&  exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} eq 'mainzone' ? 'bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 ' : '').
-                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
-                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
-                                                          ($hash->{helper}{SUPPORT_PARTY_MODE} ? "partyMode:on,off " : "").
-                                                          ($hash->{helper}{SUPPORT_EXTRA_BASS} ? "extraBass:off,auto " : "").
-                                                          ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? "ypaoVolume:off,auto " : "").
-                                                          ($hash->{helper}{SUPPORT_DAB} ? "tunerFrequencyBand:FM,DAB " : "").
-                                                          "tunerFrequency ".
+                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} && exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} ne 'mainzone' && YAMAHA_AVR_isModel_DSP($hash) ? 'bass:slider,-10,1,10 treble:slider,-10,1,10 ' : '').
+                                                          ( $hash->{helper}{SUPPORT_TONE_STATUS} && exists $hash->{ACTIVE_ZONE} && $hash->{ACTIVE_ZONE} ne 'mainzone' && !YAMAHA_AVR_isModel_DSP($hash) ? 'bass:slider,-10,2,10 treble:slider,-10,2,10 ' : '').
+                                                          ($hash->{helper}{SUPPORT_PARTY_MODE} ? 'partyMode:on,off ' : '').
+                                                          ($hash->{helper}{SUPPORT_EXTRA_BASS} ? 'extraBass:off,auto ' : '').
+                                                          ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? 'ypaoVolume:off,auto ' : '').
+                                                          ($hash->{helper}{SUPPORT_DAB} ? 'tunerFrequencyBand:FM,DAB ' : '').
+                                                          'tunerFrequency '.
                                                           'displayBrightness:slider,-4,1,0 '.
                                                           'statusRequest:noArg';
+                                                          
     return $usage if $what eq '?';
+
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
     my $powerCmdDelay = YAMAHA_AVR_isModel_DSP($hash) ? 3 : 2;
 
@@ -380,7 +384,7 @@ YAMAHA_AVR_Set #($@)
     }
     if($what eq 'off')
     {
-        return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef,{options => {wait_after_response => $powerCmdDelay}});
+        return YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef, {options => {wait_after_response => $powerCmdDelay}});
     }
     if($what eq "input")
     {
@@ -803,7 +807,8 @@ YAMAHA_AVR_Set #($@)
     elsif($what eq "remoteControl" and defined($a[2]))
     {
         # the RX-Vx71, RX-Vx73, RX-Ax10, RX-Ax20 series use a different tag name to access the remoteControl commands
-        my $control_tag = (exists($hash->{MODEL}) and $hash->{MODEL} =~ /^RX-V\d{1,2}7(1|3)|RX-A\d{1,2}(1|2)0$/ ? "List_Control" : "Cursor_Control");
+        my $control_tag = exists $hash->{MODEL} && $hash->{MODEL} =~ /^RX-V\d{1,2}7(1|3)|RX-A\d{1,2}(1|2)0$/ ? 'List_Control' : 'Cursor_Control';
+        Log3($name, 3, "YAMAHA_AVR ($name) - set remoteControl called with arg $a[2]");
         
         if($a[2] eq "up")
         {
@@ -1256,14 +1261,14 @@ YAMAHA_AVR_Undefine #($$)
 #############################
 # sends a command to the receiver via HTTP
 sub
-YAMAHA_AVR_SendCommand ($$$$;$)
+YAMAHA_AVR_SendCommand #($$$$;$)
 {
-    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
-    #my $hash = shift // return;
-    #my $data = shift // return;
-    #my $cmd  = shift // return;
-    #my $arg  = shift // return;
-    #my $additional_args = shift; #if set, this should be HASH type arg
+#    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
+    my $hash = shift // return;
+    my $data = shift; # // return;
+    my $cmd  = shift; # // return;
+    my $arg  = shift; # // return;
+    my $additional_args = shift; #if set, this should be HASH type arg
     my $name = $hash->{NAME};
     my $options;
     
@@ -1279,7 +1284,7 @@ YAMAHA_AVR_SendCommand ($$$$;$)
     
     map {$param->{$_} = $additional_args->{$_}} keys %{$additional_args};
     
-    $options = $additional_args->{options} if(exists($additional_args->{options}));
+    $options = $additional_args->{options} if exists $additional_args->{options};
     
     my $device = $hash;
        
@@ -1474,7 +1479,7 @@ sub YAMAHA_AVR_getNextRequestHash #($)
 #############################
 # parses the receiver response
 sub
-YAMAHA_AVR_ParseResponse($$$)
+YAMAHA_AVR_ParseResponse #($$$)
 {
     my $param = shift // return;
     my $err   = shift // q{};
@@ -1488,18 +1493,18 @@ YAMAHA_AVR_ParseResponse($$$)
     my $options = $param->{options};
 
     $hash->{helper}{RUNNING_REQUEST} = 0;
-    delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
-    
+    delete $hash->{helper}{'.HTTP_CONNECTION'} if !$param->{keepalive};
+
     # if request is from an other definition (zone2, zone3, ...)
-    $hash = $param->{original_hash} if(exists($param->{original_hash}));
+    $hash = $param->{original_hash} if exists $param->{original_hash};
 
     my $name = $hash->{NAME};
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
-    
-    if(exists($param->{code}))
+
+    if ( exists $param->{code} )
     {
         Log3 $name, 4, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
-        
+
         if($cmd eq "statusRequest" and $param->{code} ne "200")
         {
             if($arg eq "playShuffle")
