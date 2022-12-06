@@ -1,4 +1,4 @@
-# $Id: 71_YAMAHA_AVR.pm 26762 no more mixed recedents, fixed set 3 05.12.2022 Beta-User $
+# $Id: 71_YAMAHA_AVR.pm 26762 06.12.2022 Beta-User $
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -37,7 +37,7 @@ use Carp qw(carp);
 use GPUtils qw(GP_Import);
 
 use List::Util qw(max min);
-#use Scalar::Util qw(looks_like_number);
+use Scalar::Util qw(looks_like_number);
 #use FHEM::Meta;
 
 sub ::YAMAHA_AVR_Initialize { goto &Initialize }
@@ -72,11 +72,11 @@ Initialize
 {
     my $hash = shift;
 
-    $hash->{GetFn}     = \&YAMAHA_AVR_Get;
-    $hash->{SetFn}     = \&YAMAHA_AVR_Set;
-    $hash->{DefFn}     = \&YAMAHA_AVR_Define;
-    $hash->{AttrFn}    = \&YAMAHA_AVR_Attr;
-    $hash->{UndefFn}   = \&YAMAHA_AVR_Undefine;
+    $hash->{GetFn}     = \&Get;
+    $hash->{SetFn}     = \&Set;
+    $hash->{DefFn}     = \&Define;
+    $hash->{AttrFn}    = \&Attr;
+    $hash->{UndefFn}   = \&Undefine;
 
     $hash->{AttrList}  = 'do_not_notify:0,1 '.
                          'disable:0,1 '.
@@ -97,9 +97,7 @@ Initialize
 }
 
 #############################
-sub
-YAMAHA_AVR_Define
-{
+sub Define {
     my $hash = shift // return;
     my $def  = shift // return;
     my @arr  = split m{\s+}xms, $def;
@@ -219,7 +217,7 @@ YAMAHA_AVR_GetStatus #($;$)
 
     if ( $hash->{ACTIVE_ZONE} eq 'mainzone' && ( !exists $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} || $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS}) )
     {
-        if(YAMAHA_AVR_isModel_DSP($hash))
+        if(_isModel_DSP($hash))
         {
             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Display><FL>GetParam</FL></Display></System></YAMAHA_AV>", "statusRequest", "displayBrightness", {options => {can_fail => 1}});
         }
@@ -231,7 +229,7 @@ YAMAHA_AVR_GetStatus #($;$)
 
     if ( !exists $hash->{helper}{SUPPORT_TONE_STATUS} || ( exists $hash->{helper}{SUPPORT_TONE_STATUS} && exists $hash->{MODEL} && $hash->{helper}{SUPPORT_TONE_STATUS}))
     {   
-        if(YAMAHA_AVR_isModel_DSP($hash))
+        if(_isModel_DSP($hash))
         {
             if ( $zone eq 'Main_Zone' )
             {
@@ -277,9 +275,7 @@ YAMAHA_AVR_GetStatus #($;$)
 }
 
 ###################################
-sub
-YAMAHA_AVR_Get #($@)
-{
+sub Get {
     my ($hash, @arr) = @_;
 
     return 'argument is missing' if @arr != 2;
@@ -300,9 +296,7 @@ YAMAHA_AVR_Get #($@)
 
 
 ###################################
-sub
-YAMAHA_AVR_Set #($@)
-{
+sub Set {
     my ($hash, @a) = @_;
 
     my $name = $hash->{NAME};
@@ -317,8 +311,11 @@ YAMAHA_AVR_Set #($@)
     # get all available inputs if nothing is available
     YAMAHA_AVR_getInputs($hash) if !defined $hash->{helper}{INPUTS} || !length $hash->{helper}{INPUTS};
 
-    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES}) 
-        // Log3( $name, 3, "YAMAHA_AVR ($name) - could not determine addressed zone!") && return;
+    my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
+    if ( !defined $zone && $a[1] ne '?' ) {
+        Log3( $name, 3, "YAMAHA_AVR ($name) - could not determine addressed zone!");
+        return 'could not determine addressed zone!';
+    }
 
     my $inputs_piped = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 0) : '' ;
     my $inputs_comma = defined $hash->{helper}{INPUTS} ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{INPUTS}), 1) : '' ;
@@ -331,11 +328,8 @@ YAMAHA_AVR_Set #($@)
     
     my $decoders_piped = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 0) : '' ;
     my $decoders_comma = defined($hash->{helper}{SURROUND_DECODERS}) ? YAMAHA_AVR_Param2Fhem(lc($hash->{helper}{SURROUND_DECODERS}), 1) : '' ;
-       
-    return 'No Argument given' if !defined $a[1];
 
-    #(my $what, $a[2]) = split m{\W+}xms, $a[1], 2;
-    my $what = $a[1];
+    my $what = $a[1] // return 'No Argument given';
     my $usage = "Unknown argument $what, choose one of ". "on:noArg ".
                                                           "off:noArg ".
                                                           "volumeStraight:slider,-80,1,16 ".
@@ -362,8 +356,8 @@ YAMAHA_AVR_Set #($@)
                                                           :"").
                                                           "sleep:off,30min,60min,90min,120min,last ".
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
-                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
-                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and _isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not _isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
                                                           ($hash->{helper}{SUPPORT_PARTY_MODE} ? "partyMode:on,off " : "").
                                                           ($hash->{helper}{SUPPORT_EXTRA_BASS} ? "extraBass:off,auto " : "").
                                                           ($hash->{helper}{SUPPORT_YPAO_VOLUME} ? "ypaoVolume:off,auto " : "").
@@ -374,7 +368,7 @@ YAMAHA_AVR_Set #($@)
     return $usage if $what eq '?';
 
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
-    my $powerCmdDelay = YAMAHA_AVR_isModel_DSP($hash) ? 3 : 2;
+    my $powerCmdDelay = _isModel_DSP($hash) ? 3 : 2;
 
     Log3( $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a) ) if _Log3Demand($hash,5);
 
@@ -459,7 +453,7 @@ YAMAHA_AVR_Set #($@)
     {
 
         # Depending on the status response, use the short or long Volume command
-        my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
+        my $volume_cmd = (_isModel_DSP($hash) ? "Vol" : "Volume");
     
         if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($name, "mute", "off") eq "off"))
         {
@@ -477,83 +471,73 @@ YAMAHA_AVR_Set #($@)
     }
     elsif ( $what =~ m{\AvolumeStraight|volume|volumeUp|volumeDown\z}x )
     {
+        return "volume command requires an additional numeric parameter" if 
+            $what !~ m{\AvolumeUp|volumeDown\z}x && !defined $a[2] || !looks_like_number($a[2]); #non-numeric second parameter is faulty also with up/down commands!
+        
         my $target_volume;
-        
-        if ( $what eq 'volume' && defined $a[2] && $a[2] =~ /^\d{1,3}(?:\.\d+)?$/ && $a[2] >= 0 && $a[2] <= 100)
-        {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(int($a[2]));
-        }
-        elsif( $what eq 'volumeDown' && defined ReadingsVal($name, 'volume', undef) )
-        {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, 'volume', -45) - ( defined $a[2] && $a[2] =~ /^\d+(?:\.\d+)?$/ ? int $a[2] : AttrVal($hash->{NAME}, 'volumeSteps',5) ));
-        }
-        elsif($what eq "volumeUp" and defined(ReadingsVal($name, "volume", undef)))
-        {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+(?:\.\d+)?$/) ? int($a[2]) : AttrVal($hash->{NAME}, "volumeSteps",5)));
-        }
-        elsif($what eq "volumeStraight" and defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d+)?$/)
-        {
+
+        if ( $what eq 'volumeStraight' ) {
             $target_volume = $a[2];
+        } else {
+            my $act_vol = ReadingsNum($name, 'volume', 0);
+            if ( $a[2] =~ m{\A[+-].*} ) { 
+                $target_volume = $act_vol + $a[2];
+            } else {
+                my $change = AttrVal($hash->{NAME}, 'volumeSteps',$a[2]);
+                $target_volume = 
+                    $what eq 'volumeDown' ? $act_vol - $change :
+                    $what eq 'volumeUp'   ? $act_vol + $change :
+                    $a[2];
+            }
+            $target_volume = YAMAHA_AVR_volume_rel2abs($target_volume);
         }
-        else
-        {
-            return $usage;
-        }
-        
-        if($target_volume > YAMAHA_AVR_volume_rel2abs(AttrVal($name, "volumeMax","100")))
-        {
-            $target_volume = YAMAHA_AVR_volume_rel2abs(AttrVal($name, "volumeMax","100"));
-        }
+
+        return 'error calculating target volume' if !defined $target_volume;
+
+        $target_volume = min($target_volume, YAMAHA_AVR_volume_rel2abs(AttrVal($name, 'volumeMax','100')));
          
         # if lower than minimum (-80.5) or higher than max (16.5) set target volume to the corresponding boundary
-        $target_volume = -80.5 if(defined($target_volume) and $target_volume < -80.5);
-        $target_volume = 16.5 if(defined($target_volume) and $target_volume > 16.5);
-        
+
+        $target_volume = min(max(-80.5,$target_volume),16.5);
         # ensure $target_volume mod 0.5 == 0
         $target_volume = int($target_volume / 0.5) * 0.5;
         
-        Log3 $name, 4, "YAMAHA_AVR ($name) - new target volume: $target_volume";
+        Log3($name, 4, "YAMAHA_AVR ($name) - new target volume: $target_volume") if _Log3Demand($hash, 4);
         
-        if(defined($target_volume))
+        # DSP based models use "Vol" instead of "Volume"
+        my $volume_cmd = (_isModel_DSP($hash) ? 'Vol' : 'Volume');
+        
+        if(AttrVal($name, 'volumeSmoothChange', '1') eq '1')
         {
-            # DSP based models use "Vol" instead of "Volume"
-            my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
-            
-            if(AttrVal($name, "volumeSmoothChange", "1") eq "1")
-            {
-                my $steps = AttrVal($name, "volumeSmoothSteps", 5);
-                my $diff = int(($target_volume - ReadingsVal($name, "volumeStraight", $target_volume)) / $steps / 0.5) * 0.5;
-                my $current_volume = ReadingsVal($name, "volumeStraight", undef); 
+            my $steps = AttrVal($name, 'volumeSmoothSteps', 5);
+            my $diff = int(($target_volume - ReadingsVal($name, 'volumeStraight', $target_volume)) / $steps / 0.5) * 0.5;
+            my $current_volume = ReadingsVal($name, 'volumeStraight', undef); 
 
-                if($diff > 0)
-                {
-                    Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of +$diff volume change to reach $target_volume)";
-                }
-                else
-                {
-                    Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of $diff volume change to reach $target_volume)";
-                }
-        
-                # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
-                if(defined($current_volume) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct"))
-                {        
-                    Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, volume_target => $target_volume}});
-                }
-                else
-                {
-                    # Set the desired volume
-                    Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => $diff, volume_target => $target_volume}});
-                }
+            if ( _Log3Demand($hash, 4) ) { 
+                my $difftext = $diff > 0 ? qq(+$diff) : $diff;
+                Log3($name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of $difftext volume change to reach $target_volume)") ;
+            }
+
+            # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
+            if(defined($current_volume) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct")) #Beta-User: ?!?
+            {        
+                Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, volume_target => $target_volume}});
             }
             else
             {
                 # Set the desired volume
                 Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
-                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => 0, volume_target => $target_volume}});
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => $diff, volume_target => $target_volume}});
             }
         }
+        else
+        {
+            # Set the desired volume
+            Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => 0, volume_target => $target_volume}});
+        }
+
     }
     elsif($what eq "bass" and defined($a[2]))
     {
@@ -564,7 +548,7 @@ YAMAHA_AVR_Set #($@)
             $bassVal = -6 if($bassVal < -6);
             $bassVal = 6 if($bassVal > 6);
             
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Bass><Cross_Over><Val>" . ReadingsVal($name,"bassCrossover","125") . "</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
             }
@@ -575,12 +559,10 @@ YAMAHA_AVR_Set #($@)
         }
         else
         {
-            $bassVal = int($a[2]);
 
-            $bassVal = -10 if($bassVal < -10);
-            $bassVal = 10 if($bassVal > 10);
-            
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            $bassVal = max(-10,min(int($a[2]),10));
+
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
             }
@@ -601,7 +583,7 @@ YAMAHA_AVR_Set #($@)
             $trebleVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
             $trebleVal = -6 if($trebleVal < -6);
             $trebleVal = 6 if($trebleVal > 6);
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Treble><Cross_Over><Val>" . ReadingsVal($name,"trebleCrossover","35") . "</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
             }
@@ -615,7 +597,7 @@ YAMAHA_AVR_Set #($@)
             $trebleVal = int($trebleVal);
             $trebleVal = -10 if($trebleVal < -10);
             $trebleVal = 10 if($trebleVal > 10);
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
             }
@@ -640,7 +622,7 @@ YAMAHA_AVR_Set #($@)
                     
                     if(defined($command) and length($command) > 0)
                     {
-                        if(YAMAHA_AVR_isModel_DSP($hash))
+                        if(_isModel_DSP($hash))
                         {
                             if($hash->{MODEL} eq "RX-V2065")
                             {
@@ -681,7 +663,7 @@ YAMAHA_AVR_Set #($@)
     {
         if($a[2] eq "on")
         {
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surr><Pgm_Sel><Straight>On</Straight></Pgm_Sel></Surr></$zone></YAMAHA_AV>", $what, $a[2]);
             }
@@ -692,7 +674,7 @@ YAMAHA_AVR_Set #($@)
         }
         elsif($a[2] eq "off")
         {
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Surr><Pgm_Sel><Straight>Off</Straight></Pgm_Sel></Surr></$zone></YAMAHA_AV>", $what, $a[2]);
             }
@@ -1077,7 +1059,7 @@ YAMAHA_AVR_Set #($@)
     {
         if($a[2] =~ /^-?\d+$/ and $a[2] >= -4 and $a[2] <= 0)
         {
-            if(YAMAHA_AVR_isModel_DSP($hash))
+            if(_isModel_DSP($hash))
             {
                 YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><System><Display><FL><Dimmer><Val>".$a[2]."</Val><Exp>0</Exp><Unit></Unit></Dimmer></FL></Display></System></YAMAHA_AV>", $what, $a[2]);
             }
@@ -1163,9 +1145,7 @@ YAMAHA_AVR_Set #($@)
 }
 
 ##########################
-sub
-YAMAHA_AVR_Attr #(@)
-{
+sub Attr {
     my ($cmd, $name, $attr, $val) = @_;
     
     my $hash = $defs{$name} // return;
@@ -1180,17 +1160,17 @@ YAMAHA_AVR_Attr #(@)
     {
         if($attr =~ /^(?:volumeMax|volumeSteps)$/)
         {
-            if($val !~ /^\d+$/)
+            if( $val !~ m/^\d+$/ )
             {
                 return "invalid attribute value for attribute $attr: $val";
             }
             
-            if($attr eq "volumeMax" and ($val < 0 or $val > 100))
+            if ( $attr eq 'volumeMax' && ($val < 0 || $val > 100) )
             {
                 return "value is out of range (0-100) for attribute $attr: $val";
             }
             
-            if($attr eq "volumeSteps" and ($val < 1))
+            if ( $attr eq 'volumeSteps' && $val < 1 )
             {
                 return "value is out of range (1-*) for attribute $attr: $val";
             }
@@ -1201,9 +1181,7 @@ YAMAHA_AVR_Attr #(@)
 }
 
 #############################
-sub
-YAMAHA_AVR_Undefine #($$)
-{
+sub Undefine {
     my $hash = shift // return;
     my $name = shift // return;
 
@@ -1294,7 +1272,7 @@ YAMAHA_AVR_SendCommand #($$$$;$)
         $hash->{MAIN_ZONE} = $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone}->{NAME};
         
         # DSP based models only: use the http queue from mainzone to execute command
-        if(YAMAHA_AVR_isModel_DSP($hash))
+        if(_isModel_DSP($hash))
         {
             $device = $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{mainzone};
             $param->{original_hash} = $hash;
@@ -1903,7 +1881,7 @@ YAMAHA_AVR_ParseResponse #($$$)
             {
                 if($data =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentArtist", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentArtist", _html2txt($1));
                 }
                 else
                 {
@@ -1913,19 +1891,19 @@ YAMAHA_AVR_ParseResponse #($$$)
 
                 if($data =~ /<Band>DAB<\/Band>/ and $data =~ /<Meta_Info>.*?<Service_Label>(.+?)<\/Service_Label>.*?<\/Meta_Info>/) # RX-481D provides always Meta-Info for DAB and Tuner
                 {
-                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentStation", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentStation", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentStation", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentStation", _html2txt($1));
                 }
                 else
                 {
@@ -1934,7 +1912,7 @@ YAMAHA_AVR_ParseResponse #($$$)
                 
                 if($data =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentChannel", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentChannel", _html2txt($1));
                 }
                 else
                 {
@@ -1943,7 +1921,7 @@ YAMAHA_AVR_ParseResponse #($$$)
                 
                 if($data =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentAlbum", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentAlbum", _html2txt($1));
                 }
                 else
                 {
@@ -1952,15 +1930,15 @@ YAMAHA_AVR_ParseResponse #($$$)
 
                 if($data =~ /<Band>DAB<\/Band>/ and $data =~ /<Meta_Info>.*?<DLS>(.+?)<\/DLS>.*?<\/Meta_Info>/) # RX-481D provides always Meta-Info for DAB and FM
                 {
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentTitle", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentTitle", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Track>(.+?)<\/Track>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentTitle", _html2txt($1));
                 }
                 elsif($data =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<\/Meta_Info>/)    
                 {        
@@ -1968,20 +1946,20 @@ YAMAHA_AVR_ParseResponse #($$$)
                     
                     if($data =~ /<Meta_Info>.*?<Radio_Text_A>(.+?)<\/Radio_Text_A>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)    
                     {                                                                   
-                        readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt(trim($1)." ".trim($2)));        
+                        readingsBulkUpdate($hash, "currentTitle", _html2txt(trim($1)." ".trim($2)));        
                     }    
                     else
                     {
-                        readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($tmp));        
+                        readingsBulkUpdate($hash, "currentTitle", _html2txt($tmp));        
                     }
                 }    
                 elsif($data =~ /<Meta_Info>.*?<Radio_Text_B>(.+?)<\/Radio_Text_B>.*?<\/Meta_Info>/)    
                 {         
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));        
+                    readingsBulkUpdate($hash, "currentTitle", _html2txt($1));        
                 }
                 elsif($data =~ /<Meta_Info>.*?<Radio_Text>(.+?)<\/Radio_Text>.*?<\/Meta_Info>/) # RX-V481D
                 {
-                    readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
+                    readingsBulkUpdate($hash, "currentTitle", _html2txt($1));
                 }    
                                                                      
                           
@@ -2005,7 +1983,7 @@ YAMAHA_AVR_ParseResponse #($$$)
                 
                 if(($data =~ /<Band>DAB<\/Band>/ and $data =~ /<DAB>.*?<Signal_Info>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Signal_Info>.*?<\/DAB>/) or  # RX-481D provides always Meta-Info for DAB and FM
                    ($data =~ /<Tuning>.*?<Freq>(?:<Current>)?<Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit>(?:<\/Current>)?.*?<\/Tuning>/)  or 
-                   (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
+                   (_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
                 {
                     readingsBulkUpdate($hash, "currentStationFrequency", sprintf("%.$2f", ($1 / (10 ** $2)))." $3");
                     readingsBulkUpdate($hash, "tunerFrequency", sprintf("%.$2f", ($1 / (10 ** $2))));
@@ -2050,18 +2028,18 @@ YAMAHA_AVR_ParseResponse #($$$)
                     readingsBulkUpdate($hash, "tunerFrequencyBand", uc($1));
                 }
                 
-                if($data =~ /<Tuning>.*?<Freq><Current><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Current>.*?<\/Tuning>/ or (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
+                if($data =~ /<Tuning>.*?<Freq><Current><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Current>.*?<\/Tuning>/ or (_isModel_DSP($hash) and $data =~ /<Tuning>.*?<Freq><Val>(\d+?)<\/Val><Exp>(\d+?)<\/Exp><Unit>(.*?)<\/Unit><\/Freq>.*?<\/Tuning>/))
                 {
                     readingsBulkUpdate($hash, "tunerFrequency", sprintf("%.$2f", ($1 / (10 ** $2))));
                 }    
             }
-            elsif($arg eq "surroundDecoder")
+            elsif($arg eq 'surroundDecoder')
             {
                 if($data =~ /<Decoder_Type>(.+?)<\/Decoder_Type>/)
                 {
                     $hash->{helper}{SUPPORT_SURROUND_DECODER} = 1;
-                    readingsBulkUpdate($hash, "surroundDecoder", YAMAHA_AVR_Param2Fhem($1, 0));
-                    $hash->{helper}{SURROUND_DECODERS} = YAMAHA_AVR_generateSurroundDecoderList($hash) unless($hash->{helper}{SURROUND_DECODERS});
+                    readingsBulkUpdate($hash, 'surroundDecoder', YAMAHA_AVR_Param2Fhem($1, 0));
+                    $hash->{helper}{SURROUND_DECODERS} //= _generateSurroundDecoderList($hash);
                 }
                 elsif($data =~ /RC="2"/) # is not supported by this specific model
                 {
@@ -2070,7 +2048,7 @@ YAMAHA_AVR_ParseResponse #($$$)
             }
             elsif($arg eq "displayBrightness")
             {
-                if($data =~ /<Dimmer>(.+?)<\/Dimmer>/ or (YAMAHA_AVR_isModel_DSP($hash) and $data =~ /<Val>(.+?)<\/Val>/))
+                if($data =~ /<Dimmer>(.+?)<\/Dimmer>/ or (_isModel_DSP($hash) and $data =~ /<Val>(.+?)<\/Val>/))
                 {
                     $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS} = 1;
                     readingsBulkUpdate($hash, "displayBrightness", $1);
@@ -2239,7 +2217,7 @@ YAMAHA_AVR_ParseResponse #($$$)
             my $diff = $options->{volume_diff};
             
             # DSP based models use "Vol" instead of "Volume"
-            my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
+            my $volume_cmd = (_isModel_DSP($hash) ? "Vol" : "Volume");
             
             my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
 
@@ -2392,7 +2370,7 @@ YAMAHA_AVR_ParseXML #($$$)
     {
         Log3 $name, 4, "YAMAHA_AVR ($name) - no DSP modes found in XML";
         # DSP-Z based series does not offer DSP modes in unit description
-        if(YAMAHA_AVR_isModel_DSP($hash))
+        if(_isModel_DSP($hash))
         {
             Log3 $name, 4, "YAMAHA_AVR ($name) - using static DSP mode list für DSP-Z based models";
             $hash->{helper}{DSP_MODES} =    "Hall in Munich|".
@@ -2551,7 +2529,7 @@ sub YAMAHA_AVR_ResetTimer #($;$)
 
 #############################
 # convert all HTML entities into UTF-8 aquivalents
-sub YAMAHA_AVR_html2txt #($)
+sub _html2txt #($)
 {
     my $string = shift // return '';
 
@@ -2580,7 +2558,7 @@ sub YAMAHA_AVR_html2txt #($)
     return $string;
 }
 
-sub YAMAHA_AVR_generateSurroundDecoderList #($)
+sub _generateSurroundDecoderList #($)
 {
     my $hash = shift // return;
     
@@ -2610,7 +2588,7 @@ sub YAMAHA_AVR_generateSurroundDecoderList #($)
 #############################
 # Check if amp is one of these models: DSP-Z7, DSP-Z9, DSP-Z11, RX-Z7, RX-Z9, RX-Z11, RX-V2065, RX-V3900, DSP-AX3900
 # Tested models: DSP-Z7
-sub YAMAHA_AVR_isModel_DSP #($)
+sub _isModel_DSP #($)
 {
     my $hash = shift // return;
     
