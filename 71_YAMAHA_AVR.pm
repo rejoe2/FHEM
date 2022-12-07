@@ -1,4 +1,4 @@
-# $Id: 71_YAMAHA_AVR.pm 26762 06.12.2022 Beta-User $
+# $Id: 71_YAMAHA_AVR.pm 26762 07.12.2022 Beta-User $
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -472,7 +472,7 @@ sub Set {
     elsif ( $what =~ m{\AvolumeStraight|volume|volumeUp|volumeDown\z}x )
     {
         return "volume command requires an additional numeric parameter" if 
-            $what !~ m{\AvolumeUp|volumeDown\z}x && !defined $a[2] || !looks_like_number($a[2]); #non-numeric second parameter is faulty also with up/down commands!
+            !defined $a[2] && $what !~ m{\AvolumeUp|volumeDown\z}x || defined $a[2] && !looks_like_number($a[2]); #non-numeric second parameter is faulty also with up/down commands!
         
         my $target_volume;
 
