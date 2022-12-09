@@ -471,7 +471,7 @@ sub Set {
     }
     elsif ( $what =~ m{\AvolumeStraight|volume|volumeUp|volumeDown\z}x )
     {
-        return 'volume command requires an additional numeric parameter' if 
+        return "volume command requires an additional numeric parameter" if 
             !defined $a[2] && $what !~ m{\AvolumeUp|volumeDown\z}x || defined $a[2] && !looks_like_number($a[2]); #non-numeric second parameter is faulty also with up/down commands!
         
         my $target_volume;
@@ -483,7 +483,7 @@ sub Set {
             if ( $a[2] =~ m{\A[+-].*} ) { 
                 $target_volume = $act_vol + $a[2];
             } else {
-                my $change = $a[2] // AttrVal($hash->{NAME}, 'volumeSteps',5);
+                my $change = AttrVal($hash->{NAME}, 'volumeSteps',$a[2]);
                 $target_volume = 
                     $what eq 'volumeDown' ? $act_vol - $change :
                     $what eq 'volumeUp'   ? $act_vol + $change :
@@ -519,7 +519,7 @@ sub Set {
             }
 
             # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
-            if( defined $current_volume && $diff != 0 && !defined $a[3] || $a[3] ne 'direct' )
+            if(defined($current_volume) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct")) #Beta-User: ?!?
             {        
                 Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
                 YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, volume_target => $target_volume}});

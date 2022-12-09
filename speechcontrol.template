@@ -1,5 +1,5 @@
 ###########################################
-# $Id: speechcontrol.template 24520 2021-05-27 17:53:36Z Beta-User $
+# $Id: speechcontrol.template 26764 2022-12-02 17:52:52Z Beta-User $
 #
 # This file provides add-on templates for use with speech recognistion modules 
 # Originally developped for mqtt2-device, see forum thread here: https://forum.fhem.de/index.php/topic,99195.0.html
@@ -43,6 +43,17 @@ par:NOTDELAYED;Set this to 0 to not apply naming template on first round;{ 1 }
 option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0];return 0}
 attr DEVICE genericDeviceType light
 attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39216,delay=true
+option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0] && NOTDELAYED;return 0}
+set DEVICE attrTemplate speechcontrol_general_naming_master_template
+
+name:speechcontrol_type_light_254
+filter:NAME=speechrecognTesting
+order:100003a
+desc:template to set speech speechcontrol attributes for genericDeviceType light - brightness in 254 steps
+par:NOTDELAYED;Set this to 0 to not apply naming template on first round;{ 1 } 
+option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0];return 0}
+attr DEVICE genericDeviceType light
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,max=100,factor=0.39371,delay=true
 option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0] && NOTDELAYED;return 0}
 set DEVICE attrTemplate speechcontrol_general_naming_master_template
 

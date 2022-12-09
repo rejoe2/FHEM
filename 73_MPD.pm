@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: 73_MPD.pm 23900 2022-06-22 Beta-User + JensS fixes $
+#  $Id: 73_MPD.pm 23900 2022-12-09 Beta-User + JensS fixes + database (forum #130801) $
 #
 #  (c) 2014 Copyright: Wzut
 #  All rights reserved
@@ -1024,6 +1024,11 @@ sub mpd_cmd($$)
   return $!; 
  }
 
+# my $read = new IO::Select() || return 'Error in calling IO::Select!\n';
+# $read->add($sock);
+# my @count = $read->can_read($hash->{TIMEOUT});
+# return 'error - no data received from MPD!\n' if @count < 1;
+ 
  if ( !eval {
         $SIG{ALRM} = sub {Carp::carp 'timeout';};
         alarm(1);
@@ -1034,6 +1039,9 @@ sub mpd_cmd($$)
     ) { 
         return $@ if $@;
     }
+
+# while (<$sock>)  # MPD rede mit mir , egal was ;)
+# { last if $_ ; } # end of output.
 
  chomp $_;
 
@@ -1219,16 +1227,11 @@ sub MPD_IdleStart($)
 
  return $name."|IdleStart: $!" if (!$sock);
 
- if ( !eval {
-        $SIG{ALRM} = sub {Carp::carp 'timeout';};
-        alarm(1);
-        while (<$sock>)     # MPD rede mit mir , egal was ;)
-            { last if $_ ; } # end of output.
-        alarm(0);
-        1; } 
-    ) { 
-        return $@ if $@;
-    }
+ my $read = new IO::Select() || return 'Fehler beim Aufruf von IO::Select!\n';
+ $read->add($sock);
+ my @count = $read->can_read($hash->{TIMEOUT});
+ return "Fehler - keine Daten vom MPD!\n" if @count < 1;
+ while (<$sock>) { last if $_ ; }
 
  chomp $_;
 
@@ -1269,7 +1272,7 @@ sub MPD_IdleStart($)
 
      $_ =~s/changed: //g;
 
-     if (($_ ne $old_event) && ($_ ne "OK") && (index($_,": ") == -1))  
+     if (($_ ne $old_event) && ($_ ne "OK") && (index($_,": ") == -1) )
      { 
       $output   .= ($old_event eq "") ? $_ : "+".$_; 
       $old_event = $_;
@@ -1278,7 +1281,16 @@ sub MPD_IdleStart($)
      elsif (index($_,": ") > -1){
        $output .= "|".$_; 
        $step=1;
-     } 
+     }
+     elsif ($_ !~ m{\Aplayer|playlist|mixer|options|update\z}x){
+       print $sock "idle\n";
+       $step=1;
+       readingsSingleUpdate($hash,'last_error',$_,1);
+     }
+     elsif ($_ eq 'update'){ #might be extended for other new message types w/o further action to FHEM
+       print $sock "idle\n";
+       $step=1;
+     }
      else #if ($_ eq "OK")  
      {
        print $sock "idle\n" if($step) ;  
