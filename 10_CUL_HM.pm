@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 # CUL HomeMatic handler
-# $Id: 10_CUL_HM.pm 25977 2022-08-02 frank + Beta-User "uninitialized" 2022-08-01 $
+# $Id: 10_CUL_HM.pm 25977 2022-12-30 frank + Beta-User "uninitialized" 2022-08-01 $
 #
 # open issues: 
 # https://forum.fhem.de/index.php/topic,125378.msg1200761.html#msg1200761
@@ -9,6 +9,7 @@
 # https://forum.fhem.de/index.php/topic,121139.msg1182503.html#msg1182503
 # https://forum.fhem.de/index.php/topic,126118.msg1207202.html#msg1207202
 # https://forum.fhem.de/index.php/topic,126197.0.html
+
 
 
 package main;
@@ -8079,10 +8080,12 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     my $addr = substr($content,$l,2);
     my $data = substr($content,$l+2,2);
     if(!$regs || !($regs =~ s/$addr:../$addr:$data/)){
-      $regs .= " ".$addr.":".$data;
+        $regs .= " ".$addr.":".$data;
     }
   }
   $sdH->{helper}{shadowReg}{$regLNp} = $regs; # update shadow
+  $sdH->{helper}{shadowRegChn}{$regLNp} = $chn; #noansi: save chn for later use, even with prep
+#  Log 0,"CUL_HM_pushConfig $regs";
   my @changeList;
   if ($prep eq "exec"){#update complete registerset
     @changeList = keys%{$sdH->{helper}{shadowReg}};
@@ -8112,11 +8115,12 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     if ($pN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($pN,$hash));}
     else       {($peerAddr,$peerChn) = ('000000','00');}
 
-    if (AttrVal($chnhash->{NAME},"peerIDs",0) =~ m/${peerAddr}00/){$peerChn = "00"}# if device we are not sure about device or channel. Check peers
+    if (AttrVal($chnhash->{NAME},"peerIDs","") =~ m/${peerAddr}00/){$peerChn = "00"}# if device we are not sure about device or channel. Check peers
 
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
     ############partition
 #   my @chSplit = unpack('(A28)*',$change);
+    $chn = $sdH->{helper}{shadowRegChn}{$nrn}; #noansi: use correct chn, https://forum.fhem.de/index.php/topic,24436.msg1240628.html#msg1240628
     my @chSplit = unpack('(A1120)*',$change);# makes max 40 lines, 280 byte
     foreach my $chSpl(@chSplit){
       my $mch = CUL_HM_lstCh($chnhash,$list,$chn);
@@ -8125,7 +8129,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
       $tl = length($chSpl);
       for(my $l = 0; $l < $tl; $l+=28) {
         my $ml = $tl-$l < 28 ? $tl-$l : 28;
-        CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
+         CUL_HM_PushCmdStack($hash, '++A001'.$src.$dst.$mch.'08'. #Frank: must it be $mch instead of $chn? noansi: for HM-CC-RT-DN also $mch works but in both cases 00 is used for chn, https://forum.fhem.de/index.php/topic,129777.msg1240867.html#msg1240867
                                        substr($chSpl,$l,$ml));
       }
       CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$mch."06");

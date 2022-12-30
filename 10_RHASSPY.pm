@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 26373 2022-09-02 19:21:55Z Beta-User $
+# $Id: 10_RHASSPY.pm 26718 2022-11-18 08:24:49Z drhirn $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -2451,7 +2451,7 @@ sub getNeedsConfirmation {
                     && defined $hash->{helper}{tweaks}{confirmIntentResponses}{$intent} ? $hash->{helper}{tweaks}{confirmIntentResponses}{$intent}
                   : getResponse($hash, 'DefaultConfirmationRequestRawInput');
         my $words = $hash->{helper}{devicemap}{devices}{$device}->{confirmValueMap} // $hash->{helper}{lng}->{words} // {};
-        $Value  = $words->{$data->{Value}} if defined $data->{Value};
+        $Value  = $words->{$data->{Value}} if defined $data->{Value} && defined $words->{$data->{Value}};
         $response =~ s{(\$\w+)}{$1}eegx;
         Log3( $hash, 5, "[$hash->{NAME}] getNeedsConfirmation is true on device level, response is $response" );
         $data->{'.DevName'} = $device;
@@ -4016,7 +4016,7 @@ sub _sendToApi {
     my $url    = shift;
     my $method = shift;
     my $data   = shift;
-    my $base   = $hash->{baseUrl}; #AttrVal($hash->{NAME}, 'rhasspyMaster', undef) // return;
+    my $base   = $hash->{baseUrl};
 
     #Retrieve URL of Rhasspy-Master from attribute
     $url = $base.$url;
