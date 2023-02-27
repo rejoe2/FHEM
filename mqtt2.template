@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 26926 2022-12-29 14:51:42Z Beta-User $
+# $Id: mqtt2.template 27127 2023-01-26 19:07:14Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -55,8 +55,8 @@ setreading DEVICE attrTemplateVersion 20220110
 #MQTT2 IO ignoreRegexp
 #
 name:MQTT2_IO_ignoreRegexp_basic
-filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. <br>NOTE: early experimental version...
+filter:TYPE=MQTT2_DEVICE
 order:000002
 par:IODEVNAME;Name of the IO-Device; { InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})) }
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly \IODEVNAME=IODEVNAME
@@ -755,6 +755,22 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_TempHumSensor
 setreading DEVICE attrTemplateVersion 20200904
 
+#contributed by chefschaffner, https://forum.fhem.de/index.php/topic,94495.msg1260253.html#msg1260253
+name:zigbee2mqtt_TempSensor
+desc: Temp sensor via zigbee2mqtt <br>Tested with: OWON THS317-ET Temperature Sensor
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_07a1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_temperature;{ AttrVal('DEVICE','icon','temp_temperature') }
+attr DEVICE icon ICON
+attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C", ReadingsVal($name,'temperature',0)) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_TempSensor
+setreading DEVICE attrTemplateVersion 20230126
+
 #by TomLee, https://forum.fhem.de/index.php/topic,116310.msg1105927.html#msg1105927
 name:zigbee2mqtt_human_body_movement
 desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia human RTCGQ01LM body movement sensor (occupancy)
@@ -786,6 +802,26 @@ attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterym
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_human_body_movement_illuminance
 setreading DEVICE attrTemplateVersion 20201208
+
+#provided by barneybaer, forum https://forum.fhem.de/index.php/topic,94495.msg1257179.html#msg1257179
+name:zigbee2mqtt_human_body_presence_detector
+desc: Human body presence detector via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCZCGQ11LM Presence Detector FP1
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_08a001
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to people_sensor;{ AttrVal('DEVICE','icon','people_sensor') }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon Motion..true:people_sensor Motion..false:motion_detector
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Motion: presence
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList  \
+  mode:undirected,left_right $\DEVICETOPIC/set {"monitoring_mode":"$EVTPART1"}\
+  distance:far,medium,near $\DEVICETOPIC/set {"approach_distance":"$EVTPART1"}\
+  sensitivity:low,medium,high $\DEVICETOPIC/set {"motion_sensitivity":"$EVTPART1"}
+attr DEVICE model zigbee2mqtt_human_body_presence_detector
+setreading DEVICE attrTemplateVersion 20230111
 
 name:zigbee2mqtt_Light_Intensity_Sensor
 desc: Light Intensity Sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia light intensity sensor GZCGQ01LM
@@ -992,6 +1028,22 @@ attr DEVICE model zigbee2mqtt_symfonsik_sound_controller
 attr DEVICE userReadings volume:brightness.* {int(ReadingsVal($name,"brightness",10)/2.55)}
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20200904
+
+
+#based on contribution by RomanticBoy83: https://forum.fhem.de/index.php/topic,131980.msg1263455.html#msg1263455
+name:zigbee2mqtt_zigbee2mqtt_ir_interface
+desc: IR interface controlled by zigbee2mqtt <br>Tested with: Moes UFO-R11, https://www.zigbee2mqtt.io/devices/UFO-R11.html
+order:L_16m
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to it_remote;{ AttrVal("DEVICE","icon","it_remote") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE setList \
+  learn_ir_code:uzsuToggle,ON,OFF $\DEVICETOPIC/set {"learn_ir_code":"$EVTPART1"}\
+  ir_code_to_send:textField $\DEVICETOPIC/set {"ir_code_to_send":"$EVTPART1"}
+attr DEVICE model zigbee2mqtt_ir_interface
+setreading DEVICE attrTemplateVersion 20230227
 
 
 # Eurotronic Spirit ZigBee version
@@ -3625,12 +3677,12 @@ attr DEVICE setList  toggle:noArg $\DEVICETOPIC/rpc {"id":1,"src":"fhem2shelly",
   off-for-timer $\DEVICETOPIC/rpc {"id":1,"src":"fhem2shelly","method":"Switch.Set","params": {"id":1,"on":false,"toggle_after":$EVTPART1}}\
   x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Update","params": {"stage":"stable"}}\
   x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}
-attr DEVICE jsonMap params_switch_0_state:state params_switch_0_aenergy_total:aenergy_total params_switch_0_apower:apower params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 params_wifi_sta_ip:ip
+attr DEVICE jsonMap params_switch_0_state:state params_switch_0_aenergy_total:aenergy_total params_switch_0_apower:apower params_switch_0_temperature_tC:temperature params_switch_0_temperature_tF:0 params_wifi_sta_ip:ip temperature_tC:temperature temperature_tF:0
 loop:#:1
 copy DEVICE DEVICE_CH#
 deleteattr DEVICE_CH# stateFormat
-deleteattr DEVICE_CH# devStateIcon
-attr DEVICE_CH# jsonMap params_switch_#_state:state params_switch_#_aenergy_total:aenergy_total params_switch_#_apower:apower params_switch_#_temperature_tC:temperature params_switch_#_temperature_tF:0
+attr DEVICE_CH# devStateIcon { my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1);qq(<a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwhC</div>) }
+attr DEVICE_CH# jsonMap params_switch_#_state:state params_switch_#_aenergy_total:aenergy_total params_switch_#_apower:apower params_switch_#_temperature_tC:temperature params_switch_#_temperature_tF:0 temperature_tC:temperature temperature_tF:0
 attr DEVICE_CH# readingList $\DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:#}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/status/switch.#:.* { json2nameValue($EVENT, '', $JSONMAP) }
 attr DEVICE_CH# setList toggle:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Toggle","params": {"id":#}}\
@@ -3647,7 +3699,7 @@ attr DEVICE_CH# devicetopic DEV_TPC
 loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20230104
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20230111
 attr DEVICE,DEVICE_CH2 model shellyPlus_2pm_split
 
 # Shelly Plus 2 PM using original firmware in roller mode.
@@ -5224,6 +5276,7 @@ order:W_01
 { Svn_GetFile('contrib/AttrTemplate/99_attrT_WLED_Utils.pm', 'FHEM/99_attrT_WLED_Utils.pm', sub(){ CommandReload(undef, '99_attrT_WLED_Utils') }) }
 par:BASE_ID;BASE_ID typically is wled;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/][^/]+[/][^/]+:, ? $1 : undef }
 par:DEVNAME;Device name as configured;{ AttrVal('DEVICE','readingList','') =~ m,[^:]+[/]([^/]+)[/][^/]+:, ? $1 : undef }
+par:IPADDRESS;Insert Controller-IP ;{ my $ip =InternalVal('DEVICE',InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})).'_CONN',ReadingsVal('DEVICE','ip', ''));  $ip=~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/x ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal('DEVICE','icon','hue_filled_iris') }
 attr DEVICE icon ICON
 attr DEVICE setList\
@@ -5266,9 +5319,10 @@ attr DEVICE webCmdLabel RGB:Brightness\
 attr DEVICE setStateList on off toggle dimdown dimup effect_prev effect_next effect_random palette_prev palette_next palette_random palette_reset effect_reset
 attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
 set DEVICE attrTemplate speechcontrol_type_light_255
+setreading DEVICE ip IPADDRESS
 farewell:template has been applied successfully. Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
-setreading DEVICE attrTemplateVersion 20211220
+setreading DEVICE attrTemplateVersion 20230125
 
 
 
@@ -5484,7 +5538,7 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/device:.* device
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20200812
+setreading DEVICE attrTemplateVersion 20220812
 { AttrTemplate_Initialize() }
 
 
@@ -5506,8 +5560,14 @@ option:{ RADIO_SINGLE }
 attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* {}\
   INVERTERLONG_ID/ch0/YieldTotal:.* {}\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
@@ -5517,15 +5577,23 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC\
-  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
@@ -5535,10 +5603,14 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
+  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
 option:{ RADIO_QUATTRO }
@@ -5546,7 +5618,16 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
+  INVERTERLONG_ID/ch0/F_AC:.* F_AC\
+  INVERTERLONG_ID/ch0/PF_AC:.* PF_AC\
+  INVERTERLONG_ID/ch0/P_DC:.* P_DC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/ALARM_MES_ID:.* ALARM_MES_ID\
+  INVERTERLONG_ID/ch0/Efficiency:.* Efficiency\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
@@ -5557,18 +5638,27 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/U_DC:.* U_DC1\
+  INVERTERLONG_ID/ch1/Irridation:.* Irridation1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
   INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/U_DC:.* U_DC2\
+  INVERTERLONG_ID/ch2/Irridation:.* Irridation2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
   INVERTERLONG_ID/ch3/I_DC:.* I_DC3\
   INVERTERLONG_ID/ch3/P_DC:.* P_DC3\
+  INVERTERLONG_ID/ch3/U_DC:.* U_DC3\
+  INVERTERLONG_ID/ch3/Irridation:.* Irridation3\
   INVERTERLONG_ID/ch3/YieldDay:.* YieldDay3\
   INVERTERLONG_ID/ch3/YieldTotal:.* YieldTotal3\
   INVERTERLONG_ID/ch4/I_DC:.* I_DC4\
   INVERTERLONG_ID/ch4/P_DC:.* P_DC4\
+  INVERTERLONG_ID/ch4/U_DC:.* U_DC4\
+  INVERTERLONG_ID/ch4/Irridation:.* Irridation4\
   INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
   INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
 option:global
@@ -5582,7 +5672,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200905
+setreading DEVICE attrTemplateVersion 20230227
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
