@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.template 27127 2023-01-26 19:07:14Z Beta-User $
+# $Id: mqtt2.template 27278 2023-02-27 19:53:24Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -5530,15 +5530,28 @@ farewell:template has been applied successfully. <br>Note: In case you use an ex
 par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
-attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"
+attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"\
+  BASE_ID/([^/]+)/(available|last_success):.* "BASE_ID_$1"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/free_heap:.* free_heap\
   BASE_ID/uptime:.* uptime\
-  BASE_ID/device:.* device
+  BASE_ID/device:.* device\
+  BASE_ID/mqtt:.* mqtt\
+  BASE_ID/ip_addr:.* ip_addr\
+  BASE_ID/comm_start:.* comm_start\
+  BASE_ID/comm_stop:.* comm_stop\
+  BASE_ID/dis_night_comm:.* dis_night_comm\
+  BASE_ID/comm_disabled:.* comm_disabled\
+  BASE_ID/comm_dis_ts:.* comm_dis_ts\
+  BASE_ID/status:.* status\
+  BASE_ID/total/P_AC:.* P_AC\
+  BASE_ID/total/P_DC:.* P_DC\
+  BASE_ID/total/YieldDay:.* YieldDay\
+  BASE_ID/total/YieldTotal:.* YieldTotal
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20220812
+setreading DEVICE attrTemplateVersion 20230228
 { AttrTemplate_Initialize() }
 
 
@@ -5557,7 +5570,9 @@ par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 option:{ RADIO_SINGLE }
-attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+attr DEVICE readingList INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
   INVERTERLONG_ID/ch0/Q_AC:.* Q_AC\
@@ -5583,6 +5598,8 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
+  INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5615,6 +5632,9 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
 option:{ RADIO_QUATTRO }
 attr DEVICE readingList \
+  INVERTERLONG_ID/available:.* available\
+  INVERTERLONG_ID/last_success:.* last_success\
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
@@ -5672,7 +5692,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20230227
+setreading DEVICE attrTemplateVersion 20230228
 
 # contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
 name:hoymiles_opendtu_hub_bridge
