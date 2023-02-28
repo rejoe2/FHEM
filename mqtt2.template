@@ -5635,7 +5635,6 @@ attr DEVICE readingList \
   INVERTERLONG_ID/available:.* available\
   INVERTERLONG_ID/last_success:.* last_success\
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
-  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
