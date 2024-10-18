@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 27324 2024-10-18 Beta-User $
+# $Id: 10_RHASSPY.pm 27324 2024-10-18 Beta-User (extend respond()) $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3596,9 +3596,9 @@ sub analyzeMQTTmessage {
     
     #see https://forum.fhem.de/index.php?msg=1322195 for details
     if ( defined $data->{resetInput} && defined $data->{siteId}) {
-            handleIntentCancelAction($hash, $data);
-            activateVoiceInput($hash,[$data->{siteId}]) if $data->{requestType} eq 'voice';
-            return \@updatedList;
+        handleIntentCancelAction($hash, $data);
+        activateVoiceInput($hash,[$data->{siteId}]) if $data->{requestType} eq 'voice';
+        return \@updatedList;
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
@@ -3639,11 +3639,12 @@ sub analyzeMQTTmessage {
 
 # Antwort ausgeben
 sub respond {
-    my $hash     = shift // return;
-    my $data     = shift // return;
-    my $response = shift // getResponse( $hash, 'NoValidResponse' );
-    my $topic    = shift // q{endSession};
-    my $delay    = shift;
+    my $hash      = shift // return;
+    my $data      = shift // return;
+    my $response  = shift // getResponse( $hash, 'NoValidResponse' );
+    my $topic     = shift // q{endSession};
+    my $delay     = shift;
+	my $toDisable = shift // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
 
     my $contByDelay = $delay // $topic ne 'endSession';
     $delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
@@ -3681,7 +3682,8 @@ sub respond {
     } elsif ( $delay ) {
         $sendData->{text} = $response;
         $topic = 'continueSession';
-        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)], 'false', undef, 1 );
+		$toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';;
+        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
         $sendData->{intentFilter} = [@ca_strings];
     } else {
         $sendData->{text} = $response;
@@ -6568,7 +6570,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
       <li><b>intentFilter</b>
-        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
+        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, Choice, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
       </li>
     </ul>
   </li>
@@ -6832,7 +6834,7 @@ yellow=rgb FFFF00</code></p>
   <li>GetTimer</li> (Outdated, use generic "Timer" instead!) Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
   <li>ConfirmAction</li>
   {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
-  <li>CancelAction</li>{Mode} is recommended.
+  <li>CancelAction</li>Hand over a {Mode} key is recommended.
   <li>Choice</li>One or more of {Room}, {Device} or {Scene}
   <li>ChoiceRoom</li> {Room} NOTE: Useage of generic "Choice" intent instead is highly recommended!
   <li>ChoiceDevice</li> {Device} NOTE: Useage of generic "Choice" intent instead is highly recommended!
