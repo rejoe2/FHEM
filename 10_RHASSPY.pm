@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29261 2024-10-21 Beta-User + GV input $
+# $Id: 10_RHASSPY.pm 29261 2024-10-24 Beta-User + GV input $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1696,7 +1696,7 @@ sub RHASSPY_DialogTimeout {
 
     deleteSingleRegIntTimer($identity, $hash, 1);
 
-    respond( $hash, $data, getResponse( $hash, defined $data->{silent} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
+    respond( $hash, $data, getResponse( $hash, defined $data->{SilentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identity};
 
     return;
@@ -3656,11 +3656,10 @@ sub respond {
     my $topic    = shift // q{endSession};
     my $delay    = shift;
 
-    if ( $response eq 'SilentClosure' ) {
-	    $response = q{}; 
-	}
+    $response = q{} if $response eq 'SilentClosure'; 
+
     my $contByDelay = $delay // $topic ne 'endSession';
-    $delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
+    #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     if ( defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
         $response .= " $hash->{helper}->{lng}->{$data->{sessionId}}->{post}" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{post};
@@ -3728,6 +3727,14 @@ sub respond {
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
+	
+	#new reopen or sessionTimeout variant: Close the old session and reopen a new one:
+	if ( $topic ne = 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
+        activateVoiceInput($hash,[$data->{siteId}]);
+        $delay = ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+		$delay = $data->{SilentClosure} if defined $data->{SilentClosure} && 	looks_like_number($data->{SilentClosure});
+		resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_testmode_timeout, $hash ); #Beta-User: needs different timeout function
+	}
 
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return $hash->{NAME};
     sendSpeakCommand( $hash, { 
@@ -4255,6 +4262,7 @@ sub handleCustomIntent {
         respond( $hash, $data, $response );
         return ${$error}[1]; #comma separated list of devices to trigger
     } elsif ( ref $error eq 'HASH' ) {
+		$timeout = $error->{sessionTimeout} if defined $error->{sessionTimeout} && looks_like_number( $error->{sessionTimeout} );
     	return setDialogTimeout($hash, $data, $timeout, $error);
     } else {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
@@ -4447,7 +4455,7 @@ sub handleIntentSetOnOffGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4502,7 +4510,7 @@ sub handleIntentSetTimedOnOff {
     else { $response = getResponse($hash, 'DefaultConfirmation'); }
     # Send response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};;
     return $device; 
 }
 
@@ -4580,7 +4588,7 @@ sub handleIntentSetTimedOnOffGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4689,7 +4697,7 @@ sub handleIntentSetNumericGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) );
+    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -4863,7 +4871,7 @@ sub handleIntentSetNumeric {
 
     # send response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};
     return $device;
 }
 
@@ -5156,7 +5164,7 @@ sub handleIntentMediaControls {
         : getResponse($hash, 'DefaultConfirmation');
 
     # Send voice response
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};
     return $device;
 }
 
@@ -5215,7 +5223,7 @@ sub handleIntentSetScene{
     # Define response
     my $response = _shuffle_answer($mapping->{response}) // getResponse( $hash, 'DefaultConfirmation' );
 
-    respond( $hash, $data, $response );
+    respond( $hash, $data, $response ) if !defined $data->{noResponse};;
     return $device;
 }
 
@@ -5287,7 +5295,7 @@ sub handleIntentMediaChannels {
     analyzeAndRunCmd($hash, $device, $cmd);
 
     # Antwort senden
-    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') );
+    respond( $hash, $data, getResponse($hash, 'DefaultConfirmation') ) if !defined $data->{noResponse};;
     return $device;
 }
 
@@ -5344,7 +5352,7 @@ sub handleIntentSetColor {
     }
     # Send voice response
     $response //= getResponse($hash, 'DefaultError');
-    respond( $hash, $data, $response ) if !$inBulk;
+    respond( $hash, $data, $response ) if !$inBulk && !defined $data->{noResponse};
     return $device;
 }
 
@@ -5539,7 +5547,7 @@ sub handleIntentSetColorGroup {
     _sortAsyncQueue($hash) if $init_delay && $needs_sorting;
 
     # Send response
-    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) );
+    respond( $hash, $data, getResponse( $hash, 'DefaultConfirmation' ) ) if !defined $data->{noResponse};
     return $updatedList;
 }
 
@@ -6446,6 +6454,7 @@ After changing something relevant within FHEM for either the data structure in</
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     <p>If a simple text is returned, this will be considered as response, if return value is not defined, the default response will be used.<br>
+	You may use the internal functions (e.g. "handleIntentSetOnOff()" as well. To skipp the default answers for these intents, you have to add a "noResponse"-key to the $data argument (or ".inBulk" key forr single device intents).<br>
     For more advanced use of this feature, you may return either a HASH or an ARRAY data structure (Note: The formating of the required data might be subject to changes!). If ARRAY is returned:
     <ul><li>First element of the array is interpreted as response and may be plain text (dialog will be ended) or HASH type to continue the session. The latter will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, (configurable) default is 20 seconds, you may alternatively hand over other numeric values as second element of the array.
     </li>
