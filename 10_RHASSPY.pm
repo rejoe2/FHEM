@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29261 2024-10-24 Beta-User + GV input $
+# $Id: 10_RHASSPY.pm 29306 2024-10-28 04:50:58Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3346,6 +3346,19 @@ sub RHASSPY_SpeechDialogTimeout {
     return SpeechDialog_close($hash, $identity);
 }
 
+sub RHASSPY_reopenVoiceInput_timeout {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+    my $identity = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identity, $hash, 1);
+    Log3($hash, 5, "RHASSPY_reopenVoiceInput_timeout called with $identity");
+    #Beta-User: Here we might have to delete any remaining data from a "continuous" session....
+
+    return;
+}
+
+
 sub setSpeechDialogTimeout {
     my $hash     = shift // return;
     my $data     = shift // return;
@@ -3543,7 +3556,7 @@ sub analyzeMQTTmessage {
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
-        my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off');
+        my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off') // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
         for (@candidates) {
            push @updatedList, $_ if $defs{$_} && $_ ne $name;
@@ -3576,7 +3589,7 @@ sub analyzeMQTTmessage {
         }
         #return \@updatedList if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
-        my $ret = handleHotwordDetection($hash, $hotword, $data);
+        my $ret = handleHotwordDetection($hash, $hotword, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
 		for (@candidates) {
 			push @updatedList, $_ if $defs{$_} && $_ ne $name;
@@ -3591,7 +3604,7 @@ sub analyzeMQTTmessage {
 
     if ( $topic =~ m{\Ahermes/tts/say}x ) {
         return if !$hash->{siteId} || $siteId ne $hash->{siteId};
-        my $ret = handleTtsMsgDialog($hash, $data);
+        my $ret = handleTtsMsgDialog($hash, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
         for (@candidates) {
             push @updatedList, $_ if $defs{$_} && $_ ne $name; 
@@ -3734,8 +3747,10 @@ sub respond {
     if ( $topic ne 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
         activateVoiceInput($hash,[$data->{siteId}]);
         $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
-        $delay = $data->{SilentClosure} if defined $data->{SilentClosure} && 	looks_like_number($data->{SilentClosure});
-        resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_testmode_timeout, $hash ); #Beta-User: needs different timeout function
+        $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
+        $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput});
+        #Beta-User: timeout function needs review as soon as soon as we store any session data
+        resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
     }
 
     my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
