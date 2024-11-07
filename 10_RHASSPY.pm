@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-10-29 05:11:18Z Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-11-07 Beta-User use dialogManager directly for continous sessions $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -293,6 +293,7 @@ BEGIN {
 my @topics = qw(
     hermes/intent/+
     hermes/dialogueManager/sessionStarted
+    hermes/dialogueManager/sessionQueued
     hermes/dialogueManager/sessionEnded
     hermes/nlu/intentNotRecognized
     hermes/hotword/+/detected
@@ -1756,6 +1757,41 @@ sub setDialogTimeout {
 #    return $toTrigger;
 }
 
+sub _get_sessionIntentFilter {
+	my $hash         = shift // return;
+    my $intents   	 = shift;
+	my $enableCancel = shift;
+	
+	my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
+	my @sessionIntents;
+	for (@allIntents) {
+		next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice};
+		push @sessionIntents, $_ if 
+			!defined $hash->{helper}->{tweaks} ||
+			!defined $hash->{helper}{tweaks}->{intentFilter} ||
+			!defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
+			defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
+    }
+
+	my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+	push @sessionIntents, "${id}CancelAction" if $enableCancel;
+	
+	my @addIntents;
+	if ( ref $intents eq 'ARRAY' ) {
+	    @addIntents = @{$intents};
+	} else {
+		@addIntents = split m{,}xm, $intents;
+	}
+	for (@addIntents) {
+		if ( $_ =~ m{\a${id}} ) {
+			push @sessionIntents, $_;
+		} else {
+			push @sessionIntents, "${id}$_";
+		}
+	}
+    return \@sessionIntents;
+}
+
 sub get_unique {
     my $arr    = shift;
     my $sorted = shift; #true if shall be sorted (longest first!)
@@ -2994,8 +3030,29 @@ sub activateVoiceInput {
     my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
     my $hotword = $h->{hotword} // shift @{$anon} // $h->{modelId} // "$hash->{LANGUAGE}$hash->{fhemId}";
     my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
+	
+	my $sendData;
+	my $json;
 
-    my $sendData =  {
+	#use startSession mechanism, see https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_startsession
+	if ( defined $h->{text} ) {
+        $sendData = {
+    	    init => {
+    		    type                    => $h->{type} // 'action',
+    		    canBeEnqueued           => $h->{canBeEnqueued} // 'true',
+    			text                    => $h->{text},
+				intentFilter            => $h->{intentFilter} // _get_sessionIntentFilter($hash, undef, 1 ),
+				sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
+            }
+        };
+        $sendData->{siteId} = $siteId;
+		$sendData->{customData} = $h->{customData} // "$hash->{LANGUAGE}.$hash->{fhemId}";
+        $json = _toCleanJSON($sendData);
+        return IOWrite($hash, 'publish', qq{hermes/dialogueManager/startSession $json});
+	}
+
+    #use default hotword mechanism
+	$sendData =  {
         modelId             => $modelId,
         modelVersion        => '',
         modelType           => 'personal',
@@ -3005,7 +3062,7 @@ sub activateVoiceInput {
         sendAudioCaptured   => 'null',
         customEntities      => 'null'
     };
-    my $json = _toCleanJSON($sendData);
+    $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
 
@@ -3353,9 +3410,17 @@ sub RHASSPY_reopenVoiceInput_timeout {
     my $identity = $fnHash->{MODIFIER};
     deleteSingleRegIntTimer($identity, $hash, 1);
     Log3($hash, 5, "RHASSPY_reopenVoiceInput_timeout called with $identity");
-    #Beta-User: incomplete, closing voice input is still missing!
-    #Here we might have to delete any remaining data from a "continuous" session....
 
+    my $sendData = {
+	    sessionId   => $identity,
+		customData  => 'reopenVoiceInput_timeout'
+		
+	}
+    my $json = _toCleanJSON($sendData);
+
+    IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
+    Log3($hash, 5, "published " . qq{hermes/dialogueManager/endSession $json});
+    
     return;
 }
 
@@ -3536,6 +3601,17 @@ sub analyzeMQTTmessage {
 
         if ( $topic =~ m{sessionStarted}x ) {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
+			if ( defined $data->{customData} && ( 
+			     defined ->{customData}->{SilentClosure} || 
+				 defined ->{customData}->{reopenVoiceInput} ) ) {
+			    activateVoiceInput($hash,[$data->{siteId}]);
+                my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+                $delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
+		        $delay = $data->{customData}->{reopenVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reopenVoiceInput} && looks_like_number($data->{customData}->{reopenVoiceInput} && $data->{customData}->{reopenVoiceInput} > 0);
+                resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
+			}
+		} elsif ( $topic =~ m{sessionQueued}x ) {
+			#Beta-User: This would be the place to update timeout for the "continuous session"/ 
         } elsif ( $topic =~ m{sessionEnded}x ) {
             readingsSingleUpdate($hash, 'listening_' . makeReadingName($room), 0, 1);
             my $identity = qq($data->{sessionId});
@@ -3746,12 +3822,17 @@ sub respond {
     
     #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
     if ( $topic ne 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
-        activateVoiceInput($hash,[$data->{siteId}]);
-        $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+	
+=pod 
+		$delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
         $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
         $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
-        #Beta-User: timeout function needs review, esp. in case if we store any session data
-        resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
+=cut
+		$sendData->{text}       = getResponse($hash, 'ContinueSession');
+		$sendData->{customData} = toJSON($data);
+		activateVoiceInput($hash,[$data->{siteId}],$sendData);
+        
+        #resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
     }
 
     my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
