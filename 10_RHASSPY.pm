@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29306 2024-10-28 04:50:58Z Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-10-29 05:11:18Z Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3353,7 +3353,8 @@ sub RHASSPY_reopenVoiceInput_timeout {
     my $identity = $fnHash->{MODIFIER};
     deleteSingleRegIntTimer($identity, $hash, 1);
     Log3($hash, 5, "RHASSPY_reopenVoiceInput_timeout called with $identity");
-    #Beta-User: Here we might have to delete any remaining data from a "continuous" session....
+    #Beta-User: incomplete, closing voice input is still missing!
+    #Here we might have to delete any remaining data from a "continuous" session....
 
     return;
 }
@@ -3748,8 +3749,8 @@ sub respond {
         activateVoiceInput($hash,[$data->{siteId}]);
         $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
         $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
-        $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput});
-        #Beta-User: timeout function needs review as soon as soon as we store any session data
+        $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
+        #Beta-User: timeout function needs review, esp. in case if we store any session data
         resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
     }
 
