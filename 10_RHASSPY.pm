@@ -5873,14 +5873,14 @@ sub handleIntentCancelAction {
 
     deleteSingleRegIntTimer($identity, $hash);
     delete $hash->{helper}{'.delayed'}->{$identity};
-	my $response = getResponse( $hash, 'DefaultCancelConfirmation' );
+    my $response = getResponse( $hash, 'DefaultCancelConfirmation' );
 	
 	#Beta-User: Here we need additional Code for handling "shut up" cases in continuous sessions
-	if ( defined $data->{closeSession} ) {
-		$response = getResponse( $hash, 'DefaultConfirmation' );
-	}
-	
-    respond( $hash, $data, , undef, 0 );
+    if ( defined $data->{closeSession} ) {
+        $response = getResponse( $hash, 'DefaultConfirmation' );
+    }
+
+    respond( $hash, $data, $response, undef, 0 );
 
     return $hash->{NAME};
 }
