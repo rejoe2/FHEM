@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-11-07 Beta-User use dialogManager directly for continous sessions $
+# $Id: 10_RHASSPY.pm 29310 2024-11-12 Beta-User use dialogManager directly for continous sessions $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3036,19 +3036,27 @@ sub activateVoiceInput {
 
 	#use startSession mechanism, see https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_startsession
 	if ( defined $h->{text} ) {
-        $sendData = {
-    	    init => {
-    		    type                    => $h->{type} // 'action',
-    		    canBeEnqueued           => $h->{canBeEnqueued} // 'true',
-    			text                    => $h->{text},
-				intentFilter            => $h->{intentFilter} // _get_sessionIntentFilter($hash, undef, 1 ),
-				sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
-            }
-        };
+		my $topic = $h->{topic} // q{startSession};
+		if ( $h->{text} ) {
+
+            $sendData = {
+                init => {
+    		        type                    => $h->{type} // 'action',
+					text                    => $h->{text},
+    		        canBeEnqueued           => $h->{canBeEnqueued} // 'true',
+				    intentFilter            => $h->{intentFilter} // [ _get_sessionIntentFilter($hash, undef, 1 )],
+				    sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
+                }
+            };
+		} else {
+            $topic = q{continueSession};
+			$sendData->{sessionId} = $h->{sessionId};
+		}
         $sendData->{siteId} = $siteId;
 		$sendData->{customData} = $h->{customData} // "$hash->{LANGUAGE}.$hash->{fhemId}";
         $json = _toCleanJSON($sendData);
-        return IOWrite($hash, 'publish', qq{hermes/dialogueManager/startSession $json});
+		
+        return IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
 	}
 
     #use default hotword mechanism
@@ -3415,7 +3423,7 @@ sub RHASSPY_reopenVoiceInput_timeout {
 	    sessionId   => $identity,
 		customData  => 'reopenVoiceInput_timeout'
 		
-	}
+	};
     my $json = _toCleanJSON($sendData);
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
@@ -3587,7 +3595,7 @@ sub analyzeMQTTmessage {
         $mute = ReadingsNum($hash->{NAME},"mute_$reading",0);
     }
 
-    # Hotword detection
+    # dialogue manager related
     if ($topic =~ m{\Ahermes/dialogueManager}x) {
         my $room = getRoomName($hash, $data);
 
@@ -3601,9 +3609,9 @@ sub analyzeMQTTmessage {
 
         if ( $topic =~ m{sessionStarted}x ) {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
-			if ( defined $data->{customData} && ( 
-			     defined ->{customData}->{SilentClosure} || 
-				 defined ->{customData}->{reopenVoiceInput} ) ) {
+			if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && ( 
+			     defined $data->{customData}->{SilentClosure} || 
+				 defined $data->{customData}->{reopenVoiceInput} ) ) {
 			    activateVoiceInput($hash,[$data->{siteId}]);
                 my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
                 $delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
@@ -3634,11 +3642,11 @@ sub analyzeMQTTmessage {
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
         my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off') // q{};
-        my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-        for (@candidates) {
-           push @updatedList, $_ if $defs{$_} && $_ ne $name;
-        }
-        return \@updatedList;
+		my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
+		for (@candidates) {
+		   push @updatedList, $_ if $defs{$_} && $_ ne $name;
+		}
+		return \@updatedList;
     }
 
     if ($topic =~ m{\Ahermes/intent/.*[:_]SetMute}x && defined $siteId) {
@@ -3671,12 +3679,12 @@ sub analyzeMQTTmessage {
 		for (@candidates) {
 			push @updatedList, $_ if $defs{$_} && $_ ne $name;
         }
-        $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected');
-        @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
+        $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected') // q{};
+		@candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
 		for (@candidates) {
 			push @updatedList, $_ if $defs{$_} && $_ ne $name; 
-        }
-        return \@updatedList;
+		}
+		return \@updatedList;
     }
 
     if ( $topic =~ m{\Ahermes/tts/say}x ) {
@@ -3747,12 +3755,14 @@ sub respond {
     my $topic    = shift // q{endSession};
     my $delay    = shift;
 
-    $response = q{} if $response eq 'SilentClosure'; 
+    #$response = q{} if $response eq 'SilentClosure'; 
+	delete $response if $response eq 'SilentClosure');
+
 
     my $contByDelay = $delay // $topic ne 'endSession';
     #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
-    if ( defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
+    if ( $response && ref $response eq 'SCALAR' && defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
         $response .= " $hash->{helper}->{lng}->{$data->{sessionId}}->{post}" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{post};
         $response = "$hash->{helper}->{lng}->{$data->{sessionId}}->{pre} $response" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{pre};
         delete $hash->{helper}->{lng}->{$data->{sessionId}};
@@ -3766,6 +3776,8 @@ sub respond {
     }
 
     my $type      = $data->{requestType} // return; #voice or text
+	
+	delete $response->{text} if ref $response eq 'HASH' && $response->{text} eq 'SilentClosure';
 
     my $sendData;
 
@@ -3779,17 +3791,18 @@ sub respond {
             $sendData->{$key} = $response->{$key};
         }
     } elsif ( $topic eq 'continueSession' ) {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
     } elsif ( $delay ) {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $topic = q{continueSession};
 		my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
 		$toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
-        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
+        #my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
+		my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
         $sendData->{intentFilter} = [@ca_strings];
     } else {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
     }
 
@@ -3821,18 +3834,17 @@ sub respond {
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
     
     #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
-    if ( $topic ne 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
+    if ( $topic ne 'continueSession' && $type eq 'voice' && !defined $data->{closeSession} && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
 	
 =pod 
 		$delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
         $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
         $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
 =cut
+		delete $sendData->{customData};
 		$sendData->{text}       = getResponse($hash, 'ContinueSession');
-		$sendData->{customData} = toJSON($data);
+		$sendData->{customData} = toJSON($data); #seems, we need "incorrect" doubled JSON, see https://forum.fhem.de/index.php?msg=1324631
 		activateVoiceInput($hash,[$data->{siteId}],$sendData);
-        
-        #resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
     }
 
     my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
@@ -4938,16 +4950,16 @@ sub handleIntentSetNumeric {
     if ( !defined $data->{'.inBulk'} ) {
         $data->{Value} //= $newVal;
         $data->{Type}  //= $type;
-        delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
+        delete $data->{Change} if defined $change && ($change !~ m{\Acmd.+}x || ! defined $mapping->{$change});
     }
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
     # execute Cmd
-    !defined $change || $change ne 'cmdStop' || !defined $mapping->{cmdStop} 
+    !defined $change || $change !~ m{\Acmd.+}x
             ? !defined $useMap ? analyzeAndRunCmd($hash, $device, $cmd, $newVal)
                                : analyzeAndRunCmd($hash, $device, $useMap)
-            : analyzeAndRunCmd($hash, $device, $mapping->{cmdStop});
+            : analyzeAndRunCmd($hash, $device, $mapping->{$change});
 
     #venetian blind special
     my $specials = $hash->{helper}{devicemap}{devices}{$device}{venetian_specials};
@@ -5789,6 +5801,16 @@ sub handleIntentNotRecognized {
     my $data = shift // return;
 
     Log3( $hash, 5, "[$hash->{NAME}] handleIntentNotRecognized called, input is $data->{input}" );
+	
+	#Beta-User: silence chuncks or single words, might later be configurable
+	if ( !defined $data->{input} || length($data->{input}) < 12 ) {
+	    return if ref $data->{customData} ne 'HASH';
+		#$data->{text} = q{};
+		$data->{customData}->{text} = q{};
+		return activateVoiceInput($hash,[$data->{siteId}],$data->{customData});
+		#Beta-User: needs review for cont. sessions
+	}
+	
     my $identity = qq($data->{sessionId});
     my $siteId = $hash->{siteId};
     my $msgdev = (split m{_${siteId}_}x, $identity,3)[0];
@@ -5851,7 +5873,14 @@ sub handleIntentCancelAction {
 
     deleteSingleRegIntTimer($identity, $hash);
     delete $hash->{helper}{'.delayed'}->{$identity};
-    respond( $hash, $data, getResponse( $hash, 'DefaultCancelConfirmation' ), undef, 0 );
+	my $response = getResponse( $hash, 'DefaultCancelConfirmation' );
+	
+	#Beta-User: Here we need additional Code for handling "shut up" cases in continuous sessions
+	if ( defined $data->{closeSession} ) {
+		$response = getResponse( $hash, 'DefaultConfirmation' );
+	}
+	
+    respond( $hash, $data, , undef, 0 );
 
     return $hash->{NAME};
 }
