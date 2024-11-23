@@ -3030,37 +3030,37 @@ sub activateVoiceInput {
     my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
     my $hotword = $h->{hotword} // shift @{$anon} // $h->{modelId} // "$hash->{LANGUAGE}$hash->{fhemId}";
     my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
-	
-	my $sendData;
-	my $json;
 
-	#use startSession mechanism, see https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_startsession
-	if ( defined $h->{text} ) {
-		my $topic = $h->{topic} // q{startSession};
-		if ( $h->{text} ) {
+    my $sendData;
+    my $json;
 
+    #use startSession mechanism, see https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_startsession
+    if ( defined $h->{text} ) {
+        delete $h->{intentFilter} if $h->{intentFilter} eq 'null';
+        my $topic = $h->{topic} // q{startSession};
+        if ( $h->{text} ) {
             $sendData = {
                 init => {
-    		        type                    => $h->{type} // 'action',
-					text                    => $h->{text},
-    		        canBeEnqueued           => $h->{canBeEnqueued} // 'true',
-				    intentFilter            => $h->{intentFilter} // [ _get_sessionIntentFilter($hash, undef, 1 )],
-				    sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
+                    type     => $h->{type} // 'action',
+                    text     => $h->{text},
+                    canBeEnqueued => $h->{canBeEnqueued} // 'true',
+                    intentFilter            => $h->{intentFilter} //  _get_sessionIntentFilter($hash, undef, 1 ),
+                    sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
                 }
             };
-		} else {
+        } else {
             $topic = q{continueSession};
-			$sendData->{sessionId} = $h->{sessionId};
-		}
+        $sendData->{sessionId} = $h->{sessionId};
+        }
         $sendData->{siteId} = $siteId;
-		$sendData->{customData} = $h->{customData} // "$hash->{LANGUAGE}.$hash->{fhemId}";
+        $sendData->{customData} = $h->{customData} // "$hash->{LANGUAGE}.$hash->{fhemId}";
         $json = _toCleanJSON($sendData);
-		
+
         return IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
-	}
+    }
 
     #use default hotword mechanism
-	$sendData =  {
+    $sendData =  {
         modelId             => $modelId,
         modelVersion        => '',
         modelType           => 'personal',
@@ -3755,8 +3755,8 @@ sub respond {
     my $topic    = shift // q{endSession};
     my $delay    = shift;
 
-    #$response = q{} if $response eq 'SilentClosure'; 
-	delete $response if $response eq 'SilentClosure');
+    $response = q{} if $response eq 'SilentClosure'; 
+    #delete $response if $response eq 'SilentClosure';
 
 
     my $contByDelay = $delay // $topic ne 'endSession';
