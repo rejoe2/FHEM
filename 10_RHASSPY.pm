@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-11-12 Beta-User use dialogManager directly for continous sessions $
+# $Id: 10_RHASSPY.pm 29310 2024-11-24 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -100,6 +100,7 @@ my $languagevars = {
     'NoActiveMediaDevice' => "Sorry no active playback device.",
     'NoMediaChannelFound' => "Sorry but requested channel seems not to exist.",
     'DefaultConfirmation' => "OK",
+    'DefaultConfirmationClosure' => "OK",
     'DefaultConfirmationBack' => "So once more.",
     'DefaultConfirmationTimeout' => "Sorry, too late to confirm.",
     'DefaultCancelConfirmation' => "Thanks, aborted.",
@@ -894,7 +895,6 @@ sub configure_DialogManager {
     my $toDisable = shift // [qw(ConfirmAction CancelAction Choice ChoiceRoom ChoiceDevice)];
     my $enable    = shift // q{false};
     my $timer     = shift;
-    my $retArr    = shift;
 
     #option to delay execution to make reconfiguration last action after everything else has been done and published.
     if ( defined $timer ) {
@@ -945,8 +945,6 @@ hermes/dialogueManager/configure (JSON)
         my $disable = {intentId => "$id", enable => "$enable"};
         push @disabled, $disable;
     }
-
-    return \@disabled if $retArr;
 
     my $sendData = {
         siteId  => $siteId,
@@ -1294,14 +1292,21 @@ sub _analyze_genDevType {
             SetOnOff => { SetOnOff => {cmdOff => 'dim 0', type => 'SetOnOff', cmdOn => "dim $maxval"} },
             SetNumeric => { setTarget => { cmd => 'dim', currentVal => 'state', maxVal => $maxval, minVal => '0', step => '11', type => 'setTarget'} }
             };
-        }
-
+        }															  
         elsif ( $allset =~ m{\bpct([\b:\s]|\Z)}xms ) {
             $currentMapping = { 
             GetNumeric => { 'pct' => {currentVal => 'pct', type => 'setTarget'} },
             GetOnOff => { GetOnOff => {currentVal=>'pct', valueOn=>'100' } },
             SetOnOff => { SetOnOff => {cmdOff => 'pct 0', type => 'SetOnOff', cmdOn => 'pct 100'} },
             SetNumeric => { setTarget => { cmd => 'pct', currentVal => 'pct', maxVal => '100', minVal => '0', step => '13', type => 'setTarget'} }
+            };
+        }
+        elsif ( $allset =~ m{\bpos([\b:\s]|\Z)}xms ) {
+            $currentMapping = { 
+            GetNumeric => { 'pos' => {currentVal => 'position', type => 'setTarget'} },
+            GetOnOff => { GetOnOff => {currentVal=>'position', valueOn=>'100' } },
+            SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'} },
+            SetNumeric => { setTarget => { cmd => 'pos', currentVal => 'position', maxVal => '100', minVal => '0', step => '10', type => 'setTarget'} }
             };
         } else {
             my ($on, $off) = _getGenericOnOff($allset);
@@ -1758,37 +1763,37 @@ sub setDialogTimeout {
 }
 
 sub _get_sessionIntentFilter {
-	my $hash         = shift // return;
+    my $hash         = shift // return;
     my $intents   	 = shift;
-	my $enableCancel = shift;
-	
-	my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
-	my @sessionIntents;
-	for (@allIntents) {
-		next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice};
-		push @sessionIntents, $_ if 
-			!defined $hash->{helper}->{tweaks} ||
-			!defined $hash->{helper}{tweaks}->{intentFilter} ||
-			!defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
-			defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
+    my $enableCancel = shift;
+
+    my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
+    my @sessionIntents;
+    for (@allIntents) {
+        next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice};
+        push @sessionIntents, $_ if
+            !defined $hash->{helper}->{tweaks} ||
+            !defined $hash->{helper}{tweaks}->{intentFilter} ||
+            !defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
+            defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
     }
 
-	my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
-	push @sessionIntents, "${id}CancelAction" if $enableCancel;
-	
-	my @addIntents;
-	if ( ref $intents eq 'ARRAY' ) {
-	    @addIntents = @{$intents};
-	} else {
-		@addIntents = split m{,}xm, $intents;
-	}
-	for (@addIntents) {
-		if ( $_ =~ m{\a${id}} ) {
-			push @sessionIntents, $_;
-		} else {
-			push @sessionIntents, "${id}$_";
-		}
-	}
+    my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+    push @sessionIntents, "${id}CancelAction" if $enableCancel;
+
+    my @addIntents;
+    if ( ref $intents eq 'ARRAY' ) {
+        @addIntents = @{$intents};
+    } else {
+        @addIntents = split m{,}xm, $intents;
+    }
+    for (@addIntents) {
+        if ( $_ =~ m{\a${id}} ) {
+            push @sessionIntents, $_;
+        } else {
+            push @sessionIntents, "${id}$_";
+        }
+    }
     return \@sessionIntents;
 }
 
@@ -2825,11 +2830,18 @@ sub parseJSONPayload {
     if ( !eval { $decoded  = JSON->new->decode($json) ; 1 } ) {
         return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
     }
-
+    my $customData; # may be nested JSON -> decode and attach to $data
+    if ( defined $decoded->{customData} ) {
+        if ( !eval { $customData = JSON->new->decode($decoded->{customData}) ; 1} ) {
+            $data->{customData} = $decoded->{customData} ;
+        }else{
+            $data->{customData} = $customData;
+        }
+    }
     # Standard-Keys auslesen
     ($data->{intent} = $decoded->{intent}{intentName}) =~ s{\A.*.:}{}x if exists $decoded->{intent}{intentName};
     $data->{confidence} = $decoded->{intent}{confidenceScore} // 0.75;
-    for my $key (qw(sessionId siteId input rawInput customData lang)) {
+    for my $key (qw(sessionId siteId input rawInput lang)) { #customData is treated before
         $data->{$key} = $decoded->{$key} if exists $decoded->{$key};
     }
 
@@ -3030,7 +3042,6 @@ sub activateVoiceInput {
     my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
     my $hotword = $h->{hotword} // shift @{$anon} // $h->{modelId} // "$hash->{LANGUAGE}$hash->{fhemId}";
     my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
-
     my $sendData;
     my $json;
 
@@ -3609,17 +3620,16 @@ sub analyzeMQTTmessage {
 
         if ( $topic =~ m{sessionStarted}x ) {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
-			if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && ( 
-			     defined $data->{customData}->{SilentClosure} || 
-				 defined $data->{customData}->{reopenVoiceInput} ) ) {
-			    activateVoiceInput($hash,[$data->{siteId}]);
+            if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && (
+                defined $data->{customData}->{SilentClosure} ||
+                defined $data->{customData}->{reopenVoiceInput} ) ) { # GV: ich würde vorschlagen, dass der sessionTomeout nicht mehr in SilentClosure stehen kann (Beta-User: Grund noch unklar)
                 my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
                 $delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
-		        $delay = $data->{customData}->{reopenVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reopenVoiceInput} && looks_like_number($data->{customData}->{reopenVoiceInput} && $data->{customData}->{reopenVoiceInput} > 0);
+                $delay = $data->{customData}->{reopenVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reopenVoiceInput} && looks_like_number($data->{customData}->{reopenVoiceInput} && $data->{customData}->{reopenVoiceInput} > 0);
                 resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
-			}
-		} elsif ( $topic =~ m{sessionQueued}x ) {
-			#Beta-User: This would be the place to update timeout for the "continuous session"/ 
+            }
+        } elsif ( $topic =~ m{sessionQueued}x ) {
+            #Beta-User: This would be the place to update timeout for the "continuous session"/
         } elsif ( $topic =~ m{sessionEnded}x ) {
             readingsSingleUpdate($hash, 'listening_' . makeReadingName($room), 0, 1);
             my $identity = qq($data->{sessionId});
@@ -3756,9 +3766,7 @@ sub respond {
     my $delay    = shift;
 
     $response = q{} if $response eq 'SilentClosure'; 
-    #delete $response if $response eq 'SilentClosure';
-
-
+	
     my $contByDelay = $delay // $topic ne 'endSession';
     #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
@@ -3776,8 +3784,8 @@ sub respond {
     }
 
     my $type      = $data->{requestType} // return; #voice or text
-	
-	delete $response->{text} if ref $response eq 'HASH' && $response->{text} eq 'SilentClosure';
+
+    delete $response->{text} if ref $response eq 'HASH' && $response->{text} eq 'SilentClosure';
 
     my $sendData;
 
@@ -3796,23 +3804,21 @@ sub respond {
     } elsif ( $delay ) {
         $sendData->{text} = $response if $response;
         $topic = q{continueSession};
-		my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
-		$toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
+        my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
+        $toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
         #my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
-		my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
-        $sendData->{intentFilter} = [@ca_strings];
+        #$sendData->{intentFilter} = [@ca_strings];
+        $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toDisable, 1 ),
     } else {
         $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
     }
 
-    my $json = _toCleanJSON($sendData);
+    my $json = _toCleanJSON($sendData); #Beta-User pure toJSON() produces other errors!
     $response = $response->{text} if ref $response eq 'HASH' && defined $response->{text};
     $response = $response->{response} if ref $response eq 'HASH' && defined $response->{response};
     readingsBeginUpdate($hash);
-    $type eq 'voice' ?
-        readingsBulkUpdate($hash, 'voiceResponse', $response)
-      : readingsBulkUpdate($hash, 'textResponse', $response);
+    readingsBulkUpdate($hash, "${type}Response", $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     Log3($hash, 5, "Response is: $response");
@@ -3835,16 +3841,17 @@ sub respond {
     
     #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
     if ( $topic ne 'continueSession' && $type eq 'voice' && !defined $data->{closeSession} && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
-	
+
 =pod 
-		$delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+        $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
         $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
         $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
 =cut
-		delete $sendData->{customData};
-		$sendData->{text}       = getResponse($hash, 'ContinueSession');
-		$sendData->{customData} = toJSON($data); #seems, we need "incorrect" doubled JSON, see https://forum.fhem.de/index.php?msg=1324631
-		activateVoiceInput($hash,[$data->{siteId}],$sendData);
+        delete $sendData->{customData};
+        delete $data->{customData}->{customData} if ref $data->{customData}  eq 'HASH' && defined $data->{customData}->{customData};
+        $sendData->{text}       = getResponse($hash, 'ContinueSession');
+        $sendData->{customData} = toJSON($data); #seems, we need "incorrect" doubled JSON, see https://forum.fhem.de/index.php?msg=1324631
+        activateVoiceInput($hash,[$data->{siteId}],$sendData);
     }
 
     my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
@@ -4596,7 +4603,7 @@ sub handleIntentSetTimedOnOff {
 
     # Mapping found?
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
-    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOn  = $mapping->{cmdOn} // 'on'; #Beta-User: might need review, as e.g. "Aus-for-timer" most likely will not work...
     my $cmdOff = $mapping->{cmdOff} // 'off';
     my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
     $cmd .= "-for-timer";
@@ -4874,7 +4881,12 @@ sub handleIntentSetNumeric {
     }
     
     # Mapping and device found -> execute command
-    my $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
+	my $cmd;        
+    #if ( ! defined $mapping->{$change} ) { # @@@
+    #if ( !defined $change || !defined $mapping->{$change} ) { # @@@
+
+        $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
+    #}  Beta-User: not yet activated, we have to check first if bulk actions work as desired and all "strange" $change values will not lead to confusing results.
     my $part    = $mapping->{part};
     my $minVal  = $mapping->{minVal};
     my $maxVal  = $mapping->{maxVal};
@@ -5801,16 +5813,22 @@ sub handleIntentNotRecognized {
     my $data = shift // return;
 
     Log3( $hash, 5, "[$hash->{NAME}] handleIntentNotRecognized called, input is $data->{input}" );
-	
-	#Beta-User: silence chuncks or single words, might later be configurable
-	if ( !defined $data->{input} || length($data->{input}) < 12 ) {
-	    return if ref $data->{customData} ne 'HASH';
-		#$data->{text} = q{};
-		$data->{customData}->{text} = q{};
-		return activateVoiceInput($hash,[$data->{siteId}],$data->{customData});
-		#Beta-User: needs review for cont. sessions
-	}
-	
+
+    my $response;
+    my $reaction;
+
+    #Beta-User: silence chuncks or single words, might later be configurable
+    #if ( !defined $data->{input} || length($data->{input}) < 12 ) {
+    if ( !$data->{input} || (ref $data->{customData} eq 'HASH' && defined $data->{customData}->{RetryIntent} ) ) {
+        $response = $data->{input} ? getResponse( $hash, 'RetryIntent') : 'SilentClosure';
+        $reaction = { 
+            text => $response,
+            sendIntentNotRecognized => 'true',
+            customData => $data->{customData}      #Beta-User: toJSON?
+        };
+        return respond( $hash, $data, $reaction);  # keep session open and continue listening
+    }
+
     my $identity = qq($data->{sessionId});
     my $siteId = $hash->{siteId};
     my $msgdev = (split m{_${siteId}_}x, $identity,3)[0];
@@ -5832,14 +5850,14 @@ sub handleIntentNotRecognized {
         return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
     }
 
-    $data->{requestType} //= $data_old->{requestType} // 'voice';                                                                                           # required, otherwise session open but no voice input possible
-    my $response = getResponse( $hash, 'RetryIntent');                                                                         # get retry response
-    my $reaction = { 
+    $data->{requestType} //= $data_old->{requestType} // 'voice'; # required, otherwise session open but no voice input possible
+    $response = getResponse( $hash, 'RetryIntent');
+    $reaction = { 
         text => $response,
         sendIntentNotRecognized => 'true',
         customData => $data->{customData}
     };
-    respond( $hash, $data, $reaction);                                                                                         # keep session open and continue listening
+    respond( $hash, $data, $reaction); # keep session open and continue listening
     return $hash->{NAME};
 
 
@@ -5866,7 +5884,7 @@ sub handleIntentCancelAction {
 
     my $identity = qq($data->{sessionId});
     my $data_old = $hash->{helper}{'.delayed'}->{$identity};
-    if ( !defined $data_old || defined $data->{resetInput}) {
+    if ( ( !defined $data_old && ref $data->{customData} ne 'HASH' && !defined $data->{closeSession} ) || defined $data->{resetInput}) {
         respond( $hash, $data, getResponse( $hash, 'SilentClosure' ), undef, 0 );
         return configure_DialogManager( $hash, $data->{siteId}, undef, undef, 1 ); #global intent filter seems to be not working!
     }
@@ -5874,10 +5892,10 @@ sub handleIntentCancelAction {
     deleteSingleRegIntTimer($identity, $hash);
     delete $hash->{helper}{'.delayed'}->{$identity};
     my $response = getResponse( $hash, 'DefaultCancelConfirmation' );
-	
-	#Beta-User: Here we need additional Code for handling "shut up" cases in continuous sessions
+
+    #Beta-User: Here we need additional Code for handling "shut up" cases in continuous sessions
     if ( defined $data->{closeSession} ) {
-        $response = getResponse( $hash, 'DefaultConfirmation' );
+        $response = getResponse( $hash, 'DefaultConfirmationClosure' );
     }
 
     respond( $hash, $data, $response, undef, 0 );
