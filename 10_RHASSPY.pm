@@ -1769,23 +1769,27 @@ sub _get_sessionIntentFilter {
 
     my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
     my @sessionIntents;
-    for (@allIntents) {
-        next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice};
-        push @sessionIntents, $_ if
-            !defined $hash->{helper}->{tweaks} ||
-            !defined $hash->{helper}{tweaks}->{intentFilter} ||
-            !defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
-            defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
+	my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+    
+    if ( !$intents || ref $intents ne 'ARRAY' && $intents eq 'all' ) {
+        for (@allIntents) {
+	    	next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && $intents ne 'all';
+            #push @sessionIntents, "${id}$_" if
+			push @sessionIntents, $_ if
+                !defined $hash->{helper}->{tweaks} ||
+                !defined $hash->{helper}{tweaks}->{intentFilter} ||
+                !defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
+                defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
+		}
     }
 
-    my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
     push @sessionIntents, "${id}CancelAction" if $enableCancel;
 
     my @addIntents;
     if ( ref $intents eq 'ARRAY' ) {
         @addIntents = @{$intents};
     } else {
-        @addIntents = split m{,}xm, $intents;
+        @addIntents = split m{,}xm, $intents if defined $intents && $intents ne 'all';
     }
     for (@addIntents) {
         if ( $_ =~ m{\a${id}} ) {
@@ -3804,11 +3808,11 @@ sub respond {
     } elsif ( $delay ) {
         $sendData->{text} = $response if $response;
         $topic = q{continueSession};
-        my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
-        $toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
+        my $toEnable = $data->{intentFilter}; # // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
+        $toEnable = split m{,}xms, $toEnable if ref $toEnable ne 'ARRAY';
         #my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
         #$sendData->{intentFilter} = [@ca_strings];
-        $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toDisable, 1 ),
+        $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toEnable, 1 ),
     } else {
         $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
