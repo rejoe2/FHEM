@@ -1301,7 +1301,7 @@ sub _analyze_genDevType {
             SetNumeric => { setTarget => { cmd => 'pct', currentVal => 'pct', maxVal => '100', minVal => '0', step => '13', type => 'setTarget'} }
             };
         }
-        elsif ( $allset =~ m{\bpos([\b:\s]|\Z)}xms ) {
+        elsif ( $allset =~ m{\bpos([\b:\s]|\Z)}xms ) { # works at least for Dooya, see https://forum.fhem.de/index.php?msg=1325575
             $currentMapping = { 
             GetNumeric => { 'pos' => {currentVal => 'position', type => 'setTarget'} },
             GetOnOff => { GetOnOff => {currentVal=>'position', valueOn=>'100' } },
@@ -3809,7 +3809,7 @@ sub respond {
         $sendData->{text} = $response if $response;
         $topic = q{continueSession};
         my $toEnable = $data->{intentFilter}; # // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
-        $toEnable = split m{,}xms, $toEnable if ref $toEnable ne 'ARRAY';
+        #$toEnable = split m{,}xms, $toEnable if ref $toEnable ne 'ARRAY';
         #my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
         #$sendData->{intentFilter} = [@ca_strings];
         $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toEnable, 1 ),
