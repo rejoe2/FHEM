@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-11-24 Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-11-28 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -37,7 +37,7 @@ use JSON ();
 use Encode;
 use HttpUtils;
 use utf8;
-use List::Util 1.45 qw(max min uniq shuffle);
+use List::Util 1.45 qw(max min uniq shuffle any);
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
@@ -1072,6 +1072,7 @@ sub _analyze_rhassypAttr {
             next if !$val;
             for my $rooms (@rooms) {
                 push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
+				#any { $_ eq $scalar } @array;
             }
             $hash->{helper}{devicemap}{devices}{$device}{$item}{$key} = $val;
         }
@@ -1560,7 +1561,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querymark|sessionTimeout\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|sessionTimeout\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1579,7 +1580,6 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi $you! What can I do for you?|at your service|There you go again!};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.|Bye|CU|Cheers!|so long};
-    $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
     $hash->{helper}->{msgDialog}->{config}->{sessionTimeout} //= $hash->{sessionTimeout} // _getDialogueTimeout($hash);
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
@@ -3426,17 +3426,17 @@ sub RHASSPY_SpeechDialogTimeout {
     return SpeechDialog_close($hash, $identity);
 }
 
-sub RHASSPY_reopenVoiceInput_timeout {
+sub RHASSPY_reActivateVoiceInput_timeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
     my $identity = $fnHash->{MODIFIER};
     deleteSingleRegIntTimer($identity, $hash, 1);
-    Log3($hash, 5, "RHASSPY_reopenVoiceInput_timeout called with $identity");
+    Log3($hash, 5, "RHASSPY_reActivateVoiceInput_timeout called with $identity");
 
     my $sendData = {
 	    sessionId   => $identity,
-		customData  => 'reopenVoiceInput_timeout'
+		customData  => 'reActivateVoiceInput_timeout'
 		
 	};
     my $json = _toCleanJSON($sendData);
@@ -3626,11 +3626,11 @@ sub analyzeMQTTmessage {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
             if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && (
                 defined $data->{customData}->{SilentClosure} ||
-                defined $data->{customData}->{reopenVoiceInput} ) ) { # GV: ich würde vorschlagen, dass der sessionTomeout nicht mehr in SilentClosure stehen kann (Beta-User: Grund noch unklar)
+                defined $data->{customData}->{reActivateVoiceInput} ) ) { # GV: ich würde vorschlagen, dass der sessionTomeout nicht mehr in SilentClosure stehen kann (Beta-User: Grund noch unklar)
                 my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
                 $delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
-                $delay = $data->{customData}->{reopenVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reopenVoiceInput} && looks_like_number($data->{customData}->{reopenVoiceInput} && $data->{customData}->{reopenVoiceInput} > 0);
-                resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
+                $delay = $data->{customData}->{reActivateVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
+                resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reActivateVoiceInput_timeout, $hash );
             }
         } elsif ( $topic =~ m{sessionQueued}x ) {
             #Beta-User: This would be the place to update timeout for the "continuous session"/
@@ -3844,12 +3844,12 @@ sub respond {
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
     
     #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
-    if ( $topic ne 'continueSession' && $type eq 'voice' && !defined $data->{closeSession} && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
+    if ( $topic ne 'continueSession' && $type eq 'voice' && !defined $data->{closeSession} && ( defined $data->{reActivateVoiceInput} || defined $hash->{sessionTimeout} ) ) {
 
 =pod 
         $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
         $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
-        $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
+        $delay = $data->{reActivateVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reActivateVoiceInput} && looks_like_number($data->{reActivateVoiceInput} && $data->{reActivateVoiceInput} > 0);
 =cut
         delete $sendData->{customData};
         delete $data->{customData}->{customData} if ref $data->{customData}  eq 'HASH' && defined $data->{customData}->{customData};
@@ -6397,8 +6397,10 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <a id="RHASSPY-noChangeover"></a>
   <li><b>noChangeover</b>: By default, RHASSPY will first try to execute the intent as handed over by Rhasspy. In case there's no strict match, RHASSPY then will do a check, if the single device intent could be executed as group intent (vice versa; to do this, the {Group} key value will be used as {Device} key). Setting this key to '1' will completely prevent this check, '2' will stop changeover from single device intent to respective group intent, but allow to switch from group to single device.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
+  <a id="RHASSPY-Babble"></a>
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <a id="RHASSPY-sessionTimeout"></a>
   <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering. Note: In case of Kaldi, you may have to set a longer default there as well.</li>
   <li><b>autoTraining</b>: deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
@@ -6612,12 +6614,12 @@ After changing something relevant within FHEM for either the data structure in</
     <li>If HASH type data (or $response in ARRAY) is returned to continue a session, make sure to hand over all relevant elements, including especially <i>customData</i> for referencing and <i>intentFilter</i> if you want to restrict possible intents. It's recommended to always also activate <i>CancelAction</i> to allow user to actively exit the dialogue, or activate something that could hand over a <i>resetInput</i> key.
     </li>
     </ul>
-    <br>See also <a href="#RHASSPY-additional-files">additionals files</a> for further examples on this.</p>
+    <br>See also  <a href="#RHASSPY-dialogues"><b>dialogues</b></a> and <a href="#RHASSPY-additional-files">additionals files</a> for further examples on this.</p>
   </li>
 
   <li>
     <a id="RHASSPY-attr-rhasspyShortcuts"></a><b>rhasspyShortcuts</b>
-    <p>Define custom sentences without editing Rhasspys sentences.ini<br>
+    <p>Define custom sentences without editing Rhasspys <i>sentences.ini</i><br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
     One shortcut per line, syntax is either a simple and an extended version.</p>
     <p>Examples:</p>
@@ -6757,7 +6759,6 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
         <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
-        <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (for the future: will be added to all requests towards Rhasspy intent recognition system automatically; not functional atm.)</li>
         <br>
       </ul>
   </li>
@@ -6945,7 +6946,7 @@ yellow=rgb FFFF00</code></p>
 <a id="RHASSPY-intents"></a>
 <h4>Intents</h4>
 <p>The following intents are directly implemented in RHASSPY code. Note: In case you hand over a key named "resetInput", no specific intent handler will be called, but the respective satellite will be activated and reset to it's default intentFilter.</p>
-<p>The keywords used by these intents (in sentences.ini) are as follows:
+<p>The keywords used by these intents (in <i>sentences.ini</i>) are as follows:
 <ul>
   <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
@@ -6993,11 +6994,75 @@ yellow=rgb FFFF00</code></p>
   <li>GetTimer</li> (Outdated, use generic "Timer" instead!) Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
   <li>ConfirmAction</li>
   {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
-  <li>CancelAction</li>Hand over a {Mode} key is recommended.
+  <a id="RHASSPY-intent-cancelAction"></a>
+  <li>CancelAction</li>Hand over a {Mode} key is recommended. Including a {closeSession} key will force the deactivation of the used voice input device (see <a href="#RHASSPY-dialogues"><b>dialogues</b></a>).
   <li>Choice</li>One or more of {Room}, {Device} or {Scene}
   <li>ChoiceRoom</li> {Room} NOTE: Useage of generic "Choice" intent instead is highly recommended!
   <li>ChoiceDevice</li> {Device} NOTE: Useage of generic "Choice" intent instead is highly recommended!
-  <li>ReSpeak</li>
+  <li>ReSpeak</li><br>
+  Additionaly, you may use some additional keys to influence (voice) dialogue behaviour, see <a href="#RHASSPY-dialogues"><b>dialogues</b></a>.
+</ul>
+<a id="RHASSPY-dialogues"></a>
+<h4>Dialogues</h4>
+<p><b>Note:</b> This is an experimental feature and may be subject to changes!<br>
+The following keys may be used to control interaction with Rhasspy, especially to "contiunue" or explicitly close a session when using voice input.<br>
+Any key may origine either from <i>sentences.ini</i>, (<a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a> or <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a> to be implemented and documented! Logic in "conflicting" situations may follow the rule: sentence.ini has highest prio, then specials, tweak least)
+
+<ul>
+    <li>reActivateVoiceInput</li> Will issue an <a href="#RHASSPY-set-activateVoiceInput">activateVoiceInput</a> command following the given plus the <i>ContinueSession</i> responses, without need of speaking the hotword again. The new session (controled by FHEM) will kept open for the number (in seconds) provided by the key (or by default <a href="#RHASSPY-sessionTimeout">sessionTimeout</a> settings) and finally closed silently after the timeout has passed without new command. Note: For longer timeouts, this may need additional (timeout) configuration on the Rhasspy side as well and has some limitations, see https://forum.fhem.de/index.php?msg=1322331 for details.<br>
+	Example: For opening blinds, just add <i>[]{reopenVoiceInput:40}</i> at the end of the respective entry in <i>sentences.ini</i> e.g. to allow direct "stop" commands. 
+	<br>When using this feature, the <a href="#RHASSPY-intent-cancelAction">CancelAction</a> intent will be activated to allow forced session closure (see below).
+	<li>closeSession</li> Will force the voice input to be closed (has higher priority than reActivateVoiceInput).<br>
+	<li>noch zu bearbeiten bzw. zu klären</li>, https://forum.fhem.de/index.php?msg=1325607:
+
+
+Wenn ein Kommando nicht verstanden wurde, wird die Session beendet - außer man kombiniert mit der wie bitte? Funktion.
+Szenario: Wenn man ohne erneutes Wake-Word noch andere Kommandos geben will.
+Zusätzlich: Es wurde die responseId ContinueSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "Sonst noch was?" einstellen kann.
+
+    retryInput = true              -> wie bitte? Funktion
+
+Einstellung: in der Rhasspy Konfiguration am Ende eines sentence[]{retryInput=true}[/b] anhängen (gilt dann nur für dieses Kommando).
+Besser Alternativ: in FHEM rhasspyTweaks die Zeile retryInput=all=true (gilt immer). Statt all sind auch andere Bedingungen einstellbar.
+bewirkt, dass wenn ein Kommando nicht verstanden wurde, statt der Standardansage die Ansage wie bitte? und der Dialog offen bleibt, damit man das fehlerhafte Kommando ohne erneutes Wake-Word korrigieren kann. Die Dauer, die der Dialog offen bleibt wird von dem Timeout bestimmt, der beim Start einer Session gesetzt wurde und verlängert sich durch wie bitte? nicht.
+Zusätzlich: Es wurde die responseId RetryInput in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "wie bitte?" einstellen kann.
+
+    noResponse = true:             -> Standard Antwort eines Intent unterdrücken, nur sinnvoll, wenn reopenVoiceInput oder retryInput aktiv ist.
+
+bewirkt, dass nach Abarbeitung eines Intent keine Ansage erfolgt.
+Einstellung: in der Rhasspy Konfiguration am Ende des betreffenden sentence für etwas höher, leiser, heller ... noch []{noResponse:true} anhängen.
+Szenario Bei einer Steuerung von Lampen oder Rollläden können so Kommandos wie 'etwas heller' oder 'etwas runter' / 'Stop' ggf. mehrfach hintereinander gegeben werden, ohne dass man auf das Ende einer Ansage warten muss. Wenn diese Art Kommandos gegeben werden, sieht/hört man ja das Ergebnis.
+
+    closeSession                      ->sei still Funktion, nur sinnvoll, wenn reopenVoiceInput oder retryInput aktiv ist.
+
+Einstellen: in der Rhasspy Konfiguration einen weiteren sentence z.B. (fertig|sei still){closeSession:true} unter CancelAction einfügen.
+Funktionserweiterung für CancelAction bewirkt, dass die laufende Session mit einer anderen Ansage (responseId closeSession) beendet wird.
+Szenario: es ist gerade eine Session offen z.B. durch reopenVoiceInput und das Telefon klingelt. Rhasspy hört dann gerade auf ein Kommando und wird ständig dazwichen reden, während man sich unterhält. Mit dem Kommando 'sei still' kann man Rhasspy zum schweigen bringen als Antwort erhält man nicht das unpassende 'habe abgebrochen' sondern z.B. ein kurzes 'OK'
+Zusätzlich: Es wurde die responseId CloseSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "OK" einstellen kann.
+
+    resetInput                      -> Alles auf Anfang
+
+Einstellen:  in der Rhasspy Konfiguration den sentence Wake-Word{resetInput} bei irgend einem Intent einfügen.
+bewirkt, dass sofort eine neue Session gestartet wird. Man vermeidet ein "Das habe ich nicht verstanden" oder "wie bitte", wenn man während einer laufenden Session versehentlich das Wake-Word spricht.
+Szenario: es ist gerade eine Session offen z.B. durch reopenVoiceInput und das Wake-Word wird gesprochen. Wegen der offenen Sesssion ist z.B. Porcupine nicht aktiv und Rhasspy würde vergeblich versuchen einen passenden Intent zu finden. Durch resetInput kann man sein Wake-Word bei einem Intent unterbringen und Rhasspy versteht das Wake-Word als Kommando. Damit gibt es kein IntentNotRecognized mehr. Intern wird der betreffende Intent dann nicht ausgeführt, und statt dessen - wie man ja nach einem Wake-Word erwartet - eine Neue Session gestartet.
+
+    silentClosure = true          -> Session Ende erfolgt ohne Ansage
+
+Einstellung: In Einem hash als return eines CustomIntent übergeben.
+Hauptsächlich gedacht für CustomIntents.
+Wenn ein CustomIntent eine Session für eine angegebene Zeit offen hält, wird am Ende der Session die Standard Antwort unterdrückt.
+Zusätzlich: es wurde die responseId SilentClosure eingeführt, die man auch als response übergeben kann und eine stille Ausführung eines Kommandos bewirkt.
+ToDo: Ggf. ohne Parameter als Standard festlegen.
+
+Allgemein:
+Alle obigen Einstellungen, die in rhasspyTweaks möglich sind, können auch als Device Einstellung unter rhasspySpecials vorgenommen werden und gelten dann nur für dieses Device. Bitte das nötige Specials-Format beachten: die Tweaks Einstellung retryInput=all=true muss bei Specials retryInput:all=true geschrieben werden (der ':'). Specials sind vorrangig vor Tweaks.
+Bei der Einstellung unter rhasspyTweaks können statt all Bedingungen wie SetOnOff angegeben werden, auch kombiniert in der Form SetOnOff|SetNumeric wober die betreffende Einstellung nur für die Intents SetOnOff, bzw. SetOnOff oder SetNumeric gilt.
+Mögliche Bedingungen (derzeit) sind: Intent, Group, gdt, Type, Name, Device, Room
+Beispiel:
+reopenVoiceInput=light=15 -> sonst noch was? für 15 Sekunden gilt nur, wenn die Geräte deren attr GenericDeviceType light ist.
+Oder:
+reopenVoiceInput=SetOnOff=32 Lampen|Rollläden=25 -> für Intent SetOnOff gilt sonst noch was? für 32 Sekunden, ansonsten für die Gruppen Lampen und Rolläden eben 25 Sekunden.
+Die erste Bedingung (von linkst nach rechts), die zutrifft, bestimmt die Zeiteinstellung.
 </ul>
 
 <a id="RHASSPY-readings"></a>
