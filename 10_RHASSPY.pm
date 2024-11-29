@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-11-28 Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-11-29 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1764,23 +1764,23 @@ sub setDialogTimeout {
 
 sub _get_sessionIntentFilter {
     my $hash         = shift // return;
-    my $intents   	 = shift;
+    my $intents      = shift;
     my $enableCancel = shift;
 
     my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
     my @sessionIntents;
-	my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+        my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
     
     if ( !$intents || ref $intents ne 'ARRAY' && $intents eq 'all' ) {
         for (@allIntents) {
-	    	next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && $intents ne 'all';
+            next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && ( !defined $intents || $intents ne 'all' );
             #push @sessionIntents, "${id}$_" if
-			push @sessionIntents, $_ if
+            push @sessionIntents, $_ if
                 !defined $hash->{helper}->{tweaks} ||
                 !defined $hash->{helper}{tweaks}->{intentFilter} ||
                 !defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
                 defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
-		}
+        }
     }
 
     push @sessionIntents, "${id}CancelAction" if $enableCancel;
@@ -3602,7 +3602,7 @@ sub analyzeMQTTmessage {
     my $siteId    = $data->{siteId};
     my $mute = 0;
     if (!defined $data->{requestType}) {
-    	$data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
+        $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
     }
 
     if (defined $siteId) {
@@ -3656,11 +3656,11 @@ sub analyzeMQTTmessage {
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
         my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off') // q{};
-		my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-		for (@candidates) {
-		   push @updatedList, $_ if $defs{$_} && $_ ne $name;
-		}
-		return \@updatedList;
+        my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
+        for (@candidates) {
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
+        }
+        return \@updatedList;
     }
 
     if ($topic =~ m{\Ahermes/intent/.*[:_]SetMute}x && defined $siteId) {
@@ -3690,15 +3690,15 @@ sub analyzeMQTTmessage {
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $ret = handleHotwordDetection($hash, $hotword, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-		for (@candidates) {
-			push @updatedList, $_ if $defs{$_} && $_ ne $name;
+        for (@candidates) {
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
         }
         $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected') // q{};
-		@candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-		for (@candidates) {
-			push @updatedList, $_ if $defs{$_} && $_ ne $name; 
-		}
-		return \@updatedList;
+        @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
+        for (@candidates) {
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
+        }
+        return \@updatedList;
     }
 
     if ( $topic =~ m{\Ahermes/tts/say}x ) {
@@ -6769,7 +6769,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   <li>
     <a id="RHASSPY-attr-rhasspySpeechDialog"></a><b>rhasspySpeechDialog</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
+    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a>.<br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
@@ -6993,7 +6993,7 @@ yellow=rgb FFFF00</code></p>
   Required tags to set a timer: at least one of {Hour}, {Hourabs}, {Min} or {Sec}. {Label} and {Room} are optional to distinguish between different timers. If {Hourabs} is provided, all timer info will be regarded as absolute time of day info, otherwise everything is calculated using a "from now" logic.
   <li>GetTimer</li> (Outdated, use generic "Timer" instead!) Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
   <li>ConfirmAction</li>
-  {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
+  {Mode} with value 'OK'. All other calls will be interpreted as <i>CancelAction</i> intent call.
   <a id="RHASSPY-intent-cancelAction"></a>
   <li>CancelAction</li>Hand over a {Mode} key is recommended. Including a {closeSession} key will force the deactivation of the used voice input device (see <a href="#RHASSPY-dialogues"><b>dialogues</b></a>).
   <li>Choice</li>One or more of {Room}, {Device} or {Scene}
@@ -7006,17 +7006,18 @@ yellow=rgb FFFF00</code></p>
 <h4>Dialogues</h4>
 <p><b>Note:</b> This is an experimental feature and may be subject to changes!<br>
 The following keys may be used to control interaction with Rhasspy, especially to "contiunue" or explicitly close a session when using voice input.<br>
-Any key may origine either from <i>sentences.ini</i>, (<a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a> or <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a> to be implemented and documented! Logic in "conflicting" situations may follow the rule: sentence.ini has highest prio, then specials, tweak least)
+Any key may origine either from <i>sentences.ini</i>, (<a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a> or <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a> to be implemented and documented! Logic in "conflicting" situations may follow the rule: sentence.ini has highest prio, then specials, tweak least).
 
 <ul>
     <li>reActivateVoiceInput</li> Will issue an <a href="#RHASSPY-set-activateVoiceInput">activateVoiceInput</a> command following the given plus the <i>ContinueSession</i> responses, without need of speaking the hotword again. The new session (controled by FHEM) will kept open for the number (in seconds) provided by the key (or by default <a href="#RHASSPY-sessionTimeout">sessionTimeout</a> settings) and finally closed silently after the timeout has passed without new command. Note: For longer timeouts, this may need additional (timeout) configuration on the Rhasspy side as well and has some limitations, see https://forum.fhem.de/index.php?msg=1322331 for details.<br>
-	Example: For opening blinds, just add <i>[]{reopenVoiceInput:40}</i> at the end of the respective entry in <i>sentences.ini</i> e.g. to allow direct "stop" commands. 
-	<br>When using this feature, the <a href="#RHASSPY-intent-cancelAction">CancelAction</a> intent will be activated to allow forced session closure (see below).
-	<li>closeSession</li> Will force the voice input to be closed (has higher priority than reActivateVoiceInput).<br>
-	<li>noch zu bearbeiten bzw. zu klären</li>, https://forum.fhem.de/index.php?msg=1325607:
+    Example: For opening blinds, just add <i>[]{reActivateVoiceInput:40}</i> at the end of the respective entry in <i>sentences.ini</i> e.g. to allow direct "stop" commands.
+    <br>When using this feature, the <i><a href="#RHASSPY-intent-cancelAction">CancelAction</a></i> intent will be activated to allow forced session closure (see below).
+    <li>closeSession</li> Will force the voice input to be closed (has higher priority than reActivateVoiceInput).<br>
+    Example for <i>CancelAction</i> intent: <code>(goodbye | shut up){closeSession}</code>.
 
+    <li>noch zu bearbeiten bzw. zu klären</li>, https://forum.fhem.de/index.php?msg=1325607:
 
-Wenn ein Kommando nicht verstanden wurde, wird die Session beendet - außer man kombiniert mit der wie bitte? Funktion.
+<i>Wenn ein Kommando nicht verstanden wurde, wird die Session beendet - außer man kombiniert mit der wie bitte? Funktion.
 Szenario: Wenn man ohne erneutes Wake-Word noch andere Kommandos geben will.
 Zusätzlich: Es wurde die responseId ContinueSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "Sonst noch was?" einstellen kann.
 
@@ -7062,7 +7063,7 @@ Beispiel:
 reopenVoiceInput=light=15 -> sonst noch was? für 15 Sekunden gilt nur, wenn die Geräte deren attr GenericDeviceType light ist.
 Oder:
 reopenVoiceInput=SetOnOff=32 Lampen|Rollläden=25 -> für Intent SetOnOff gilt sonst noch was? für 32 Sekunden, ansonsten für die Gruppen Lampen und Rolläden eben 25 Sekunden.
-Die erste Bedingung (von linkst nach rechts), die zutrifft, bestimmt die Zeiteinstellung.
+Die erste Bedingung (von linkst nach rechts), die zutrifft, bestimmt die Zeiteinstellung.</i>
 </ul>
 
 <a id="RHASSPY-readings"></a>

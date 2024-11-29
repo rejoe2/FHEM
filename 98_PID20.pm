@@ -1,4 +1,4 @@
-# $Id: 98_PID20.pm 28754 2024-04-05 10:22:49Z betateilchen $
+# $Id: 98_PID20.pm 28754 2024-11-29 Beta-User $
 
 =for comment
 ####################################################################################################
@@ -193,7 +193,6 @@ sub PID20_Define($$$)
   my ( $hash, $def ) = @_;
   my @a       = split( "[ \t][ \t]*", $def );
   my $name    = $a[0];
-  my $err     = 0;
   if ( @a != 4 )
   {
     return "wrong syntax: define &lt;name&gt; PID20 " 
@@ -212,6 +211,10 @@ sub PID20_Check($$$)
   my $msg;
 
   # if sensor unkonwn
+  my $name = $hash->{NAME};
+
+  my $err     = 0;
+
   if ( !$defs{$sensor} )
   {
     my $msg = "$name: Unknown sensor device $sensor specified";
@@ -292,10 +295,10 @@ sub PID20_Notify($$)
     return if !$events; # Some previous notify deleted the array.
     for my $evnt(@{$events}){
       if ($evnt =~ m/INITIALIZED|REREADCFG/){
-	    my (undef, $sensorinfo, $actorinfo) = split m{\s+}xms, $hash->{DEF};
-		return PID20_Check($hash, $sensorinfo, $actorinfo );
-	  }
-	}
+        my ($sensorinfo, $actorinfo) = split m{\s+}xms, $hash->{DEF};
+        return PID20_Check($hash, $sensorinfo, $actorinfo );
+      }
+    }
   }
 
   return if ( $dev->{NAME} ne $sensorName );
