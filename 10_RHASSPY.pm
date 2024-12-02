@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-11-29 Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-12-02 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -1702,7 +1702,7 @@ sub RHASSPY_DialogTimeout {
 
     deleteSingleRegIntTimer($identity, $hash, 1);
 
-    respond( $hash, $data, getResponse( $hash, defined $data->{SilentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
+    respond( $hash, $data, getResponse( $hash, defined $data->{silentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identity};
 
     return;
@@ -1767,14 +1767,13 @@ sub _get_sessionIntentFilter {
     my $intents      = shift;
     my $enableCancel = shift;
 
-    my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
     my @sessionIntents;
-        my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+    my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
     
-    if ( !$intents || ref $intents ne 'ARRAY' && $intents eq 'all' ) {
+    if ( !$intents ) {
+        my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
         for (@allIntents) {
-            next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && ( !defined $intents || $intents ne 'all' );
-            #push @sessionIntents, "${id}$_" if
+            next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && !defined $intents;
             push @sessionIntents, $_ if
                 !defined $hash->{helper}->{tweaks} ||
                 !defined $hash->{helper}{tweaks}->{intentFilter} ||
@@ -3625,11 +3624,13 @@ sub analyzeMQTTmessage {
         if ( $topic =~ m{sessionStarted}x ) {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
             if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && (
-                defined $data->{customData}->{SilentClosure} ||
+                # defined $data->{customData}->{SilentClosure} || #disabled on GV proposal 
                 defined $data->{customData}->{reActivateVoiceInput} ) ) { # GV: ich würde vorschlagen, dass der sessionTomeout nicht mehr in SilentClosure stehen kann (Beta-User: Grund noch unklar)
                 my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
-                $delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
-                $delay = $data->{customData}->{reActivateVoiceInput} if !defined $data->{customData}->{SilentClosure} && defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
+                #$delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
+                $delay = $data->{customData}->{reActivateVoiceInput} if 
+				    #!defined $data->{customData}->{SilentClosure} && 
+					defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
                 resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reActivateVoiceInput_timeout, $hash );
             }
         } elsif ( $topic =~ m{sessionQueued}x ) {
@@ -3712,9 +3713,7 @@ sub analyzeMQTTmessage {
     }
 
     if ($mute) {
-        #$data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
-        respond( $hash, $data, getResponse( $hash, 'SilentClosure' ), 'endSession', 0 );
-        #Beta-User: Da fehlt mir der Soll-Ablauf für das "room-listening"-Reading; das wird ja über einen anderen Topic abgewickelt
+        respond( $hash, $data, 'SilentClosure', 'endSession', 0 );
         return \@updatedList;
     }
     
@@ -3808,10 +3807,7 @@ sub respond {
     } elsif ( $delay ) {
         $sendData->{text} = $response if $response;
         $topic = q{continueSession};
-        my $toEnable = $data->{intentFilter}; # // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
-        #$toEnable = split m{,}xms, $toEnable if ref $toEnable ne 'ARRAY';
-        #my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
-        #$sendData->{intentFilter} = [@ca_strings];
+        my $toEnable = $data->{intentFilter};
         $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toEnable, 1 ),
     } else {
         $sendData->{text} = $response if $response;
@@ -3848,8 +3844,8 @@ sub respond {
 
 =pod 
         $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
-        $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
-        $delay = $data->{reActivateVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reActivateVoiceInput} && looks_like_number($data->{reActivateVoiceInput} && $data->{reActivateVoiceInput} > 0);
+        $delay = $data->{silentClosure}    if  defined $data->{silentClosure} && looks_like_number($data->{silentClosure});
+        $delay = $data->{reActivateVoiceInput} if !defined $data->{silentClosure} && defined $data->{reActivateVoiceInput} && looks_like_number($data->{reActivateVoiceInput} && $data->{reActivateVoiceInput} > 0);
 =cut
         delete $sendData->{customData};
         delete $data->{customData}->{customData} if ref $data->{customData}  eq 'HASH' && defined $data->{customData}->{customData};
@@ -7015,6 +7011,7 @@ Any key may origine either from <i>sentences.ini</i>, (<a href="#RHASSPY-attr-rh
     <li>closeSession</li> Will force the voice input to be closed (has higher priority than reActivateVoiceInput).<br>
     Example for <i>CancelAction</i> intent: <code>(goodbye | shut up){closeSession}</code>.
 
+<!-- 
     <li>noch zu bearbeiten bzw. zu klären</li>, https://forum.fhem.de/index.php?msg=1325607:
 
 <i>Wenn ein Kommando nicht verstanden wurde, wird die Session beendet - außer man kombiniert mit der wie bitte? Funktion.
@@ -7028,24 +7025,24 @@ Besser Alternativ: in FHEM rhasspyTweaks die Zeile retryInput=all=true (gilt imm
 bewirkt, dass wenn ein Kommando nicht verstanden wurde, statt der Standardansage die Ansage wie bitte? und der Dialog offen bleibt, damit man das fehlerhafte Kommando ohne erneutes Wake-Word korrigieren kann. Die Dauer, die der Dialog offen bleibt wird von dem Timeout bestimmt, der beim Start einer Session gesetzt wurde und verlängert sich durch wie bitte? nicht.
 Zusätzlich: Es wurde die responseId RetryInput in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "wie bitte?" einstellen kann.
 
-    noResponse = true:             -> Standard Antwort eines Intent unterdrücken, nur sinnvoll, wenn reopenVoiceInput oder retryInput aktiv ist.
+    noResponse = true:             -> Standard Antwort eines Intent unterdrücken, nur sinnvoll, wenn reActivateVoiceInput oder retryInput aktiv ist.
 
 bewirkt, dass nach Abarbeitung eines Intent keine Ansage erfolgt.
 Einstellung: in der Rhasspy Konfiguration am Ende des betreffenden sentence für etwas höher, leiser, heller ... noch []{noResponse:true} anhängen.
 Szenario Bei einer Steuerung von Lampen oder Rollläden können so Kommandos wie 'etwas heller' oder 'etwas runter' / 'Stop' ggf. mehrfach hintereinander gegeben werden, ohne dass man auf das Ende einer Ansage warten muss. Wenn diese Art Kommandos gegeben werden, sieht/hört man ja das Ergebnis.
 
-    closeSession                      ->sei still Funktion, nur sinnvoll, wenn reopenVoiceInput oder retryInput aktiv ist.
+    closeSession                      ->sei still Funktion, nur sinnvoll, wenn reActivateVoiceInput oder retryInput aktiv ist.
 
 Einstellen: in der Rhasspy Konfiguration einen weiteren sentence z.B. (fertig|sei still){closeSession:true} unter CancelAction einfügen.
 Funktionserweiterung für CancelAction bewirkt, dass die laufende Session mit einer anderen Ansage (responseId closeSession) beendet wird.
-Szenario: es ist gerade eine Session offen z.B. durch reopenVoiceInput und das Telefon klingelt. Rhasspy hört dann gerade auf ein Kommando und wird ständig dazwichen reden, während man sich unterhält. Mit dem Kommando 'sei still' kann man Rhasspy zum schweigen bringen als Antwort erhält man nicht das unpassende 'habe abgebrochen' sondern z.B. ein kurzes 'OK'
+Szenario: es ist gerade eine Session offen z.B. durch reActivateVoiceInput und das Telefon klingelt. Rhasspy hört dann gerade auf ein Kommando und wird ständig dazwichen reden, während man sich unterhält. Mit dem Kommando 'sei still' kann man Rhasspy zum schweigen bringen als Antwort erhält man nicht das unpassende 'habe abgebrochen' sondern z.B. ein kurzes 'OK'
 Zusätzlich: Es wurde die responseId CloseSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "OK" einstellen kann.
 
     resetInput                      -> Alles auf Anfang
 
 Einstellen:  in der Rhasspy Konfiguration den sentence Wake-Word{resetInput} bei irgend einem Intent einfügen.
 bewirkt, dass sofort eine neue Session gestartet wird. Man vermeidet ein "Das habe ich nicht verstanden" oder "wie bitte", wenn man während einer laufenden Session versehentlich das Wake-Word spricht.
-Szenario: es ist gerade eine Session offen z.B. durch reopenVoiceInput und das Wake-Word wird gesprochen. Wegen der offenen Sesssion ist z.B. Porcupine nicht aktiv und Rhasspy würde vergeblich versuchen einen passenden Intent zu finden. Durch resetInput kann man sein Wake-Word bei einem Intent unterbringen und Rhasspy versteht das Wake-Word als Kommando. Damit gibt es kein IntentNotRecognized mehr. Intern wird der betreffende Intent dann nicht ausgeführt, und statt dessen - wie man ja nach einem Wake-Word erwartet - eine Neue Session gestartet.
+Szenario: es ist gerade eine Session offen z.B. durch reActivateVoiceInput und das Wake-Word wird gesprochen. Wegen der offenen Sesssion ist z.B. Porcupine nicht aktiv und Rhasspy würde vergeblich versuchen einen passenden Intent zu finden. Durch resetInput kann man sein Wake-Word bei einem Intent unterbringen und Rhasspy versteht das Wake-Word als Kommando. Damit gibt es kein IntentNotRecognized mehr. Intern wird der betreffende Intent dann nicht ausgeführt, und statt dessen - wie man ja nach einem Wake-Word erwartet - eine Neue Session gestartet.
 
     silentClosure = true          -> Session Ende erfolgt ohne Ansage
 
@@ -7060,10 +7057,11 @@ Alle obigen Einstellungen, die in rhasspyTweaks möglich sind, können auch als 
 Bei der Einstellung unter rhasspyTweaks können statt all Bedingungen wie SetOnOff angegeben werden, auch kombiniert in der Form SetOnOff|SetNumeric wober die betreffende Einstellung nur für die Intents SetOnOff, bzw. SetOnOff oder SetNumeric gilt.
 Mögliche Bedingungen (derzeit) sind: Intent, Group, gdt, Type, Name, Device, Room
 Beispiel:
-reopenVoiceInput=light=15 -> sonst noch was? für 15 Sekunden gilt nur, wenn die Geräte deren attr GenericDeviceType light ist.
+reActivateVoiceInput=light=15 -> sonst noch was? für 15 Sekunden gilt nur, wenn die Geräte deren attr GenericDeviceType light ist.
 Oder:
-reopenVoiceInput=SetOnOff=32 Lampen|Rollläden=25 -> für Intent SetOnOff gilt sonst noch was? für 32 Sekunden, ansonsten für die Gruppen Lampen und Rolläden eben 25 Sekunden.
-Die erste Bedingung (von linkst nach rechts), die zutrifft, bestimmt die Zeiteinstellung.</i>
+reActivateVoiceInput=SetOnOff=32 Lampen|Rollläden=25 -> für Intent SetOnOff gilt sonst noch was? für 32 Sekunden, ansonsten für die Gruppen Lampen und Rolläden eben 25 Sekunden.
+Die erste Bedingung (von links nach rechts), die zutrifft, bestimmt die Zeiteinstellung.</i>
+-->
 </ul>
 
 <a id="RHASSPY-readings"></a>
