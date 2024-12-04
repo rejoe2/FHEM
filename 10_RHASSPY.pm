@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 29310 2024-12-02 Beta-User $
+# $Id: 10_RHASSPY.pm 29310 2024-12-04 Beta-User $
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -3629,8 +3629,8 @@ sub analyzeMQTTmessage {
                 my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
                 #$delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
                 $delay = $data->{customData}->{reActivateVoiceInput} if 
-				    #!defined $data->{customData}->{SilentClosure} && 
-					defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
+                    #!defined $data->{customData}->{SilentClosure} &&
+                    defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
                 resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reActivateVoiceInput_timeout, $hash );
             }
         } elsif ( $topic =~ m{sessionQueued}x ) {
@@ -5814,19 +5814,16 @@ sub handleIntentNotRecognized {
 
     Log3( $hash, 5, "[$hash->{NAME}] handleIntentNotRecognized called, input is $data->{input}" );
 
-    my $response;
     my $reaction;
-
-    #Beta-User: silence chuncks or single words, might later be configurable
-    #if ( !defined $data->{input} || length($data->{input}) < 12 ) {
-    if ( !$data->{input} || (ref $data->{customData} eq 'HASH' && defined $data->{customData}->{RetryIntent} ) ) {
-        $response = $data->{input} ? getResponse( $hash, 'RetryIntent') : 'SilentClosure';
-        $reaction = { 
-            text => $response,
+    
+    if ( !$data->{input} ) { # just listened to "noise" or silence
+        $data->{requestType} //= 'voice'; # we need "voice" to make sure we reopen the microphone if session is voice type
+        $reaction = {
+            text => 'SilentClosure',
             sendIntentNotRecognized => 'true',
-            customData => $data->{customData}      #Beta-User: toJSON?
+            customData => $data->{customData}
         };
-        return respond( $hash, $data, $reaction);  # keep session open and continue listening
+        return respond( $hash, $data, $reaction);  # continue session silently
     }
 
     my $identity = qq($data->{sessionId});
@@ -5843,17 +5840,31 @@ sub handleIntentNotRecognized {
     my $data_old = $hash->{helper}{'.delayed'}->{$identity};
 
     if ( !defined $data_old ) {
+        
         return handleCustomIntent($hash, 'intentNotRecognized', $data) if defined $hash->{helper}{custom} && defined $hash->{helper}{custom}{intentNotRecognized};
         my $entry = qq([$data->{siteId}] $data->{input});
         readingsSingleUpdate($hash, 'intentNotRecognized', $entry, 1);
-        $data->{requestType} = 'text';
+        #Beta-User: silence chuncks or single words, might later be configurable
+        #if ( !defined $data->{input} || length($data->{input}) < 12 ) {
+        #if ( !$data->{input} || (ref $data->{customData} eq 'HASH' && defined $data->{customData}->{RetryIntent} ) ) {
+        if ( defined $hash->{sessionTimeout} ) { #this might be the place to extend for "getOption" keys
+            $data->{requestType} //= 'voice'; # we need "voice" to make sure we reopen the microphone if session is voice type
+            $reaction = {
+                text => getResponse( $hash, 'RetryIntent'),
+                sendIntentNotRecognized => 'true',
+                customData => $data->{customData}
+            };
+            return respond( $hash, $data, $reaction);  # continue listening
+        }
+		
+        $data->{requestType} //= 'text';
         return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
     }
 
+    #$data_old is given, continue dialogue
     $data->{requestType} //= $data_old->{requestType} // 'voice'; # required, otherwise session open but no voice input possible
-    $response = getResponse( $hash, 'RetryIntent');
     $reaction = { 
-        text => $response,
+        text => getResponse( $hash, 'RetryIntent'),
         sendIntentNotRecognized => 'true',
         customData => $data->{customData}
     };
