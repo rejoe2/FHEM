@@ -3540,7 +3540,7 @@ sub vitoconnect_getResourceCallback {
                  # Use build in Mapping Roger (old way)
                  $Reading = $RequestListRoger->{ $feature->{feature} . "." . $key };
                 }
-                elsif ( AttrVal( $name, 'vitoconnect_raw_readings', 1 ) !~ m{0|svn}x ) {
+                elsif ( AttrVal( $name, 'vitoconnect_raw_readings', 1 ) =~ m{0|svn}x ) {
                  # Use build in Mapping SVN (old way)
                  $Reading = $RequestListSvn->{ $feature->{feature} . "." . $key };
                 };
