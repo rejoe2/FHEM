@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-09 16:03:37Z stefanru $
+# $Id: 98_vitoconnect.pm 29740 2025-03-10 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1275,7 +1275,7 @@ sub vitoconnect_Initialize {
       . "vitoconnect_mappings:textField-long "
       . "vitoconnect_translations:textField-long "
       . "vitoconnect_mapping_roger:0,1 "
-      . "vitoconnect_raw_readings:0,1 "                 # Liefert nur die raw readings und verhindert das mappen wenn gesetzt
+      . "vitoconnect_raw_readings:0,1,svn "             # Liefert nur die raw readings und verhindert das mappen wenn auf 1 gesetzt; svn-Mapping, wenn auf svn gesetzt
       . "vitoconnect_disable_raw_readings:0,1 "         # Wird ein mapping verwendet können die weiteren RAW Readings ausgeblendet werden
       . "vitoconnect_gw_readings:0,1 "                  # Schreibt die GW readings als Reading ins Device
       . "vitoconnect_actions_active:0,1 "
@@ -1385,26 +1385,26 @@ sub vitoconnect_Set {
     Log3($name,5,$name." - Set val: $val, Set Opt: $opt");
     
     # Hier richtig?
-    return "set ".$name." needs at least one argument" unless (defined($opt) );
+    return "set $name needs at least one argument" if !defined $opt;
     
     # Setter für Device Werte rufen
-    my $return;
-    if  (AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" ) {
-        #use new dynamic parsing of JSON to get raw setters
-        $return = vitoconnect_Set_New ($hash,$name,$opt,@args);
-    } 
-    elsif  (AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) eq "1" ) {
+    my $more_sets;
+    if  (AttrVal( $name, 'vitoconnect_mapping_roger', 0 )) {
         #use roger setters
-        $return = vitoconnect_Set_Roger ($hash,$name,$opt,@args);
-    } 
-    else {
+        $more_sets = vitoconnect_Set_Roger ($hash,$name,$opt,@args);
+    }
+    elsif  ( AttrVal( $name, 'vitoconnect_raw_readings', 'svn') eq 'svn' ) {
         #use svn setters
-        $return = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
+        $more_sets = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
+    }
+    else {
+        #use new dynamic parsing of JSON to get raw setters
+        $more_sets = vitoconnect_Set_New ($hash,$name,$opt,@args);
     }
     
     # Check if val was returned or action executed with return;
-    if (defined $return) {
-      $val .= $return;
+    if (defined $more_sets) {
+      $val .= $more_sets;
     } else {
       return;
     }
@@ -2683,8 +2683,8 @@ sub vitoconnect_Attr {
     Log(5,$name.", ".$cmd ." vitoconnect_: ".($attr_name // 'undef')." value: ".($attr_value // 'undef'));
     if ($cmd eq "set")  {
         if ($attr_name eq "vitoconnect_raw_readings" )      {
-            if ($attr_value !~ /^0|1$/)                     {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 0 or 1.";
+            if ($attr_value !~ /^0|1|svn$/)                     {
+                my $err = "Invalid argument $attr_value to $attr_name. Must be 0, 1 or svn.";
                 Log(1,$name.", vitoconnect_Attr: ".$err);
                 return $err;
             }
@@ -3540,19 +3540,19 @@ sub vitoconnect_getResourceCallback {
                  # Use build in Mapping Roger (old way)
                  $Reading = $RequestListRoger->{ $feature->{feature} . "." . $key };
                 }
-                else {
+                elsif ( AttrVal( $name, 'vitoconnect_raw_readings', 1 ) !~ m{0|svn}x ) {
                  # Use build in Mapping SVN (old way)
                  $Reading = $RequestListSvn->{ $feature->{feature} . "." . $key };
                 };
 
-                if ( !defined($Reading) || AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" )
-                {   
-                    $Reading = $feature->{feature} . "." . $key;
-                }
-                
                 if ( !defined($Reading) && AttrVal( $name, 'vitoconnect_disable_raw_readings', 0 ) eq "1" )
                 {   
                     next;
+                }
+
+                if ( !defined $Reading || AttrVal( $name, 'vitoconnect_raw_readings', 1 ) !~ m{0|svn}x )
+                {   
+                    $Reading = $feature->{feature} . ".$key";
                 }
                 
                 my $Type  = $properties->{$key}->{type};
@@ -4023,6 +4023,7 @@ sub vitoconnect_DeleteKeyValue {
 
 1;
 
+__END__
 
 =pod
 =item device
