@@ -1393,7 +1393,7 @@ sub vitoconnect_Set {
         #use roger setters
         $more_sets = vitoconnect_Set_Roger ($hash,$name,$opt,@args);
     }
-    elsif  ( AttrVal( $name, 'vitoconnect_raw_readings', 'svn') eq 'svn' ) {
+    elsif  ( AttrVal( $name, 'vitoconnect_raw_readings', 1) eq 'svn' ) {
         #use svn setters
         $more_sets = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
     }
@@ -2183,9 +2183,11 @@ sub vitoconnect_Set_SVN {
 sub vitoconnect_Set_Roger {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
 
-    if ($opt eq "HK1_Betriebsart" )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
+    my $hknum;
+    if ($opt =~ m{HK([\d+]).Betriebsart} )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
+	$hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.0.operating.modes.active/commands/setMode",
+            "heating.circuits.$hknum.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}",
             $name,$opt,@args
         );
@@ -2610,33 +2612,56 @@ sub vitoconnect_Set_Roger {
         return;
     }
 
-    my $val = "WW_einmaliges_Aufladen:activate,deactivate "
-        ."WW_Zirkulationspumpe_Zeitplan:textField-long "
-        ."WW_Zeitplan:textField-long "
-#       ."WW_Haupttemperatur:slider,10,1,60 "
-        ."WW_Solltemperatur:slider,10,1,60 "
-        ."WW_Temperatur_2:slider,10,1,60 "
-        ."WW_Betriebsart:balanced,off "
-        ."Urlaub_Start_Zeit "
-        ."Urlaub_Ende_Zeit "
-        ."Urlaub_stop:noArg ";
+    my $separator = '_';
+    
+    my $val = "WW${separator}einmaliges_Aufladen:activate,deactivate "
+        ."WW${separator}Zirkulationspumpe_Zeitplan:textField-long "
+        ."WW${separator}Zeitplan:textField-long "
+#       ."WW${separator}Haupttemperatur:slider,10,1,60 "
+        ."WW${separator}Solltemperatur:slider,10,1,60 "
+        ."WW${separator}Temperatur_2:slider,10,1,60 "
+        ."WW${separator}Betriebsart:balanced,off ";
+	if ($separator eq '_') { #Set_Roger
+	    $val .= "Urlaub_Start_Zeit "
+	    ."Urlaub_Ende_Zeit "
+	    ."Urlaub_stop:noArg ";
+	} else { #svn setters
+	    $val .= "Urlaub_Start "
+	    . "Urlaub_Ende "
+	    . "Urlaub_unschedule:noArg ";
+	}
 
-    if (ReadingsVal($name,"HK1_aktiv","0") eq "1") {
-        $val .=
-             "HK1_Heizkurve_Niveau:slider,-13,1,40 "
-            ."HK1_Heizkurve_Steigung:slider,0.2,0.1,3.5,1 "
-            ."HK1_Zeitsteuerung_Heizung:textField-long "
-            ."HK1_Urlaub_Start_Zeit "
-            ."HK1_Urlaub_Ende_Zeit "
-            ."HK1_Urlaub_stop:noArg "
-            ."HK1_Betriebsart:active,standby "
-            ."HK1_Soll_Temp_comfort_aktiv:activate,deactivate "
-            ."HK1_Soll_Temp_comfort:slider,4,1,37 "
-            ."HK1_Soll_Temp_eco_aktiv:activate,deactivate "
-            ."HK1_Soll_Temp_normal:slider,3,1,37 "
-            ."HK1_Soll_Temp_reduziert:slider,3,1,37 "
-            ."HK1_Name ";
+    for my $i (1..3) {
+	if ( ReadingsVal($name,"HK${i}${separator}aktiv",0) ) {
+	    $val .=
+		 "HK${i}${separator}Heizkurve_Niveau:slider,-13,1,40 "
+		."HK${i}${separator}Heizkurve_Steigung:slider,0.2,0.1,3.5,1 "
+		."HK${i}${separator}Zeitsteuerung_Heizung:textField-long "
+		."HK${i}${separator}Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal ";
+		if ($separator eq '_') { #Set_Roger
+		    $val .= "HK${i}_Urlaub_Start_Zeit "
+		    ."HK${i}_Urlaub_Ende_Zeit "
+		    ."HK${i}_Urlaub_stop:noArg "
+		    ."HK${i}_Soll_Temp_comfort_aktiv:activate,deactivate "
+		    ."HK${i}_Soll_Temp_comfort:slider,4,1,37 "
+		    ."HK${i}_Soll_Temp_eco_aktiv:activate,deactivate "
+		    ."HK${i}_Soll_Temp_normal:slider,3,1,37 "
+		    ."HK${i}_Soll_Temp_reduziert:slider,3,1,37 ";
+		} else { #svn setters
+		    $val .= "HK${i}-Urlaub_Start "
+		    . "HK${i}-Urlaub_Ende "
+		    . "HK${i}-Urlaub_unschedule:noArg "
+		    . "HK${i}-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
+		    . "HK${i}-Solltemperatur_comfort_aktiv:activate,deactivate "
+		    . "HK${i}-Solltemperatur_comfort:slider,4,1,37 "
+		    . "HK${i}-Solltemperatur_eco_aktiv:activate,deactivate "
+		    . "HK${i}-Solltemperatur_normal:slider,3,1,37 "
+		    . "HK${i}-Solltemperatur_reduziert:slider,3,1,37 ";
+		}
+		$val .= "HK${i}${separator}Name ";
+	}
     }
+=pod
     if (ReadingsVal($name,"HK2_aktiv","0") eq "1") {
         $val .=
             "HK2_Heizkurve_Niveau:slider,-13,1,40 "
@@ -2669,6 +2694,7 @@ sub vitoconnect_Set_Roger {
           . "HK3_Solltemperatur_reduziert:slider,3,1,37 "
           . "HK3_Name ";
     }
+=cut
     
     return $val;
 }
@@ -3516,7 +3542,7 @@ sub vitoconnect_getResourceCallback {
             foreach my $key ( sort keys %$properties ) {
                 
                 
-                my $Reading = "";
+                my $Reading;
                 
                 if ( scalar keys %translations > 0) {
                     
@@ -3550,7 +3576,7 @@ sub vitoconnect_getResourceCallback {
                     next;
                 }
 
-                if ( !defined $Reading || AttrVal( $name, 'vitoconnect_raw_readings', 1 ) !~ m{0|svn}x )
+                if ( !defined $Reading && AttrVal( $name, 'vitoconnect_raw_readings', 1 ) !~ m{0|svn}x )
                 {   
                     $Reading = $feature->{feature} . ".$key";
                 }
