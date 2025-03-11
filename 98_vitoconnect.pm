@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-10 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-03-11 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -141,6 +141,7 @@ my $iotURL_V1     = "https://api.viessmann.com/iot/v1/equipment/";
 my $iotURL_V2     = "https://api.viessmann.com/iot/v2/features/";
 my $errorURL_V3   = "https://api.viessmann.com/service-documents/v3/error-database";
 
+#Beta-User: highly dangerous, as these two affect the entire (main!) namespace!
 my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
 my %translations;       # Über das Attribut translations definierte Readings zum überschreiben der RequestList
 
@@ -1395,7 +1396,8 @@ sub vitoconnect_Set {
     }
     elsif  ( AttrVal( $name, 'vitoconnect_raw_readings', 1) eq 'svn' ) {
         #use svn setters
-        $more_sets = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
+        $more_sets = vitoconnect_Set_Roger ($hash,$name,$opt,@args); #new version!
+        #$more_sets = vitoconnect_Set_SVN ($hash,$name,$opt,@args);
     }
     else {
         #use new dynamic parsing of JSON to get raw setters
@@ -1403,61 +1405,60 @@ sub vitoconnect_Set {
     }
     
     # Check if val was returned or action executed with return;
-    if (defined $more_sets) {
-      $val .= $more_sets;
-    } else {
-      return;
-    }
+    return if !defined $more_sets;  #sucessfull set command in sub
+
+    $val .= $more_sets;
+    return $val if $opt eq '?'; # return value for getAllSet()
 
     if  ($opt eq "update")                            {   # set <name> update: update readings immeadiatlely
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
         vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
         return;
     }
-    elsif ($opt eq "logResponseOnce" )                  {   # set <name> logResponseOnce: dumps the json response of Viessmann server to entities.json, gw.json, actions.json in FHEM log directory
+    if ($opt eq "logResponseOnce" )                  {   # set <name> logResponseOnce: dumps the json response of Viessmann server to entities.json, gw.json, actions.json in FHEM log directory
         $hash->{".logResponseOnce"} = 1;                    # in 'Internals' merken
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    elsif ($opt eq "clearReadings" )                    {   # set <name> clearReadings: clear all readings immeadiatlely
+    if ($opt eq "clearReadings" )                    {   # set <name> clearReadings: clear all readings immeadiatlely
         AnalyzeCommand($hash,"deletereading ".$name." .*");
         return;
     }
-    elsif ($opt eq "password" )                         {   # set <name> password: store password in key store
+    if ($opt eq "password" )                         {   # set <name> password: store password in key store
         my $err = vitoconnect_StoreKeyValue($hash,"passwd",$args[0]);   # Kennwort verschlüsselt speichern
         return $err if ($err);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    elsif ($opt eq "apiKey" )                           {   # set <name> apiKey: bisher keine Beschreibung
+    if ($opt eq "apiKey" )                           {   # set <name> apiKey: bisher keine Beschreibung
         $hash->{apiKey} = $args[0];
         my $err = vitoconnect_StoreKeyValue($hash,"apiKey",$args[0]);   # apiKey verschlüsselt speichern
         RemoveInternalTimer($hash);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    elsif ($opt eq "selectDevice" )                           {   # set <name> selectDevice: Bei mehreren Devices eines auswählen
+    if ($opt eq 'selectDevice' )                           {   # set <name> selectDevice: Bei mehreren Devices eines auswählen
         Log3($name,4,$name." - Set selectedDevice serial: ".$args[0]);
         if (defined $args[0] && $args[0] ne '') {
-        my $serial = $args[0];
-        my %devices = %{ $hash->{devices} };
-        if (exists $devices{$serial}) {
-          my $installationId = $devices{$serial}{installationId};
-          Log3($name,5,$name." - Set selectedDevice: instID: $installationId, serial $serial");
-          CommandAttr (undef, "$name vitoconnect_installationID $installationId");
-          CommandAttr (undef, "$name vitoconnect_serial $serial");
-        }
-        $hash->{selectedDevice} = $serial;
-        RemoveInternalTimer($hash);                         # bisherigen Timer löschen
-        vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
+            my $serial = $args[0];
+            my %devices = %{ $hash->{devices} };
+            if (exists $devices{$serial}) {
+              my $installationId = $devices{$serial}{installationId};
+              Log3($name,5,$name." - Set selectedDevice: instID: $installationId, serial $serial");
+              CommandAttr (undef, "$name vitoconnect_installationID $installationId");
+              CommandAttr (undef, "$name vitoconnect_serial $serial");
+            }
+            $hash->{selectedDevice} = $serial;
+            RemoveInternalTimer($hash);                         # bisherigen Timer löschen
+            vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
         } else {
-        readingsSingleUpdate($hash,"state","Kein Gateway/Device gefunden, bitte Setup überprüfen",1);  
+            readingsSingleUpdate($hash,"state","Kein Gateway/Device gefunden, bitte Setup überprüfen",1);  
         }
         return;
     }
-    elsif ($opt eq "clearMappedErrors" ){
-     AnalyzeCommand($hash,"deletereading ".$name." device.messages.errors.mapped.*");
+    elsif ($opt eq 'clearMappedErrors' ){
+     AnalyzeCommand($hash,"deletereading $name device.messages.errors.mapped.*");
      return;
     }
 
@@ -1681,559 +1682,116 @@ sub vitoconnect_Set_New {
     return $val;
 }
 
-
 #####################################################################################################################
-# Implementierung set-Befehle alte logik fixes mapping letzte SVN Version
-#####################################################################################################################
-sub vitoconnect_Set_SVN {
-    my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
-    # SVN mapping original handling of modul
-
-    if ( $opt eq "HK1-Heizkurve-Niveau" ) {
-        my $slope = ReadingsVal( $name, "HK1-Heizkurve-Steigung", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.heating.curve/commands/setCurve",
-            "{\"shift\":$args[0],\"slope\":$slope}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Heizkurve-Niveau" ) {
-        my $slope = ReadingsVal( $name, "HK2-Heizkurve-Steigung", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.heating.curve/commands/setCurve",
-            "{\"shift\":$args[0],\"slope\":$slope}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Heizkurve-Niveau" ) {
-        my $slope = ReadingsVal( $name, "HK3-Heizkurve-Steigung", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.heating.curve/commands/setCurve",
-            "{\"shift\":$args[0],\"slope\":$slope}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Heizkurve-Steigung" ) {
-        my $shift = ReadingsVal( $name, "HK1-Heizkurve-Niveau", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.heating.curve/commands/setCurve",
-            "{\"shift\":$shift,\"slope\":$args[0]}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Heizkurve-Steigung" ) {
-        my $shift = ReadingsVal( $name, "HK2-Heizkurve-Niveau", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.heating.curve/commands/setCurve",
-            "{\"shift\":$shift,\"slope\":$args[0]}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Heizkurve-Steigung" ) {
-        my $shift = ReadingsVal( $name, "HK3-Heizkurve-Niveau", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.heating.curve/commands/setCurve",
-            "{\"shift\":$shift,\"slope\":$args[0]}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Urlaub_Start" ) {
-        my $end = ReadingsVal( $name, "HK1-Urlaub_Ende", "" );
-        if ( $end eq "" ) {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Urlaub_Start" ) {
-        my $end = ReadingsVal( $name, "HK2-Urlaub_Ende", "" );
-        if ( $end eq "" ) {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Urlaub_Start" ) {
-        my $end = ReadingsVal( $name, "HK3-Urlaub_Ende", "" );
-        if ( $end eq "" ) {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Urlaub_Ende" ) {
-        my $start = ReadingsVal( $name, "HK1-Urlaub_Start", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Urlaub_Ende" ) {
-        my $start = ReadingsVal( $name, "HK2-Urlaub_Start", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Urlaub_Ende" ) {
-        my $start = ReadingsVal( $name, "HK3-Urlaub_Start", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Urlaub_unschedule" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.holiday/commands/unschedule",
-            "{}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Urlaub_unschedule" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.holiday/commands/unschedule",
-            "{}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Urlaub_unschedule" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.holiday/commands/unschedule",
-            "{}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Zeitsteuerung_Heizung" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.0.heating.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK2-Zeitsteuerung_Heizung" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.1.heating.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK3-Zeitsteuerung_Heizung" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.2.heating.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK1-Betriebsart" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.0.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK2-Betriebsart" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.1.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK3-Betriebsart" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.2.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK1-Solltemperatur_comfort_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.0.operating.programs.comfort/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK2-Solltemperatur_comfort_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.1.operating.programs.comfort/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK3-Solltemperatur_comfort_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.2.operating.programs.comfort/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK1-Solltemperatur_comfort" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Solltemperatur_comfort" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Solltemperatur_comfort" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Solltemperatur_eco_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.0.operating.programs.eco/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-
-    }
-    elsif ( $opt eq "HK2-Solltemperatur_eco_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.1.operating.programs.eco/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK3-Solltemperatur_eco_aktiv" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.2.operating.programs.eco/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK1-Solltemperatur_normal" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Solltemperatur_normal" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Solltemperatur_normal" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Solltemperatur_reduziert" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK2-Solltemperatur_reduziert" ) {
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK3-Solltemperatur_reduziert" ) {
-        vitoconnect_action($hash,
-               "heating.circuits.2.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,
-            $opt,
-            @args
-        );
-        return;
-    }
-    elsif ( $opt eq "HK1-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.0/commands/setName",
-            "{\"name\":\"@args\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK2-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.1/commands/setName",
-            "{\"name\":\"@args\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "HK3-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.2/commands/setName",
-            "{\"name\":\"@args\"}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-einmaliges_Aufladen" ) {
-        vitoconnect_action( $hash,
-            "heating.dhw.oneTimeCharge/commands/$args[0]",
-            "{}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-Zirkulationspumpe_Zeitplan" ) {
-        vitoconnect_action( $hash,
-            "heating.dhw.pumps.circulation.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-Zeitplan" ) {
-        vitoconnect_action( $hash, "heating.dhw.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-Haupttemperatur" ) {
-        vitoconnect_action( $hash,
-            "heating.dhw.temperature.main/commands/setTargetTemperature",
-            "{\"temperature\":$args[0]}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-Solltemperatur" ) {
-        vitoconnect_action( $hash,
-            "heating.dhw.temperature/commands/commands/setTargetTemperature",
-            "{\"temperature\":$args[0]}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "WW-Temperatur_2" ) {
-        vitoconnect_action( $hash,
-            "heating.dhw.temperature.temp2/commands/setTargetTemperature",
-            "{\"temperature\":$args[0]}", $name, $opt, @args );
-        return;
-    }
-    elsif ( $opt eq "Urlaub_Start" ) {
-        my $end = ReadingsVal( $name, "Urlaub_Ende", "" );
-        if ( $end eq "" ) {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
-        vitoconnect_action(
-            $hash,
-            "heating.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "Urlaub_Ende" ) {
-        my $start = ReadingsVal( $name, "Urlaub_Start", "" );
-        vitoconnect_action(
-            $hash,
-            "heating.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name, $opt, @args
-        );
-        return;
-    }
-    elsif ( $opt eq "Urlaub_unschedule" ) {
-        vitoconnect_action( $hash,
-            "heating.operating.programs.holiday/commands/unschedule",
-            "{}", $name, $opt, @args );
-        return;
-    }
-
-    my $val = "WW-einmaliges_Aufladen:activate,deactivate "
-      . "WW-Zirkulationspumpe_Zeitplan:textField-long "
-      . "WW-Zeitplan:textField-long "
-      . "WW-Haupttemperatur:slider,10,1,60 "
-      . "WW-Solltemperatur:slider,10,1,60 "
-      . "WW-Temperatur_2:slider,10,1,60 "
-      . "Urlaub_Start "
-      . "Urlaub_Ende "
-      . "Urlaub_unschedule:noArg ";
-
-    if ( ReadingsVal( $name, "HK1-aktiv", "0" ) eq "1" ) {
-        $val .=
-            "HK1-Heizkurve-Niveau:slider,-13,1,40 "
-          . "HK1-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 "
-          . "HK1-Zeitsteuerung_Heizung:textField-long "
-          . "HK1-Urlaub_Start "
-          . "HK1-Urlaub_Ende "
-          . "HK1-Urlaub_unschedule:noArg "
-          . "HK1-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-          . "HK1-Solltemperatur_comfort_aktiv:activate,deactivate "
-          . "HK1-Solltemperatur_comfort:slider,4,1,37 "
-          . "HK1-Solltemperatur_eco_aktiv:activate,deactivate "
-          . "HK1-Solltemperatur_normal:slider,3,1,37 "
-          . "HK1-Solltemperatur_reduziert:slider,3,1,37 "
-          . "HK1-Name ";
-    }
-    if ( ReadingsVal( $name, "HK2-aktiv", "0" ) eq "1" ) {
-        $val .=
-            "HK2-Heizkurve-Niveau:slider,-13,1,40 "
-          . "HK2-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 "
-          . "HK2-Zeitsteuerung_Heizung:textField-long "
-          . "HK2-Urlaub_Start "
-          . "HK2-Urlaub_Ende "
-          . "HK2-Urlaub_unschedule:noArg "
-          . "HK2-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-          . "HK2-Solltemperatur_comfort_aktiv:activate,deactivate "
-          . "HK2-Solltemperatur_comfort:slider,4,1,37 "
-          . "HK2-Solltemperatur_eco_aktiv:activate,deactivate "
-          . "HK2-Solltemperatur_normal:slider,3,1,37 "
-          . "HK2-Solltemperatur_reduziert:slider,3,1,37 "
-          . "HK2-Name ";
-    }
-    if ( ReadingsVal( $name, "HK3-aktiv", "0" ) eq "1" ) {
-        $val .=
-            "HK3-Heizkurve-Niveau:slider,-13,1,40 "
-          . "HK3-Heizkurve-Steigung:slider,0.2,0.1,3.5,1 "
-          . "HK3-Zeitsteuerung_Heizung:textField-long "
-          . "HK3-Urlaub_Start "
-          . "HK3-Urlaub_Ende "
-          . "HK3-Urlaub_unschedule:noArg "
-          . "HK3-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-          . "HK3-Solltemperatur_comfort_aktiv:activate,deactivate "
-          . "HK3-Solltemperatur_comfort:slider,4,1,37 "
-          . "HK3-Solltemperatur_eco_aktiv:activate,deactivate "
-          . "HK3-Solltemperatur_normal:slider,3,1,37 "
-          . "HK3-Solltemperatur_reduziert:slider,3,1,37 "
-          . "HK3-Name ";
-    }
-    
-    return $val;
-}
-
-
-#####################################################################################################################
-# Implementierung set-Befehle alte logik fixes mapping von Roger letzte Version
+# Implementierung set-Befehle alte logik fixes mapping von Roger letzte Version oder letzte svn-Version
 #####################################################################################################################
 sub vitoconnect_Set_Roger {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
 
     my $hknum;
-    if ($opt =~ m{HK([\d+]).Betriebsart} )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
-	$hknum = $1 - 1;
+    my $separator = AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) ? '_' : '-';
+    
+    my $val = "WW${separator}einmaliges_Aufladen:activate,deactivate "
+        ."WW${separator}Zirkulationspumpe_Zeitplan:textField-long "
+        ."WW${separator}Zeitplan:textField-long "
+#       ."WW${separator}Haupttemperatur:slider,10,1,60 "
+        ."WW${separator}Solltemperatur:slider,10,1,60 "
+        ."WW${separator}Temperatur_2:slider,10,1,60 "
+        ."WW${separator}Betriebsart:balanced,off ";
+	if ($separator eq '_') { #Set_Roger
+	    $val .= 'Urlaub_Start_Zeit Urlaub_Ende_Zeit Urlaub_stop:noArg ';
+	} else { #svn setters
+	    $val .= 'Urlaub_Start Urlaub_Ende Urlaub_unschedule:noArg ';
+	}
+
+    for my $i (1..3) {
+        if ( ReadingsVal($name,"HK${i}${separator}aktiv",0) ) {
+            $val .=
+             "HK${i}${separator}Heizkurve${separator}Niveau:slider,-13,1,40 "
+            ."HK${i}${separator}Heizkurve${separator}Steigung:slider,0.2,0.1,3.5,1 "
+            ."HK${i}${separator}Zeitsteuerung_Heizung:textField-long "
+            ."HK${i}${separator}Name ";
+            if ($separator eq '_') { #Set_Roger
+                $val .= "HK${i}_Urlaub_Start_Zeit "
+                ."HK${i}_Urlaub_Ende_Zeit "
+                ."HK${i}_Urlaub_stop:noArg "
+                ."HK${i}_Betriebsart:active,standby "
+                ."HK${i}_Soll_Temp_comfort_aktiv:activate,deactivate "
+                ."HK${i}_Soll_Temp_comfort:slider,4,1,37 "
+                ."HK${i}_Soll_Temp_eco_aktiv:activate,deactivate "
+                ."HK${i}_Soll_Temp_normal:slider,3,1,37 "
+                ."HK${i}_Soll_Temp_reduziert:slider,3,1,37 ";
+            } else { #svn setters
+                $val .= "HK${i}-Urlaub_Start "
+                . "HK${i}-Urlaub_Ende "
+                . "HK${i}-Urlaub_unschedule:noArg "
+                . "HK${i}-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
+                . "HK${i}-Solltemperatur_comfort_aktiv:activate,deactivate "
+                . "HK${i}-Solltemperatur_comfort:slider,4,1,37 "
+                . "HK${i}-Solltemperatur_eco_aktiv:activate,deactivate "
+                . "HK${i}-Solltemperatur_normal:slider,3,1,37 "
+                . "HK${i}-Solltemperatur_reduziert:slider,3,1,37 ";
+            }
+        }
+    }
+    
+    return $val if $opt eq '?'; # return value for getAllSet()
+    
+    if ($opt =~ m{HK([\d+]).Betriebsart}x )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
+	    $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.$hknum.operating.modes.active/commands/setMode",
+            "heating.circuits.${hknum}.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK1_Soll_Temp_normal" )     {   # set <name> HK1_Soll_Temp_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.normal/commands/setTemperature",
+    if ($opt =~ m{HK([\d+]).Soll_Temp_normal}x )     {   # set <name> HK1_Soll_Temp_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
+        $hknum = $1 - 1;
+		vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.normal/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK1_Soll_Temp_reduziert" )      {   # set <name> HK1_Soll_Temp_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.reduced/commands/setTemperature",
+    if ($opt =~ m{HK([\d+]).Soll_Temp_reduziert}x )      {   # set <name> HK1_Soll_Temp_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
+        $hknum = $1 - 1;
+		vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.reduced/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK1_Soll_Temp_comfort" )        {   # set <name> HK1_Soll_Temp_comfort: set comfort target temperatur for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.comfort/commands/setTemperature",
+    if ($opt =~ m{HK([\d+]).Soll_Temp_comfort}x )        {   # set <name> HK1_Soll_Temp_comfort: set comfort target temperatur for HKn
+        $hknum = $1 - 1;
+		vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.comfort/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK1_Soll_Temp_comfort_aktiv" )  {   # set <name> HK1_Soll_Temp_comfort_aktiv: activate/deactivate comfort temperature for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.comfort/commands/$args[0]",
+    if ($opt =~ m{HK([\d+]).Soll_Temp_comfort_aktiv}x )  {   # set <name> HK1_Soll_Temp_comfort_aktiv: activate/deactivate comfort temperature for HKn
+        $hknum = $1 - 1;
+		vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.comfort/commands/$args[0]",
             "{}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK1_Soll_Temp_eco_aktiv" )      {   # set <name> HK1_Soll_Temp_eco_aktiv: activate/deactivate eco temperature for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.eco/commands/$args[0]",
+    if ($opt =~ m{HK([\d+]).Soll_Temp_eco_aktiv}x )      {   # set <name> HK1_Soll_Temp_eco_aktiv: activate/deactivate eco temperature for HKn
+        $hknum = $1 - 1;
+		vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.eco/commands/$args[0]",
             "{}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "WW_Betriebsart" )                   {   # set <name> HKn_Betriebsart: sets WW_Betriebsart to balanced,off
+    if ($opt =~ m{WW.Betriebsart}x )                   {   # set <name> HKn_Betriebsart: sets WW_Betriebsart to balanced,off
         vitoconnect_action($hash,
             "heating.dhw.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}",
@@ -2241,7 +1799,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "WW_einmaliges_Aufladen" )           {   # set <name> WW_einmaliges_Aufladen: activate or deactivate one time charge for hot water
+    if ($opt =~ m{WW.einmaliges_Aufladen}x )           {   # set <name> WW_einmaliges_Aufladen: activate or deactivate one time charge for hot water
         vitoconnect_action($hash,
             "heating.dhw.oneTimeCharge/commands/$args[0]",
             "{}",
@@ -2249,7 +1807,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "WW_Solltemperatur" )                {   # set <name> WW_Solltemperatur: sets hot water main temperature to targetTemperature, targetTemperature is an integer between 10 and 60
+    if ($opt =~ m{WW.Solltemperatur}x )                {   # set <name> WW_Solltemperatur: sets hot water main temperature to targetTemperature, targetTemperature is an integer between 10 and 60
         vitoconnect_action($hash,
             "heating.dhw.temperature.main/commands/setTargetTemperature",
             "{\"temperature\":$args[0]}",
@@ -2257,7 +1815,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "WW_Zirkulationspumpe_Zeitplan" )    {   # set <name> WW_Zirkulationspumpe_Zeitplan: sets the schedule in JSON format for hot water circulation pump
+    if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulationspumpe_Zeitplan: sets the schedule in JSON format for hot water circulation pump
         vitoconnect_action($hash,
             "heating.dhw.pumps.circulation.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}",
@@ -2265,7 +1823,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "WW_Zeitplan" )                      {   # set <name> WW_Zeitplan: sets the schedule in JSON format for hot water
+    if ($opt =~ m{WW.Zeitplan}x )                      {   # set <name> WW_Zeitplan: sets the schedule in JSON format for hot water
         vitoconnect_action($hash,
             "heating.dhw.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}",
@@ -2281,7 +1839,7 @@ sub vitoconnect_Set_Roger {
 #       );
 #       return;
 #   }
-    elsif ($opt eq "WW_Temperatur_2" )                  {   # set <name> WW_Temperatur_2: sets hot water 2 temperature to targetTemperature, targetTemperature is an integer between 10 and 60
+    if ($opt =~ m{WW.Temperatur_2}x )                  {   # set <name> WW_Temperatur_2: sets hot water 2 temperature to targetTemperature, targetTemperature is an integer between 10 and 60
         vitoconnect_action($hash,
             "heating.dhw.temperature.temp2/commands/setTargetTemperature",
             "{\"temperature\":$args[0]}",
@@ -2289,8 +1847,8 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "Urlaub_Start_Zeit" )                        {   # set <name> Urlaub_Start_Zeit: set holiday start time, start has to look like this: 2019-02-02
-        my $end = ReadingsVal($name,"Urlaub_Ende_Zeit","");
+    if ($opt =~ m{\AUrlaub_Start.*}x )                        {   # set <name> Urlaub_Start_Zeit: set holiday start time, start has to look like this: 2019-02-02
+        my $end = ReadingsVal($name,$separator eq '_'? 'Urlaub_Ende_Zeit' : 'Urlaub_Ende',"");
         if ($end eq "")                                 {
             my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
             $t += ONE_DAY;
@@ -2303,8 +1861,8 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "Urlaub_Ende_Zeit" )                     {   # set <name> Urlaub_Ende_Zeit: set holiday end time, end has to look like this: 2019-02-16
-        my $start = ReadingsVal($name,"Urlaub_Start_Zeit","");
+    if ($opt =~ m{\AUrlaub_Ende.*}x )                     {   # set <name> Urlaub_Ende_Zeit: set holiday end time, end has to look like this: 2019-02-16
+        my $start = ReadingsVal($name,$separator eq '_'? 'Urlaub_Start_Zeit' : 'Urlaub_Start',"");
         vitoconnect_action($hash,
             "heating.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
@@ -2312,7 +1870,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "Urlaub_stop" )              {   # set <name> Urlaub_stop: remove holiday start and end time
+    if ($opt eq 'Urlaub_stop' || $opt eq 'Urlaub_unschedule' )              {   # set <name> Urlaub_stop: remove holiday start and end time
         vitoconnect_action($hash,
             "heating.operating.programs.holiday/commands/unschedule",
             "{}",
@@ -2320,382 +1878,118 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    elsif ($opt eq "HK1_Name" )                         {   # set <name> HK1_Name: sets the name of the circuit for HKn
+    if ($opt =~ m{HK([\d+]).Name}x )                         {   # set <name> HK1_Name: sets the name of the circuit for HKn
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.0/commands/setName",
+            "heating.circuits.$hknum/commands/setName",
             "{\"name\":\"@args\"}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Name" )                         {   # set <name> HK2_Name: sets the name of the circuit for HKn
+    if ($opt =~ m{HK([\d+]).Heizkurve.Niveau}x )             {   # set <name> HK1_Heizkurve_Niveau: set shift of heating curve for HKn
+        my $slope = ReadingsVal($name,"HK${1}${separator}Heizkurve${separator}Steigung","");
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1/commands/setName",
-            "{\"name\":\"@args\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Name" )                         {   # set <name> HK3_Name: sets the name of the circuit for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.2/commands/setName",
-            "{\"name\":\"@args\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Heizkurve_Niveau" )             {   # set <name> HK1_Heizkurve_Niveau: set shift of heating curve for HKn
-        my $slope = ReadingsVal($name,"HK1_Heizkurve_Steigung","");
-        vitoconnect_action($hash,
-            "heating.circuits.0.heating.curve/commands/setCurve",
+            "heating.circuits.${hknum}.heating.curve/commands/setCurve",
             "{\"shift\":$args[0],\"slope\":$slope}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Heizkurve_Niveau" )             {   #  set <name> HK2_Heizkurve_Niveau: set shift of heating curve for HKn
-        my $slope = ReadingsVal($name,"HK2_Heizkurve_Steigung","");
+    if ($opt =~ m{HK([\d+]).Heizkurve.Steigung}x )           {   # set <name> HK1_Heizkurve_Steigung: set slope of heating curve for HKn
+        my $shift = ReadingsVal($name,"HK${1}${separator}Heizkurve${separator}Niveau","");
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1.heating.curve/commands/setCurve",
-            "{\"shift\":$args[0],\"slope\":$slope}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Heizkurve_Niveau" )             {   # set <name> HK3_Heizkurve_Niveau: set shift of heating curve for HKn
-        my $slope = ReadingsVal($name,"HK3_Heizkurve_Steigung","");
-        vitoconnect_action($hash,
-            "heating.circuits.2.heating.curve/commands/setCurve",
-            "{\"shift\":$args[0],\"slope\":$slope}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Heizkurve_Steigung" )           {   # set <name> HK1_Heizkurve_Steigung: set slope of heating curve for HKn
-        my $shift = ReadingsVal($name,"HK1_Heizkurve_Niveau","");
-        vitoconnect_action($hash,
-            "heating.circuits.0.heating.curve/commands/setCurve",
+            "heating.circuits.${hknum}.heating.curve/commands/setCurve",
             "{\"shift\":$shift,\"slope\":$args[0]}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Heizkurve_Steigung" )           {   # set <name> HK2_Heizkurve_Steigung: set slope of heating curve for HKn
-        my $shift = ReadingsVal($name,"HK2-Heizkurve-Niveau","");
-        vitoconnect_action($hash,
-            "heating.circuits.1.heating.curve/commands/setCurve",
-            "{\"shift\":$shift,\"slope\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Heizkurve_Steigung" )           {   # set <name> HK3_Heizkurve_Steigung:  set slope of heating curve for HKn
-        my $shift = ReadingsVal($name,"HK3-Heizkurve-Niveau","");
-        vitoconnect_action($hash,
-            "heating.circuits.2.heating.curve/commands/setCurve",
-            "{\"shift\":$shift,\"slope\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Urlaub_Start_Zeit" )            {   # set <name> HK1_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
-        my $end = ReadingsVal($name,"HK1_Urlaub_Ende_Zeit","");
+    if ($opt =~ m{HK([\d+])_Urlaub_Start.*}x )            {   # set <name> HK1_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
+        my $end = ReadingsVal($name,"HK${1}_Urlaub_Ende",ReadingsVal($name,"HK${1}_Urlaub_Ende_Zeit",''));
+        $hknum = $1 - 1;
         if ($end eq "")         {
             my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
             $t += ONE_DAY;
             $end = $t->strftime("%Y-%m-%d");
         }
         vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.holiday/commands/schedule",
+            "heating.circuits.${hknum}.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Urlaub_Start_Zeit" )            {   # set <name> HK2_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
-        my $end = ReadingsVal($name,"HK2_Urlaub_Ende_Zeit","");
-        if ($end eq "")                                 {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
+    if ($opt =~ m{HK([\d+])_Urlaub_Ende.*}x )                 {   # set <name> HK1_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
+        my $start = ReadingsVal($name,"HK${1}_Urlaub_Start",ReadingsVal($name,"HK${1}_Urlaub_Start_Zeit",""));
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Urlaub_Start_Zeit" )                    {   # set <name> HK3-HK3_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
-        my $end = ReadingsVal($name,"HK3_Urlaub_Ende_Zeit","");
-        if ($end eq "")                                 {
-            my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
-            $t += ONE_DAY;
-            $end = $t->strftime("%Y-%m-%d");
-        }
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Urlaub_Ende_Zeit" )                 {   # set <name> HK1_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
-        my $start = ReadingsVal($name,"HK1_Urlaub_Start_Zeit","");
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.holiday/commands/schedule",
+            "heating.circuits.${hknum}.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Urlaub_Ende_Zeit" )                 {   # set <name> HK2_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
-        my $start = ReadingsVal($name,"HK2_Urlaub_Start_Zeit","");
+    if ($opt =~ m{HK([\d+])_Urlaub_(stop|unschedule)}x )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Urlaub_Ende_Zeit" )                 {   # set <name> HK3_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
-        my $start = ReadingsVal($name,"HK3_Urlaub_Start_Zeit","");
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.holiday/commands/schedule",
-            "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Urlaub_stop" )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.0.operating.programs.holiday/commands/unschedule",
+            "heating.circuits.${hknum}.operating.programs.holiday/commands/unschedule",
             "{}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2_Urlaub_stop" )          {   # set <name> HK2_Urlaub_stop: remove holiday start and end time for HKn
+    if ($opt =~ m{HK([\d+]).Zeitsteuerung_Heizung}x )        {   # set <name> HK1_Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.holiday/commands/unschedule",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Urlaub_stop" )          {   # set <name> HK3_Urlaub_stop: remove holiday start and end time for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.holiday/commands/unschedule",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK1_Zeitsteuerung_Heizung" )        {   # set <name> HK1_Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.0.heating.schedule/commands/setSchedule",
+            "heating.circuits.${hknum}.heating.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK2-Zeitsteuerung_Heizung" )        {   # set <name> HK2-Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
+    
+    if ($opt =~ m{HK([\d+]).Solltemperatur_comfort_aktiv}x ) {   # set <name> HK2-Solltemperatur_comfort_aktiv: activate/deactivate comfort temperature for HKn
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.1.heating.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3-Zeitsteuerung_Heizung" )        {   # set <name> HK3-Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.2.heating.schedule/commands/setSchedule",
-            "{\"newSchedule\":@args}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2_Betriebsart" )                  {   # set <name> HK2-Betriebsart: sets HKn_Betriebsart to  heating,standby
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Betriebsart" )                  {   # set <name> HK3-Betriebsart: sets HKn_Betriebsart to  heating,standby
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2-Solltemperatur_comfort_aktiv" ) {   # set <name> HK2-Solltemperatur_comfort_aktiv: activate/deactivate comfort temperature for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.comfort/commands/$args[0]",
+            "heating.circuits.${hknum}.operating.programs.comfort/commands/$args[0]",
             "{}",
             $name,$opt,@args
         );
         return;
     }
-    elsif ($opt eq "HK3-Solltemperatur_comfort_aktiv" ) {   # set <name> HK3-Solltemperatur_comfort_aktiv: activate/deactivate comfort temperature for HKn
+    
+    if ($opt =~ m{HK([\d+]).Solltemperatur_(comfort|normal)}x )       {   # set <name> HK2-Solltemperatur_comfort: set comfort target temperatur for HKn
+        $hknum = $1 - 1;
         vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.comfort/commands/$args[0]",
+            "heating.circuits.${hknum}.operating.programs.${2}/commands/setTemperature",
+            "{\"targetTemperature\":$args[0]}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{HK([\d+]).Solltemperatur_eco_aktiv}x )     {   # set <name> HK2_Solltemperatur_eco_aktiv: activate/deactivate eco temperature for HKn
+        $hknum = $1 - 1;
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.eco/commands/$args[0]",
             "{}",
             $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2-Solltemperatur_comfort" )       {   # set <name> HK2-Solltemperatur_comfort: set comfort target temperatur for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3-Solltemperatur_comfort" )       {   # set <name> HK3-Solltemperatur_comfort: set comfort target temperatur for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2_Solltemperatur_eco_aktiv" )     {   # set <name> HK2_Solltemperatur_eco_aktiv: activate/deactivate eco temperature for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.eco/commands/$args[0]",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Solltemperatur_eco_aktiv" )     {   # set <name> HK3_Solltemperatur_eco_aktiv: activate/deactivate eco temperature for HKn
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.eco/commands/$args[0]",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2_Solltemperatur_normal" )        {   # set <name> HK2_Solltemperatur_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Solltemperatur_normal" )        {   # set <name> HK3_Solltemperatur_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK2_Solltemperatur_reduziert" )     {   # set <name> HK2_Solltemperatur_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.1.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    elsif ($opt eq "HK3_Solltemperatur_reduziert" )     {   # set <name> HK3_Solltemperatur_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        vitoconnect_action($hash,
-            "heating.circuits.2.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}"
-            ,$name,$opt,@args
         );
         return;
     }
 
-    my $separator = '_';
-    
-    my $val = "WW${separator}einmaliges_Aufladen:activate,deactivate "
-        ."WW${separator}Zirkulationspumpe_Zeitplan:textField-long "
-        ."WW${separator}Zeitplan:textField-long "
-#       ."WW${separator}Haupttemperatur:slider,10,1,60 "
-        ."WW${separator}Solltemperatur:slider,10,1,60 "
-        ."WW${separator}Temperatur_2:slider,10,1,60 "
-        ."WW${separator}Betriebsart:balanced,off ";
-	if ($separator eq '_') { #Set_Roger
-	    $val .= "Urlaub_Start_Zeit "
-	    ."Urlaub_Ende_Zeit "
-	    ."Urlaub_stop:noArg ";
-	} else { #svn setters
-	    $val .= "Urlaub_Start "
-	    . "Urlaub_Ende "
-	    . "Urlaub_unschedule:noArg ";
-	}
+    if ($opt =~ m{HK([\d+]).Solltemperatur_reduziert}x )     {   # set <name> HK2_Solltemperatur_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
+        $hknum = $1 - 1;
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.reduced/commands/setTemperature",
+            "{\"targetTemperature\":$args[0]}",
+            $name,$opt,@args
+        );
+        return;
+    }
 
-    for my $i (1..3) {
-	if ( ReadingsVal($name,"HK${i}${separator}aktiv",0) ) {
-	    $val .=
-		 "HK${i}${separator}Heizkurve_Niveau:slider,-13,1,40 "
-		."HK${i}${separator}Heizkurve_Steigung:slider,0.2,0.1,3.5,1 "
-		."HK${i}${separator}Zeitsteuerung_Heizung:textField-long "
-		."HK${i}${separator}Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal ";
-		if ($separator eq '_') { #Set_Roger
-		    $val .= "HK${i}_Urlaub_Start_Zeit "
-		    ."HK${i}_Urlaub_Ende_Zeit "
-		    ."HK${i}_Urlaub_stop:noArg "
-		    ."HK${i}_Soll_Temp_comfort_aktiv:activate,deactivate "
-		    ."HK${i}_Soll_Temp_comfort:slider,4,1,37 "
-		    ."HK${i}_Soll_Temp_eco_aktiv:activate,deactivate "
-		    ."HK${i}_Soll_Temp_normal:slider,3,1,37 "
-		    ."HK${i}_Soll_Temp_reduziert:slider,3,1,37 ";
-		} else { #svn setters
-		    $val .= "HK${i}-Urlaub_Start "
-		    . "HK${i}-Urlaub_Ende "
-		    . "HK${i}-Urlaub_unschedule:noArg "
-		    . "HK${i}-Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-		    . "HK${i}-Solltemperatur_comfort_aktiv:activate,deactivate "
-		    . "HK${i}-Solltemperatur_comfort:slider,4,1,37 "
-		    . "HK${i}-Solltemperatur_eco_aktiv:activate,deactivate "
-		    . "HK${i}-Solltemperatur_normal:slider,3,1,37 "
-		    . "HK${i}-Solltemperatur_reduziert:slider,3,1,37 ";
-		}
-		$val .= "HK${i}${separator}Name ";
-	}
-    }
-=pod
-    if (ReadingsVal($name,"HK2_aktiv","0") eq "1") {
-        $val .=
-            "HK2_Heizkurve_Niveau:slider,-13,1,40 "
-          . "HK2_Heizkurve_Steigung:slider,0.2,0.1,3.5,1 "
-          . "HK2_Zeitsteuerung_Heizung:textField-long "
-          . "HK2_Urlaub_Start_Zeit "
-          . "HK2_Urlaub_Ende_Zeit "
-          . "HK2_Urlaub_stop:noArg "
-          . "HK2_Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-          . "HK2_Solltemperatur_comfort_aktiv:activate,deactivate "
-          . "HK2_Solltemperatur_comfort:slider,4,1,37 "
-          . "HK2_Solltemperatur_eco_aktiv:activate,deactivate "
-          . "HK2_Solltemperatur_normal:slider,3,1,37 "
-          . "HK2_Solltemperatur_reduziert:slider,3,1,37 "
-          . "HK2_Name ";
-    }
-    if (ReadingsVal($name,"HK3_aktiv","0") eq "1") {
-        $val .=
-            "HK3_Heizkurve_Niveau:slider,-13,1,40 "
-          . "HK3_Heizkurve_Steigung:slider,0.2,0.1,3.5,1 "
-          . "HK3_Zeitsteuerung_Heizung:textField-long "
-          . "HK3_Urlaub_Start_Zeit "
-          . "HK3_Urlaub_Ende_Zeit "
-          . "HK3_Urlaub_stop:noArg "
-          . "HK3_Betriebsart:active,standby,heating,dhw,dhwAndHeating,forcedReduced,forcedNormal "
-          . "HK3_Solltemperatur_comfort_aktiv:activate,deactivate "
-          . "HK3_Solltemperatur_comfort:slider,4,1,37 "
-          . "HK3_Solltemperatur_eco_aktiv:activate,deactivate "
-          . "HK3_Solltemperatur_normal:slider,3,1,37 "
-          . "HK3_Solltemperatur_reduziert:slider,3,1,37 "
-          . "HK3_Name ";
-    }
-=cut
-    
     return $val;
 }
 
@@ -2707,32 +2001,20 @@ sub vitoconnect_Attr {
     my ($cmd,$name,$attr_name,$attr_value ) = @_;
     
     Log(5,$name.", ".$cmd ." vitoconnect_: ".($attr_name // 'undef')." value: ".($attr_value // 'undef'));
-    if ($cmd eq "set")  {
+    if ($cmd eq 'set')  {
         if ($attr_name eq "vitoconnect_raw_readings" )      {
             if ($attr_value !~ /^0|1|svn$/)                     {
                 my $err = "Invalid argument $attr_value to $attr_name. Must be 0, 1 or svn.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
+                Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
+            Log3($name,1,"$name - using svn mappings might not be supported in the future!")                      # Warnung ins Log 
+                if !$init_done && $attr_value eq 'svn';
         }
-        elsif ($attr_name eq "vitoconnect_disable_raw_readings")     {
-            if ( $attr_value !~ /^0|1$/ ) {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 0 or 1.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
-                return $err;
-            }
-        }
-        elsif ($attr_name eq "vitoconnect_gw_readings")     {
-            if ( $attr_value !~ /^0|1$/ ) {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 0 or 1.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
-                return $err;
-            }
-        }
-        elsif ($attr_name eq "vitoconnect_actions_active")  {
+        elsif ( $attr_name eq 'vitoconnect_disable_raw_readings' || $attr_name eq 'vitoconnect_gw_readings' || $attr_name eq 'vitoconnect_actions_active' )  {
             if ($attr_value !~ /^0|1$/)                     {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 0 or 1.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
+                my $err = "Invalid argument $attr_value to $attr_name. Must be 0 or 1.";
+                Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
         }
@@ -2753,23 +2035,25 @@ sub vitoconnect_Attr {
             }
         }
         elsif ($attr_name eq "vitoconnect_mapping_roger")   {
+            Log3($name,1,"$name - using Roger mappings is no longer recommended!")                      # Warnung ins Log 
+                if !$init_done;
             if ($attr_value !~ /^0|1$/)                     {
                 my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 0 or 1.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
+                Log3($name,1,$name.", vitoconnect_Attr: ".$err);
                 return $err;
             }
         }
         elsif ($attr_name eq "vitoconnect_serial")                      {
             if (length($attr_value) != 16)                      {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be 16 characters long.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
+                my $err = "Invalid argument $attr_value to $attr_name. Must be 16 characters long.";
+                Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
         }
         elsif ($attr_name eq "vitoconnect_installationID")                      {
             if (length($attr_value) < 2)                      {
-                my $err = "Invalid argument ".$attr_value." to ".$attr_name.". Must be at least 2 characters long.";
-                Log(1,$name.", vitoconnect_Attr: ".$err);
+                my $err = "Invalid argument $attr_value to $attr_name. Must be at least 2 characters long.";
+                Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
         }
