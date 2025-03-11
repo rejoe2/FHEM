@@ -1688,7 +1688,6 @@ sub vitoconnect_Set_New {
 sub vitoconnect_Set_Roger {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
 
-    my $hknum;
     my $separator = AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) ? '_' : '-';
     
     my $val = "WW${separator}einmaliges_Aufladen:activate,deactivate "
@@ -1737,61 +1736,7 @@ sub vitoconnect_Set_Roger {
     
     return $val if $opt eq '?'; # return value for getAllSet()
     
-    if ($opt =~ m{HK([\d+]).Betriebsart}x )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
-	    $hknum = $1 - 1;
-        vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.modes.active/commands/setMode",
-            "{\"mode\":\"$args[0]\"}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{HK([\d+]).Soll_Temp_normal}x )     {   # set <name> HK1_Soll_Temp_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        $hknum = $1 - 1;
-		vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.normal/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{HK([\d+]).Soll_Temp_reduziert}x )      {   # set <name> HK1_Soll_Temp_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        $hknum = $1 - 1;
-		vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.reduced/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{HK([\d+]).Soll_Temp_comfort}x )        {   # set <name> HK1_Soll_Temp_comfort: set comfort target temperatur for HKn
-        $hknum = $1 - 1;
-		vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.comfort/commands/setTemperature",
-            "{\"targetTemperature\":$args[0]}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{HK([\d+]).Soll_Temp_comfort_aktiv}x )  {   # set <name> HK1_Soll_Temp_comfort_aktiv: activate/deactivate comfort temperature for HKn
-        $hknum = $1 - 1;
-		vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.comfort/commands/$args[0]",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{HK([\d+]).Soll_Temp_eco_aktiv}x )      {   # set <name> HK1_Soll_Temp_eco_aktiv: activate/deactivate eco temperature for HKn
-        $hknum = $1 - 1;
-		vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.eco/commands/$args[0]",
-            "{}",
-            $name,$opt,@args
-        );
-        return;
-    }
-    if ($opt =~ m{WW.Betriebsart}x )                   {   # set <name> HKn_Betriebsart: sets WW_Betriebsart to balanced,off
+    if ($opt =~ m{WW.Betriebsart}x )                   {   # set <name> WW_Betriebsart: sets WW_Betriebsart to balanced,off
         vitoconnect_action($hash,
             "heating.dhw.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}",
@@ -1849,7 +1794,7 @@ sub vitoconnect_Set_Roger {
     }
     if ($opt =~ m{\AUrlaub_Start.*}x )                        {   # set <name> Urlaub_Start_Zeit: set holiday start time, start has to look like this: 2019-02-02
         my $end = ReadingsVal($name,$separator eq '_'? 'Urlaub_Ende_Zeit' : 'Urlaub_Ende',"");
-        if ($end eq "")                                 {
+        if ($end eq '')                                 {
             my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
             $t += ONE_DAY;
             $end = $t->strftime("%Y-%m-%d");
@@ -1878,18 +1823,72 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+]).Name}x )                         {   # set <name> HK1_Name: sets the name of the circuit for HKn
+    
+    my $hknum = 0;
+    if ($opt =~ m{\AHK([\d+]).+}x )                  {   # evaluate HKn number
         $hknum = $1 - 1;
+    } else {
+        return $val;
+    }
+    
+    if ($opt =~ m{\AHK..Betriebsart}x )                  {   # set <name> HKn_Betriebsart: sets HKn_Betriebsart to heating,standby
         vitoconnect_action($hash,
-            "heating.circuits.$hknum/commands/setName",
+            "heating.circuits.${hknum}.operating.modes.active/commands/setMode",
+            "{\"mode\":\"$args[0]\"}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Soll_Temp_normal}x )     {   # set <name> HK1_Soll_Temp_normal: sets the normale target temperature for HKn, where targetTemperature is an integer between 3 and 37
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.normal/commands/setTemperature",
+            "{\"targetTemperature\":$args[0]}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Soll_Temp_reduziert}x )      {   # set <name> HK1_Soll_Temp_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.reduced/commands/setTemperature",
+            "{\"targetTemperature\":$args[0]}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Soll_Temp_comfort}x )        {   # set <name> HK1_Soll_Temp_comfort: set comfort target temperatur for HKn
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.comfort/commands/setTemperature",
+            "{\"targetTemperature\":$args[0]}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Soll_Temp_comfort_aktiv}x )  {   # set <name> HK1_Soll_Temp_comfort_aktiv: activate/deactivate comfort temperature for HKn
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.comfort/commands/$args[0]",
+            "{}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Soll_Temp_eco_aktiv}x )      {   # set <name> HK1_Soll_Temp_eco_aktiv: activate/deactivate eco temperature for HKn
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}.operating.programs.eco/commands/$args[0]",
+            "{}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{\AHK..Name}x )                         {   # set <name> HK1_Name: sets the name of the circuit for HKn
+        vitoconnect_action($hash,
+            "heating.circuits.${hknum}/commands/setName",
             "{\"name\":\"@args\"}",
             $name,$opt,@args
         );
         return;
     }
-    if ($opt =~ m{HK([\d+]).Heizkurve.Niveau}x )             {   # set <name> HK1_Heizkurve_Niveau: set shift of heating curve for HKn
+    if ($opt =~ m{\AHK..Heizkurve.Niveau}x )             {   # set <name> HK1_Heizkurve_Niveau: set shift of heating curve for HKn
         my $slope = ReadingsVal($name,"HK${1}${separator}Heizkurve${separator}Steigung","");
-        $hknum = $1 - 1;
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.heating.curve/commands/setCurve",
             "{\"shift\":$args[0],\"slope\":$slope}",
@@ -1897,9 +1896,8 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+]).Heizkurve.Steigung}x )           {   # set <name> HK1_Heizkurve_Steigung: set slope of heating curve for HKn
+    if ( $opt =~ m{\AHK..Heizkurve.Steigung}x )           {   # set <name> HK1_Heizkurve_Steigung: set slope of heating curve for HKn
         my $shift = ReadingsVal($name,"HK${1}${separator}Heizkurve${separator}Niveau","");
-        $hknum = $1 - 1;
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.heating.curve/commands/setCurve",
             "{\"shift\":$shift,\"slope\":$args[0]}",
@@ -1907,9 +1905,8 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+])_Urlaub_Start.*}x )            {   # set <name> HK1_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
+    if ( $opt =~ m{\AHK._Urlaub_Start.*}x )            {   # set <name> HK1_Urlaub_Start_Zeit: set holiday start time for HKn, start  has to look like this: 2019-02-16
         my $end = ReadingsVal($name,"HK${1}_Urlaub_Ende",ReadingsVal($name,"HK${1}_Urlaub_Ende_Zeit",''));
-        $hknum = $1 - 1;
         if ($end eq "")         {
             my $t = Time::Piece->strptime( $args[0], "%Y-%m-%d" );
             $t += ONE_DAY;
@@ -1922,9 +1919,8 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+])_Urlaub_Ende.*}x )                 {   # set <name> HK1_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
+    if ( $opt =~ m{\AHK._Urlaub_Ende.*}x )                 {   # set <name> HK1_Urlaub_Ende_Zeit: set holiday end time for HKn, end has to look like this: 2019-02-16
         my $start = ReadingsVal($name,"HK${1}_Urlaub_Start",ReadingsVal($name,"HK${1}_Urlaub_Start_Zeit",""));
-        $hknum = $1 - 1;
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
@@ -1932,8 +1928,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+])_Urlaub_(stop|unschedule)}x )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK.)_Urlaub_(stop|unschedule)}x )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.holiday/commands/unschedule",
             "{}",
@@ -1941,8 +1936,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ($opt =~ m{HK([\d+]).Zeitsteuerung_Heizung}x )        {   # set <name> HK1_Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK..Zeitsteuerung_Heizung}x )        {   # set <name> HK1_Zeitsteuerung_Heizung: sets the heating schedule in JSON format for HKn
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.heating.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}",
@@ -1951,8 +1945,7 @@ sub vitoconnect_Set_Roger {
         return;
     }
     
-    if ($opt =~ m{HK([\d+]).Solltemperatur_comfort_aktiv}x ) {   # set <name> HK2-Solltemperatur_comfort_aktiv: activate/deactivate comfort temperature for HKn
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK..Solltemperatur_comfort_aktiv}x ) {   # set <name> HK2-Solltemperatur_comfort_aktiv: activate/deactivate comfort temperature for HKn
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.comfort/commands/$args[0]",
             "{}",
@@ -1961,17 +1954,15 @@ sub vitoconnect_Set_Roger {
         return;
     }
     
-    if ($opt =~ m{HK([\d+]).Solltemperatur_(comfort|normal)}x )       {   # set <name> HK2-Solltemperatur_comfort: set comfort target temperatur for HKn
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK..Solltemperatur_(comfort|normal)}x )       {   # set <name> HK2-Solltemperatur_comfort: set comfort target temperatur for HKn
         vitoconnect_action($hash,
-            "heating.circuits.${hknum}.operating.programs.${2}/commands/setTemperature",
+            "heating.circuits.${hknum}.operating.programs.${1}/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name,$opt,@args
         );
         return;
     }
-    if ($opt =~ m{HK([\d+]).Solltemperatur_eco_aktiv}x )     {   # set <name> HK2_Solltemperatur_eco_aktiv: activate/deactivate eco temperature for HKn
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK..Solltemperatur_eco_aktiv}x )     {   # set <name> HK2_Solltemperatur_eco_aktiv: activate/deactivate eco temperature for HKn
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.eco/commands/$args[0]",
             "{}",
@@ -1980,8 +1971,7 @@ sub vitoconnect_Set_Roger {
         return;
     }
 
-    if ($opt =~ m{HK([\d+]).Solltemperatur_reduziert}x )     {   # set <name> HK2_Solltemperatur_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
-        $hknum = $1 - 1;
+    if ( $opt =~ m{\AHK..Solltemperatur_reduziert}x )     {   # set <name> HK2_Solltemperatur_reduziert: sets the reduced target temperature for HKn, where targetTemperature is an integer between 3 and 37
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.reduced/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
