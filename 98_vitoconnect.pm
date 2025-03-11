@@ -3321,6 +3321,73 @@ sub vitoconnect_DeleteKeyValue {
     return;
 }
 
+sub vitoconnect_send_weekprofile {
+  my $name       = shift // Carp::carp q[No device name provided!]              && return;
+  my $wp_name    = shift // Carp::carp q[No weekprofile device name provided!]  && return;
+  my $wp_profile = shift // AttrVal($name, 'weekprofile', undef) // Carp::carp q[No weekprofile profile name provided!] && return;
+  my $entity     = shift // '0.heating';  #might be one of (0-2).(heating|circulation), dhw or dhw.pumps?
+  
+=pod
+if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulationspumpe_Zeitplan: sets the schedule in JSON format for hot water circulation pump
+        vitoconnect_action($hash,
+            "heating.dhw.pumps.circulation.schedule/commands/setSchedule",
+            "{\"newSchedule\":@args}",
+            $name,$opt,@args
+        );
+        return;
+    }
+    if ($opt =~ m{WW.Zeitplan}x )                      {   # set <name> WW_Zeitplan: sets the schedule in JSON format for hot water
+        vitoconnect_action($hash,
+            "heating.dhw.schedule/commands/setSchedule",
+            "{\"newSchedule\":@args}",
+            $name,$opt,@args
+        );
+        return;
+
+=cut
+  
+  my $model = 'bla'; # 
+  
+  my $hash = $defs{$name} // return;
+  
+  my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
+  if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
+    Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
+    return;
+  }
+
+  my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+  my $payload;
+  my @days = (0..6);
+  my $decoded;
+  if ( !eval { $decoded  = decode_json($wp_profile_data) ; 1 } ) {
+    Log3($name, 1, "JSON decoding error in $wp_profile provided by $wp_name: $@");
+    return;
+  }
+
+  for my $i (@days) {
+      $payload = '{';
+
+      for my $j (0..7) {
+        if (defined $decoded->{$D[$i]}{'time'}[$j]) {
+          my $time = $decoded->{$D[$i]}{'time'}[$j-1] // "00:00";
+          my ($hour,$minute) = split m{:}xms, $time;
+          $hour = 0 if $hour == 24;
+          $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$decoded->{$D[$i]}{'temp'}[$j];
+          $payload .= '},{' if defined $decoded->{$D[$i]}{'time'}[$j+1];
+        }
+      }
+      $payload .='}';
+      if ( $i == 0 && ( $model eq '5+2' || $model eq '6+1') ) {
+        CommandSet($hash,"$name holidays $payload");
+        $payload = '{';
+      }
+      CommandSet($hash,"$name workdays $payload") if $model eq '5+2' || $model eq '6+1' || $model eq '7';
+  }
+  readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
+  return;
+}
+
 1;
 
 __END__
@@ -3498,9 +3565,11 @@ __END__
         <li><i>vitoconnect_raw_readings</i>:<br>         
             Create readings with plain JSON names like <code>heating.circuits.0.heating.curve.slope</code> instead of German identifiers (old mapping), mapping attribute, or translation attribute.<br>
             When using raw readings, setters will be created dynamically matching the raw readings (new).<br>
-            I recommend this setting since you get everything as dynamically as possible from the API.<br>
+            This is activated by default now as this setting ensures you get everything as dynamically as possible from the API.<br>
             You can use <code>stateFormat</code> or <code>userReadings</code> to display your important readings with a readable name.<br>
-            If <code>vitoconnect_raw_readings</code> is set, no mapping will be used.
+            If <code>vitoconnect_raw_readings</code> is set, no mapping will be used. Setting this to "svn" forces the module to use a compability mode for the reading names.
+            <br>
+            <b>Note: Using the old (Roger- or svn-) mappings is no longer recommended, they may be removed later!</b>
         </li>
         <a id="vitoconnect-attr-vitoconnect_disable_raw_readings"></a>
         <li><i>vitoconnect_disable_raw_readings</i>:<br>         
@@ -3536,7 +3605,9 @@ __END__
         </li>
         <a id="vitoconnect-attr-vitoconnect_mapping_roger"></a>
         <li><i>vitoconnect_mapping_roger</i>:<br>
-            Use the mapping from Roger from 8. November (<a href="https://forum.fhem.de/index.php?msg=1292441">https://forum.fhem.de/index.php?msg=1292441</a>) instead of the SVN mapping.
+            Use the mapping from Roger from 8. November (<a href="https://forum.fhem.de/index.php?msg=1292441">https://forum.fhem.de/index.php?msg=1292441</a>) instead of the raw mapping.
+            <br>
+            <b>Note: Using the old (Roger- or svn-) mappings is no longer recommended and may be removed later!</b>
         </li>
         <a id="vitoconnect-attr-vitoconnect_serial"></a>
         <li><i>vitoconnect_serial</i>:<br>
@@ -3723,9 +3794,11 @@ __END__
         <li><i>vitoconnect_raw_readings</i>:<br>         
             Erstellt Readings mit einfachen JSON-Namen wie 'heating.circuits.0.heating.curve.slope' anstelle von deutschen Bezeichnern (altes Mapping), Mapping-Attributen oder Übersetzungen.<br>
             Wenn raw Readings verwendet werden, werden die Setter dynamisch erstellt, die den raw Readings entsprechen.<br>
-            Diese Einstellung wird empfohlen, um die Daten so dynamisch wie möglich von der API zu erhalten.<br>
+            Diese Einstellung entspricht nunmehr dem default und wird empfohlen, um die Daten so dynamisch wie möglich von der API zu erhalten.<br>
             stateFormat oder userReadings können verwendet werden, um wichtige Readings mit einem lesbaren Namen anzuzeigen.<br>
-            Wenn vitoconnect_raw_readings gesetzt ist, wird kein Mapping verwendet.
+            Wenn vitoconnect_raw_readings nicht bzw. auf "1" gesetzt ist, wird kein Mapping verwendet. Die Einstellung "svn" bewirkt einen Kompabilitätsmodus.
+            <br>
+            <b>Beachte: Das Verwenden der alten (Roger- bzw. svn-) Mappings ist nicht empfohlen und wird ggf. künftig nicht mehr unterstützt!</b>
         </li>
         <a id="vitoconnect-attr-vitoconnect_disable_raw_readings"></a>
         <li><i>vitoconnect_disable_raw_readings</i>:<br>
@@ -3761,7 +3834,8 @@ __END__
         </li>
         <a id="vitoconnect-attr-vitoconnect_mapping_roger"></a>
         <li><i>vitoconnect_mapping_roger</i>:<br>
-            Verwendet das Mapping von Roger vom 8. November (https://forum.fhem.de/index.php?msg=1292441) anstelle der SVN-Zuordnung.
+            Verwendet das Mapping von Roger vom 8. November (https://forum.fhem.de/index.php?msg=1292441) anstelle der SVN-Zuordnung.<br>
+            <b>Beachte: Das Verwenden der alten (Roger- bzw. svn-) Mappings ist nicht empfohlen und wird ggf. künftig nicht mehr unterstützt!</b>
         </li>
         <a id="vitoconnect-attr-vitoconnect_serial"></a>
         <li><i>vitoconnect_serial</i>:<br>
