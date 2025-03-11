@@ -1928,7 +1928,7 @@ sub vitoconnect_Set_Roger {
         );
         return;
     }
-    if ( $opt =~ m{\AHK.)_Urlaub_(stop|unschedule)}x )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
+    if ( $opt =~ m{\AHK..Urlaub_(?:stop|unschedule)}x )          {   # set <name> HK1_Urlaub_stop: remove holiday start and end time for HKn
         vitoconnect_action($hash,
             "heating.circuits.${hknum}.operating.programs.holiday/commands/unschedule",
             "{}",
