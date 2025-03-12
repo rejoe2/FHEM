@@ -1472,24 +1472,35 @@ return $val;
 sub vitoconnect_Set_New {
     my ($hash, $name, $opt, @args) = @_;
     my $gw = AttrVal( $name, 'vitoconnect_serial', 0 );
-    my $val = "";
+    my $val = '';
     
     my $Response = $hash->{".response_$gw"};
     if ($Response) {  # Überprüfen, ob $Response Daten enthält
         my $data;
-        eval { $data = decode_json($Response); };
-        if ($@) {
+        
+        if ( !eval { $data = JSON->new->decode($Response) ; 1 } ) {
+            Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             # JSON-Dekodierung fehlgeschlagen, nur Standardoptionen zurückgeben
             return $val;
         }
+        return if !defined $data;
         
-        foreach my $item (@{$data->{'data'}}) {
+        for my $item (@{$data->{data}}) {
 
             if (exists $item->{commands}) {
                 my $feature = $item->{feature};
                 Log(5,$name.",vitoconnect_Set_New feature: ". $feature);
+                my $cmdMapName = {
+                    setTemperature              =>  'temperature',
+                    setHysteresis               =>  'value',
+                    setHysteresisSwitchOnValue  =>  'switchOnValue',
+                    setHysteresisSwitchOffValue =>  'switchOffValue',
+                    setMin                      =>  'min',
+                    setMax                      =>  'max',
+                    setSchedule                 =>  'entries'
+                };
 
-                foreach my $commandName (sort keys %{$item->{commands}}) {           #<====== Loop Commands, sort necessary for activate temperature for burners, see below
+                for my $commandName (sort keys %{$item->{commands}}) {           #<====== Loop Commands, sort necessary for activate temperature for burners, see below
                     my $commandNr = keys %{$item->{commands}};
                     my @propertyKeys = keys %{$item->{properties}};
                     my $propertyKeysNr = keys %{$item->{properties}};
@@ -1497,17 +1508,27 @@ sub vitoconnect_Set_New {
                     
                     Log(5,$name.", -vitoconnect_Set_New isExecutable: ". $item->{commands}{$commandName}{isExecutable}); 
                     if ($item->{commands}{$commandName}{isExecutable} == 0) {
-                    Log(5,$name.", -vitoconnect_Set_New $commandName nicht ausführbar"); 
-                     next; #diser Befehl ist nicht ausführbar, nächster 
+                        Log(5,$name.", -vitoconnect_Set_New $commandName nicht ausführbar"); 
+                        next; #diser Befehl ist nicht ausführbar, nächster 
                     }
 
                     Log(5,$name.", -vitoconnect_Set_New feature: ". $feature);
                     Log(5,$name.", -vitoconnect_Set_New commandNr: ". $commandNr); 
                     Log(5,$name.", -vitoconnect_Set_New commandname: ". $commandName); 
                     my $readingNamePrep;
+                    
+                    if ( $commandName eq 'setLevels' ) {
+                        # duplicate, setMin, setMax can do this https://api.viessmann.com/iot/v2/features/installations/2772216/gateways/7736172146035226/devices/0/features/heating.circuits.0.temperature.levels/commands/setLevels
+                        next;
+                    }
+                                            
                     if ($commandNr == 1 and $propertyKeysNr == 1) {               # Ein command value = property z.B. heating.circuits.0.operating.modes.active
-                     $readingNamePrep .= $feature.".". $propertyKeys[0];
-                    } elsif ( $commandName eq "setTemperature" ) {
+                        $readingNamePrep .= $feature.".". $propertyKeys[0];
+                    } elsif ( defined $cmdMapName->{$commandName} ) {
+                        $readingNamePrep .= "$feature.$cmdMapName->{$commandName}";
+                    }
+=pod
+                    eq "setTemperature" ) {
                         $readingNamePrep .= $feature.".temperature";              #<------- setTemperature only 1 param, so it can be defined here, 
                                                                                   # for burner Vitoladens 300C, heating.circuits.0.operating.programs.comfort
                                                                                   # activate (temperature), deactivate(noArg), setTemperature (targetTemperature) only one can work with value provided
@@ -1524,16 +1545,13 @@ sub vitoconnect_Set_New {
                         $readingNamePrep .= $feature.".max";
                     } elsif ( $commandName eq "setSchedule" ) {                   #<------- setSchedule very special mapping, must be predefined
                         $readingNamePrep .= $feature.".entries";
-                    } elsif ( $commandName eq "setLevels" ) {
-                        # duplicate, setMin, setMax can do this https://api.viessmann.com/iot/v2/features/installations/2772216/gateways/7736172146035226/devices/0/features/heating.circuits.0.temperature.levels/commands/setLevels
-                        next;
                     }
+=cut
                     else {
-                    # all other cases, will be defined in param loop
+                        # all other cases, will be defined in param loop
                     }
-                    if(defined($readingNamePrep))
-                    {
-                    Log(5,$name.", -vitoconnect_Set_New readingNamePrep: ". $readingNamePrep); 
+                    if( defined $readingNamePrep ) {
+                        Log(5,$name.", -vitoconnect_Set_New readingNamePrep: ". $readingNamePrep); 
                     }
 
                     if ($paramNr > 2) {                                          #<------- more then 2 parameters, with unsorted JSON can not be handled, but also do not exist at the moment
@@ -1697,11 +1715,11 @@ sub vitoconnect_Set_Roger {
         ."WW${separator}Solltemperatur:slider,10,1,60 "
         ."WW${separator}Temperatur_2:slider,10,1,60 "
         ."WW${separator}Betriebsart:balanced,off ";
-	if ($separator eq '_') { #Set_Roger
-	    $val .= 'Urlaub_Start_Zeit Urlaub_Ende_Zeit Urlaub_stop:noArg ';
-	} else { #svn setters
-	    $val .= 'Urlaub_Start Urlaub_Ende Urlaub_unschedule:noArg ';
-	}
+    if ($separator eq '_') { #Set_Roger
+        $val .= 'Urlaub_Start_Zeit Urlaub_Ende_Zeit Urlaub_stop:noArg ';
+    } else { #svn setters
+        $val .= 'Urlaub_Start Urlaub_Ende Urlaub_unschedule:noArg ';
+    }
 
     for my $i (1..3) {
         if ( ReadingsVal($name,"HK${i}${separator}aktiv",0) ) {
@@ -2209,16 +2227,20 @@ sub vitoconnect_getAccessTokenCallback {
     if ($err eq "")                 {   # kein Fehler bei Antwort
         Log3($name,4,$name." - getAccessTokenCallback went ok");
         Log3($name,5,$name." - Received response: ".$response_body."\n");
-        my $decode_json = eval {decode_json($response_body)};
-        if ($@)                     {
-            Log3($name,1,$name.", vitoconnect_getAccessTokenCallback: JSON error while request: ".$@);
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        
+        my $decode_json;
+        if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+            Log3($hash->{NAME}, 1, "JSON decoding error: $@");
+            Log3($name,1,"$name, vitoconnect_getAccessTokenCallback: JSON error while request: $@");
+            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
             return;
         }
-        my $access_token = $decode_json->{"access_token"};              # aus JSON dekodieren
+        return if !defined $decode_json;
+               
+        my $access_token = $decode_json->{access_token};               # aus JSON dekodieren
         if ($access_token ne "")    {
-            $hash->{".access_token"} = $access_token;                   # in Internals speichern
-            $hash->{"refresh_token"} = $decode_json->{"refresh_token"}; # in Internals speichern
+            $hash->{'.access_token'} = $access_token;                  # in Internals speichern
+            $hash->{refresh_token} = $decode_json->{refresh_token};    # in Internals speichern
 
             Log3($name,4,$name." - Access Token: ".substr($access_token,0,20)."...");
             vitoconnect_getGw($hash);   # Abfrage Gateway-Serial
@@ -2277,15 +2299,19 @@ sub vitoconnect_getRefreshCallback {
     if ($err eq "")                 {
         Log3($name,4,$name.". - getRefreshCallback went ok");
         Log3($name,5,$name." - Received response: ".$response_body."\n");
-        my $decode_json = eval {decode_json($response_body)};
-        if ($@)                     {   # Fehler aufgetreten
-            Log3($name,1,$name.", vitoconnect_getRefreshCallback: JSON error while request: ".$@);
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        
+         my $decode_json;
+        if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+            Log3($hash->{NAME}, 1, "JSON decoding error: $@");
+            Log3($name,1,"$name, vitoconnect_getRefreshCallback: JSON error while request: $@");
+            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
             return;
         }
-        my $access_token = $decode_json->{"access_token"};
-        if ($access_token ne "")    {   # kein Fehler
-            $hash->{".access_token"} = $access_token;   # in Internal merken
+        return if !defined $decode_json;
+               
+        my $access_token = $decode_json->{access_token};               # aus JSON dekodieren
+        if ($access_token ne '')    {
+            $hash->{'.access_token'} = $access_token;                  # in Internals speichern
             Log3($name,4,$name." - Access Token: ".substr($access_token,0,20)."...");
             #vitoconnect_getGw($hash);  # Abfrage Gateway-Serial
             # directly call get resource to save API calls
@@ -2312,9 +2338,9 @@ sub vitoconnect_getRefreshCallback {
 #   https://documentation.viessmann.com/static/iot/overview
 #####################################################################################################################
 sub vitoconnect_getGw {
-    my ($hash)       = @_;  # Übergabe-Parameter
+    my $hash         = shift // return;  # Übergabe-Parameter
     my $name         = $hash->{NAME};
-    my $access_token = $hash->{".access_token"};
+    my $access_token = $hash->{'.access_token'};
     my $param        = {
 #       url      => $apiURL
         url      => $iotURL_V1
@@ -2338,14 +2364,15 @@ sub vitoconnect_getGwCallback {
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
 
-    if ($err eq "")                         {   # kein Fehler aufgetreten
+    if ($err eq '')                         {   # kein Fehler aufgetreten
         Log3($name,4,$name." - getGwCallback went ok");
         Log3($name,5,$name." - Received response: ".$response_body."\n");
-        my $items = eval {decode_json($response_body)};
-        if ($@)                             {   # Fehler beim JSON dekodieren
-            readingsSingleUpdate($hash,"state","JSON error while request: ".$@,1);  # Reading 'state'
-            Log3($name,1,$name.", vitoconnect_getGwCallback: JSON error while request: ".$@);
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        #my $items = eval {decode_json($response_body)};
+        my $items;
+        if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
+            readingsSingleUpdate($hash,'state',"JSON error while request: $@",1);  # Reading 'state'
+            Log3($name,1,"$name, vitoconnect_getGwCallback: JSON error while request: $@");
+            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
             return;
         }
         $err = vitoconnect_errorHandling($hash,$items);
@@ -2475,8 +2502,8 @@ sub vitoconnect_getInstallationCallback {
     if ($err eq "")                         {
         Log3 $name, 4, "$name - getInstallationCallback went ok";
         Log3 $name, 5, "$name - Received response: $response_body";
-        my $items = eval { decode_json($response_body) };
-        if ($@) {
+        my $items; # = eval { decode_json($response_body) };
+        if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             readingsSingleUpdate( $hash, "state","JSON error while request: ".$@,1);
             Log3($name,1,$name.", vitoconnect_getInstallationCallback: JSON error while request: ".$@);
             InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
@@ -2542,8 +2569,14 @@ sub vitoconnect_getInstallationFeaturesCallback {
     my $name = $hash->{NAME};
     my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
     
-    my $decode_json = eval {decode_json($response_body)};
-    if ((defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
+    #my $decode_json = eval {decode_json($response_body)};
+    my $decode_json;
+    if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+        Log3($name,1,"$name, getInstallationFeaturesCallback: JSON error while request: $@");
+        return;
+    }
+            
+    if ((defined($err) && $err ne '') || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
         Log3($name,1,$name.",vitoconnect_getFeatures: Fehler während installation features: ".$err." :: ".$response_body);
         $err = vitoconnect_errorHandling($hash,$decode_json);
         if ($err ==1){
@@ -2610,8 +2643,10 @@ sub vitoconnect_getDeviceCallback {
     if ($err eq "")                         {
         Log3 $name, 4, "$name - getDeviceCallback went ok";
         Log3 $name, 5, "$name - Received response: $response_body\n";
-        my $items = eval { decode_json($response_body) };
-        if ($@)                             {
+        #my $items = eval { decode_json($response_body) };
+        
+        my $items;
+        if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             RemoveInternalTimer($hash);
             readingsSingleUpdate($hash,"state","JSON error while request: ".$@,1);
             Log3($name,1,$name.", vitoconnect_getDeviceCallback: JSON error while request: ".$@);           
@@ -2685,9 +2720,14 @@ sub vitoconnect_getFeaturesCallback {
     my $name = $hash->{NAME};
     my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
     
-    my $decode_json = eval {decode_json($response_body)};
+    #my $decode_json = eval {decode_json($response_body)};
+    my $decode_json;
+    if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+        Log3($name,1,"$name, getFeaturesCallback: JSON error while request: $@");
+        return;
+    }
 
-    if ((defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
+    if ((defined($err) && $err ne '') || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
         Log3($name,1,$name.",vitoconnect_getFeatures: Fehler während Gateway features: ".$err." :: ".$response_body);
         $err = vitoconnect_errorHandling($hash,$decode_json);
         if ($err ==1){
@@ -2767,13 +2807,14 @@ sub vitoconnect_getResourceCallback {
     if ($err eq "")                         {   # kein Fehler aufgetreten
         Log3($name,4,$name." - getResourceCallback went ok");
         Log3($name,5,$name." - Received response: ".substr($response_body,0,100)."...");
-        my $items = eval {decode_json($response_body)};
-        if ($@)                             {   # Fehler beim JSON dekodieren
+        my $items;
+        if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             readingsSingleUpdate($hash,"state","JSON error while request: ".$@,1);  # Reading 'state'
             Log3($name,1,$name.", vitoconnect_getResourceCallback: JSON error while request: ".$@);
-             InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
             return;
         }
+        return if !defined $items; # needs timer as well?
         
         $err = vitoconnect_errorHandling($hash,$items);
         if ($err ==1){
@@ -2796,25 +2837,20 @@ sub vitoconnect_getResourceCallback {
         Log(5,$name.", RequestListMapping count:".scalar keys %$RequestListMapping);
         
         readingsBeginUpdate($hash);
-        foreach ( @{ $items->{data} } ) {
-            my $feature    = $_;
+        for my $feature ( @{ $items->{data} } ) {
             my $properties = $feature->{properties};
-            
-            
-        if (AttrVal( $name, 'vitoconnect_actions_active', 0 ) eq "1") {
-        # Write all commands
-         if (exists $feature->{commands}) {
-          foreach my $command (keys %{$feature->{commands}}) {
-           my $Reading = $feature->{feature}.".".$command;
-           my $Value = $feature->{commands}{$command}{uri};
-            readingsBulkUpdate($hash,$Reading,$Value,1);
-          }
-         }
-        }
+            if (AttrVal( $name, 'vitoconnect_actions_active', 0 ) eq "1") { # Write all commands
+                if (exists $feature->{commands}) {
+                    for my $command (keys %{$feature->{commands}}) {
+                        my $Reading = $feature->{feature}.".".$command;
+                        my $Value = $feature->{commands}{$command}{uri};
+                        readingsBulkUpdate($hash,$Reading,$Value,1);
+                    }
+                }
+            }
         
             
-            foreach my $key ( sort keys %$properties ) {
-                
+            for my $key ( sort keys %$properties ) {
                 
                 my $Reading;
                 
@@ -3044,13 +3080,23 @@ sub vitoconnect_getErrorCode {
             Log3($name, 5, $name . ", vitoconnect_getErrorCode url=" . $param->{url});
 
             my ($err, $msg) = HttpUtils_BlockingGet($param);
-            my $decode_json = eval { JSON->new->decode($msg) };#decode_json($msg) };
-            Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
 
-            if (defined($err) && $err ne "") {   # Fehler bei Befehlsausführung
-                Log3($name, 1, $name . ", vitoconnect_getErrorCode call finished with error, err:" . $err);
-            } elsif (exists $decode_json->{statusCode} && $decode_json->{statusCode} ne "") {
-                Log3($name, 1, $name . ", vitoconnect_getErrorCode call finished with error, status code:" . $decode_json->{statusCode});
+            if (defined($err) && $err ne '') {   # Fehler bei Befehlsausführung
+                Log3($name, 1, "$name, vitoconnect_getErrorCode call finished with error, err: $err");
+                return;
+            }
+
+            my $decode_json;
+
+            if ( !eval { $decode_json = JSON->new->decode($msg) ; 1 } ) {
+                Log3($hash->{NAME}, 1, "JSON decoding error: $@");
+                return "API seems not to return valid JSON: $@";
+            }
+            return if !defined $decode_json;
+            #Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
+            
+            if (exists $decode_json->{statusCode} && $decode_json->{statusCode} ne '') {
+                Log3($name, 1, "$name, vitoconnect_getErrorCode call finished with error, status code: $decode_json->{statusCode}");
             } else {   # Befehl korrekt ausgeführt
                 Log3($name, 5, $name . ", vitoconnect_getErrorCode: finished ok");
                 if (exists $decode_json->{faultCodes} && @{$decode_json->{faultCodes}}) {
@@ -3113,16 +3159,24 @@ sub vitoconnect_action {
     Log3($name,3,$name.", vitoconnect_action data=".$param->{data}); # change back to 3
 #   https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_BlockingGet
     (my $err,my $msg) = HttpUtils_BlockingGet($param);
-    my $decode_json = eval {decode_json($msg)};
+    #my $decode_json = eval {decode_json($msg)};
+    my $decode_json;
+    if ( !eval { $decode_json = JSON->new->decode($msg) ; 1 } ) {
+        Log3($hash->{NAME}, 1, "JSON decoding error: $@");
+            return "API seems not to return valid JSON: $@";
+        }
+    return if !defined $decode_json;
 
-    Log3($name,3,$name.", vitoconnect_action call finished, err:" .$err);
+    Log3($name,3,$name.", vitoconnect_action call finished, err:" .$err) if $err;
     my $Text = join(' ',@args); # Befehlsparameter in Text
     if ( (defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "") )                   {   # Fehler bei Befehlsausführung
         readingsSingleUpdate($hash,"Aktion_Status","Fehler: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
         Log3($name,1,$name.",vitoconnect_action: set ".$name." ".$opt." ".@args.", Fehler bei Befehlsausfuehrung: ".$err." :: ".$msg);
     }
     else                                                                {   # Befehl korrekt ausgeführt
-        readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
+        #readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,'Aktion_Status',"OK: $opt $Text");
         #Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
         Log3($name,3,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt"); 
         
@@ -3134,7 +3188,8 @@ sub vitoconnect_action {
             $opt = $1 . ".active";
             $Text = "1";
         }
-        readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        #readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        readingsBulkUpdate($hash,$opt,$Text);   # Reading updaten
         #Log3($name,1,$name.",vitoconnect_action: reading upd1 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
         
         # Spezial Readings update, activate mit temperatur siehe brenner Vitoladens300C
@@ -3144,11 +3199,13 @@ sub vitoconnect_action {
             $opt = $1 . ".active";
             $Text = "1";
         }
-        readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        #readingsSingleUpdate($hash,$opt,$Text,1);   # Reading updaten
+        readingsBulkUpdate($hash,$opt,$Text);
         #Log3($name,1,$name.",vitoconnect_action: reading upd2 hash:".$hash." opt:".$opt." text:".$Text); # TODO: Wieder weg machen $err
+        readingsEndUpdate($hash, 1);
         
         
-        Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
+        Log3($name,4,$name.",vitoconnect_action: set feature: $feature data: $data, korrekt ausgefuehrt"); #4
     }
     return;
 }
@@ -3322,10 +3379,10 @@ sub vitoconnect_DeleteKeyValue {
 }
 
 sub vitoconnect_send_weekprofile {
-  my $name       = shift // Carp::carp q[No device name provided!]              && return;
-  my $wp_name    = shift // Carp::carp q[No weekprofile device name provided!]  && return;
-  my $wp_profile = shift // AttrVal($name, 'weekprofile', undef) // Carp::carp q[No weekprofile profile name provided!] && return;
-  my $entity     = shift // '0.heating';  #might be one of (0-2).(heating|circulation), dhw or dhw.pumps?
+    my $name       = shift // Carp::carp q[No device name provided!]              && return;
+    my $wp_name    = shift // Carp::carp q[No weekprofile device name provided!]  && return;
+    my $wp_profile = shift // AttrVal($name, 'weekprofile', undef) // Carp::carp q[No weekprofile profile name provided!] && return;
+    my $entity     = shift // '0.heating';  #might be one of (0-2).(heating|circulation), dhw or dhw.pumps?
   
 =pod
 if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulationspumpe_Zeitplan: sets the schedule in JSON format for hot water circulation pump
@@ -3343,50 +3400,215 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
             $name,$opt,@args
         );
         return;
+        
+    vitoconnect_action($hash,
+            "heating.circuits.${hknum}.heating.schedule/commands/setSchedule",
+            "{\"newSchedule\":@args}",
+            $name,$opt,@args
+        );
 
 =cut
   
-  my $model = 'bla'; # 
+    my $hash = $defs{$name} // return;
   
-  my $hash = $defs{$name} // return;
-  
-  my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
-  if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
-    Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
-    return;
-  }
+    my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
+    if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
+        Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
+        return;
+    }
 
-  my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
-  my $payload;
-  my @days = (0..6);
-  my $decoded;
-  if ( !eval { $decoded  = decode_json($wp_profile_data) ; 1 } ) {
-    Log3($name, 1, "JSON decoding error in $wp_profile provided by $wp_name: $@");
-    return;
-  }
+    my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+    my $payload = '[';
+    my @days = (1..6,0); # vitoconnect starts week with monday...
+    my $decoded;
+    if ( !eval { $decoded  = JSON->new->decode($wp_profile_data) ; 1 } ) {
+        Log3($name, 1, "JSON decoding error in $wp_profile provided by $wp_name: $@");
+        return;
+    }
 
-  for my $i (@days) {
-      $payload = '{';
+    for my $i (@days) {
+        my $defaultval = 'off';
+        my $oldval = 'off';
+        my $position   = 0;
+        $payload .= qq({"$D[$i]":); #{"mon":
 
-      for my $j (0..7) {
-        if (defined $decoded->{$D[$i]}{'time'}[$j]) {
-          my $time = $decoded->{$D[$i]}{'time'}[$j-1] // "00:00";
-          my ($hour,$minute) = split m{:}xms, $time;
-          $hour = 0 if $hour == 24;
-          $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$decoded->{$D[$i]}{'temp'}[$j];
-          $payload .= '},{' if defined $decoded->{$D[$i]}{'time'}[$j+1];
+        for my $j (0..7) {
+            if (defined $decoded->{$D[$i]}{'time'}[$j]) {
+                my $time = $decoded->{$D[$i]}{'time'}[$j-1] // "00:00";
+                my ($hour,$minute) = split m{:}xms, $time;
+                $hour = 0 if $hour == 24;
+                $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$decoded->{$D[$i]}{'temp'}[$j];
+                $payload .= '},{' if defined $decoded->{$D[$i]}{'time'}[$j+1];
+            }
+            # if "position" is complete, we need something like:
+            # {"mode":"normal","start":"05:50","end":"16:00","position":0}
         }
-      }
-      $payload .='}';
-      if ( $i == 0 && ( $model eq '5+2' || $model eq '6+1') ) {
-        CommandSet($hash,"$name holidays $payload");
-        $payload = '{';
-      }
-      CommandSet($hash,"$name workdays $payload") if $model eq '5+2' || $model eq '6+1' || $model eq '7';
-  }
-  readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
-  return;
+        $payload .= '},'; #},
+    }
+    chop $payload; # remove last ","
+    $payload .= ']';
+=pod
+    vitoconnect_action($hash,
+        "heating.circuits.${hknum}.heating.schedule/commands/setSchedule",
+            qq({"newSchedule":$payload}),
+            $name,$opt,$payload
+        );
+=cut
+    readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);
+    readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
+    return;
 }
+
+=pod
+allowed positions: 0-3 (all schedules)
+(HK1_Zeitsteuerung_Heizung)
+heating.circuits.0.heating.schedule.entries [{"mon":{"mode":"normal","start":"05:50","end":"22:00","position":0}},{"tue":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"wed":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"thu":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"fri":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sat":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sun":{"mode":"normal","start":"06:00","end":"22:00","position":0}}]
+heating.circuits.0.heating.schedule.entries [{"mon":{"mode":"normal","start":"05:50","end":"22:00","position":0}},{"tue":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"wed":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"thu":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"fri":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sat":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sun":{"mode":"normal","start":"06:00","end":"22:00","position":0}}]
+[{"mon":{"mode":"normal","start":"05:50","end":"16:00","position":0}},{"mon":{"mode":"comfort","start":"16:00","end":"21:30","position":1}},{"mon":{"mode":"normal","start":"21:30","end":"22:00","position":2}},{"tue":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"wed":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"thu":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"fri":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sat":{"mode":"normal","start":"06:00","end":"22:00","position":0}},{"sun":{"mode":"normal","start":"06:00","end":"22:00","position":0}}]
+first approach: 
+every temp below 20 degrees is "eco" (not to be included in array, just "end" trigger)
+every temp starting with 22 degrees is "comfort" 
+all in the middle are "normal"
+(might be adopted later to readingVal() requests?) 
+(WW_Zeitplan)
+heating.dhw.schedule.entries [{"mon":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"tue":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"wed":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"thu":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"fri":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"sat":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"sun":{"mode":"on","start":"05:30","end":"22:00","position":0}}]
+periodes outside "on" are just "off"
+first approach: every temp starting with 21 degrees is "on"
+
+=pod
+sub send_weekprofile {
+    my $name       = shift // return;
+    my $wp_name    = shift // return;
+    my $wp_profile = shift // return;
+    my $model      = shift // ReadingsVal($name,'week','unknown'); #selected,Mo-Fr,Mo-So,Sa-So? holiday to set actual $wday to sunday program?
+    #[quote author=Reinhart link=topic=97989.msg925644#msg925644 date=1554057312]
+    #"daysel" nicht. Für mich bedeutet dies, das das Csv mit der Feldbeschreibung nicht überein stimmt. Ich kann aber nirgends einen Fehler sichten (timerhc.inc oder _templates.csv). [code]daysel,UCH,0=selected;1=Mo-Fr;2=Sa-So;3=Mo-So,,Tage[/code]
+    #Ebenfalls getestet mit numerischem daysel (0,1,2,3), auch ohne Erfolg.
+    my $onLimit    = shift // '20';
+
+    my $hash = $defs{$name} // return;
+
+    my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
+    if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
+        Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
+        return;
+    }
+
+    my @Dl = ("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday");
+    my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+
+    my $payload;
+    #my @days = (0..6);
+    my $text = decode_json($wp_profile_data);
+
+    ( $model, my @days ) = split m{:}xms, $model;
+    (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime;
+
+    my @models;
+    if ( $model eq 'unknown' ) {
+        my $monday = toJSON($text->{$D[1]}{time}) . toJSON($text->{$D[1]}{temp});
+        my $satday = toJSON($text->{$D[6]}{time}) . toJSON($text->{$D[6]}{temp});
+        my $sunday = toJSON($text->{$D[0]}{time}) . toJSON($text->{$D[0]}{temp});
+        $models[0] = $satday eq $sunday && $sunday eq $monday ? '3' : $satday eq $sunday ? 2 : 0;
+        $models[1] = 1;
+        for my $i (2..5) {
+            my $othday = toJSON($text->{$D[$i]}{time}) . toJSON($text->{$D[$i]}{temp});
+            next if $othday eq $monday;
+            $models[1] = 0;
+            last;
+        }
+        @days = $models[0] == 3 ? (1) :
+                $models[1] == 1 && $models[0] == 2 ? (0,1) :
+                $models[1] == 1 ? (0,1,6) :
+                $models[1] == 0 && $models[0] == 2 ? (0..5) : (0..6)
+    }
+
+    if (!@days) {
+        if ( $model eq 'Mo-Fr' ) {
+            @days = (1);
+            $models[1] = 1;
+        } elsif ( $model eq 'Mo-So' ) {
+            @days = (1);
+            $models[1] = 1;
+            $models[0] = 3;
+        } elsif ( $model eq 'holiday' ) {
+            @days = (0);
+        } elsif ( $model eq 'selected' ) {
+            @days = (0..6);
+            $models[1] = 0;
+            $models[0] = 0;
+        } elsif ( $model eq 'Sa-So' ) {
+            @days = (0);
+            $models[0] = 2;
+        }
+    }
+
+    for my $i (@days) {
+        $payload = q{};
+        my $pairs = 0;
+        my $onOff = 'off';
+
+        for my $j (0..20) {
+            my $time = '00:00';
+            if (defined $text->{$D[$i]}{time}[$j]) {
+                $time = $text->{$D[$i]}{time}[$j-1] // '00:00';
+                my $val = $text->{$D[$i]}{temp}[$j];
+                if ( $val eq $onOff || (looks_like_number($val) && _compareOnOff( $val, $onOff, $onLimit ) ) ) {
+                    $time = '00:00' if !$j;
+                    $payload .= qq{$time;$text->{$D[$i]}{time}[$j];};
+                    $pairs++;
+                    $val = $val eq 'on' ? 'off' : 'on';
+                }
+            }
+            while ( $pairs < 3 && !defined $text->{$D[$i]}{time}[$j] ) {
+                #fill up the three pairs with last time
+                $pairs++;
+                $payload .= qq{-,-;-,-;};
+            }
+            last if $pairs == 3;
+        }
+
+        if ( $model eq 'holiday' ) {
+            $payload .= 'selected';
+            CommandSet($defs{$name},"$name $Dl[$wday] $payload") if ReadingsVal($name,$Dl[$wday],'') ne $payload;
+        } elsif ( $model eq 'selected' ) {
+            $payload .= 'selected';
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
+        } elsif ($i == 1) {
+            $payload .=  defined $models[0] && $models[0] == 3 ? 'Mo-So' : defined $models[1] && $models[1] ? 'Mo-Fr' : 'selected';
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if defined $models[0] && $models[0] == 3 ||defined $models[1] && $models[1];
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
+        } elsif ($i == 0 || $i == 6 ) {
+            my $united = defined $models[0] && $models[0] == 2; 
+            $payload .=  $united ? 'Sa-So' : 'selected';
+            CommandSet($defs{$name},"$name $Dl[$united ? 6 : $i] $payload") if ReadingsVal($name,$Dl[$united ? 6 : $i],'') ne $payload || $united;
+        } else {
+            $payload .= 'selected';
+            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
+        }
+    }
+
+    readingsSingleUpdate( $defs{$name}, 'weekprofile', "$wp_name $wp_profile",1);
+    return;
+}
+
+sub _compareOnOff {
+    my $val   = shift // return;
+    my $onOff = shift // return;
+    my $lim   = shift;
+
+    if ( $onOff eq 'on' ) {
+        return $val < $lim;
+    } else {
+        return $val >= $lim;
+    }
+    return;
+}
+=cut
+
+
+
+=cut
 
 1;
 
