@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-11 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-03-14 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -3418,6 +3418,8 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     }
 
     my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+    my $lim2;
+    $lim2 = 20 if $entity =~ m{\A..heating\z}x;
     my $payload = '[';
     my @days = (1..6,0); # vitoconnect starts week with monday...
     my $decoded;
@@ -3427,29 +3429,75 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     }
 
     for my $i (@days) {
-        my $defaultval = 'off';
         my $oldval = 'off';
-        my $position   = 0;
-        $payload .= qq({"$D[$i]":); #{"mon":
+        my $position = 0;
+        my $start;
+        my $dayname = lc $D[$i];
+        $payload .= qq({"$dayname":); #{"mon":
+        my $val;
 
-        for my $j (0..7) {
-            if (defined $decoded->{$D[$i]}{'time'}[$j]) {
-                my $time = $decoded->{$D[$i]}{'time'}[$j-1] // "00:00";
-                my ($hour,$minute) = split m{:}xms, $time;
-                $hour = 0 if $hour == 24;
-                $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$decoded->{$D[$i]}{'temp'}[$j];
-                $payload .= '},{' if defined $decoded->{$D[$i]}{'time'}[$j+1];
+        for my $j (0..20) {
+            my $time;
+            if (defined $decoded->{$D[$i]}{time}[$j]) {
+                $time = $decoded->{$D[$i]}{time}[$j-1] // '00:00';
+                if ( !$j ) {    #first value
+                    $time = '00:00';
+                }
+
+                $val = $decoded->{$D[$i]}{temp}[$j];
+        #Log3($name, 1, "test: $dayname entry $j starts $time with $val");
+
+                $val = vitoconnect_compareOnOff($val,$oldval,22,$lim2);
+                if ( $j == 20 ) {    #last value, force closing
+                    $time = '24:00';
+                    $val = 'off' ;
+                }
+            } else { #no more entries in profile
+                $time = '24:00';
+                $val = 'off' ;
+
             }
-            # if "position" is complete, we need something like:
-            # {"mode":"normal","start":"05:50","end":"16:00","position":0}
+            next if !defined $val;   #nothing's changed
+
+            if ( $val ne $oldval ) {
+        #Log3($name, 1, "test: $dayname entry $j changed to $val");
+                if ($oldval eq 'off') {
+                    $time = '00:00' if !$j;
+                } else {
+                    # "position" is complete, we need something like:
+                    # {"mode":"normal","start":"05:50","end":"16:00","position":0}
+
+                    #nr of positions is limited to 4 (0-3)
+                    if ( $position == 4 ) {
+                        Log3($name,2,"vitoconnect only accepts 4 positions, check your weekprofiles!");
+                        return "Error:vitoconnect only accepts 4 positions, check your weekprofile $wp_name: $wp_profile!";
+                    }
+
+                    $payload .= qq({"mode":"$oldval","start":"$start","end":"$time","position":$position},);
+                    $position++;
+                }
+                $start = $time;
+                $oldval = $val;
+            }
+            last if !defined $decoded->{$D[$i]}{time}[$j]
+
         }
-        $payload .= '},'; #},
+        if (!$position) {    #prevent empty entry, so we set some defaults!
+            if ( !defined $lim2 ) {
+                $payload .= qq({"mode":"on","start":"05:30","end":"21:30","position":0},);
+            } else {
+                $payload .= qq({"mode":"normal","start":"06:00","end":"22:00","position":0},);
+            }
+        }
+        chop $payload; # remove last ","
+        $payload .= '},';
     }
     chop $payload; # remove last ","
     $payload .= ']';
 =pod
+    #for heating types only; we will have to check that...
     vitoconnect_action($hash,
-        "heating.circuits.${hknum}.heating.schedule/commands/setSchedule",
+        "heating.circuits.${entity}.schedule/commands/setSchedule",
             qq({"newSchedule":$payload}),
             $name,$opt,$payload
         );
@@ -3458,6 +3506,9 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
     return;
 }
+
+
+
 
 =pod
 allowed positions: 0-3 (all schedules)
@@ -3473,142 +3524,35 @@ all in the middle are "normal"
 (WW_Zeitplan)
 heating.dhw.schedule.entries [{"mon":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"tue":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"wed":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"thu":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"fri":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"sat":{"mode":"on","start":"05:30","end":"22:00","position":0}},{"sun":{"mode":"on","start":"05:30","end":"22:00","position":0}}]
 periodes outside "on" are just "off"
-first approach: every temp starting with 21 degrees is "on"
-
-=pod
-sub send_weekprofile {
-    my $name       = shift // return;
-    my $wp_name    = shift // return;
-    my $wp_profile = shift // return;
-    my $model      = shift // ReadingsVal($name,'week','unknown'); #selected,Mo-Fr,Mo-So,Sa-So? holiday to set actual $wday to sunday program?
-    #[quote author=Reinhart link=topic=97989.msg925644#msg925644 date=1554057312]
-    #"daysel" nicht. Für mich bedeutet dies, das das Csv mit der Feldbeschreibung nicht überein stimmt. Ich kann aber nirgends einen Fehler sichten (timerhc.inc oder _templates.csv). [code]daysel,UCH,0=selected;1=Mo-Fr;2=Sa-So;3=Mo-So,,Tage[/code]
-    #Ebenfalls getestet mit numerischem daysel (0,1,2,3), auch ohne Erfolg.
-    my $onLimit    = shift // '20';
-
-    my $hash = $defs{$name} // return;
-
-    my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
-    if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
-        Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
-        return;
-    }
-
-    my @Dl = ("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday");
-    my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
-
-    my $payload;
-    #my @days = (0..6);
-    my $text = decode_json($wp_profile_data);
-
-    ( $model, my @days ) = split m{:}xms, $model;
-    (my $sec,my $min,my $hour,my $mday,my $mon,my $year,my $wday,my $yday,my $isdst) = localtime;
-
-    my @models;
-    if ( $model eq 'unknown' ) {
-        my $monday = toJSON($text->{$D[1]}{time}) . toJSON($text->{$D[1]}{temp});
-        my $satday = toJSON($text->{$D[6]}{time}) . toJSON($text->{$D[6]}{temp});
-        my $sunday = toJSON($text->{$D[0]}{time}) . toJSON($text->{$D[0]}{temp});
-        $models[0] = $satday eq $sunday && $sunday eq $monday ? '3' : $satday eq $sunday ? 2 : 0;
-        $models[1] = 1;
-        for my $i (2..5) {
-            my $othday = toJSON($text->{$D[$i]}{time}) . toJSON($text->{$D[$i]}{temp});
-            next if $othday eq $monday;
-            $models[1] = 0;
-            last;
-        }
-        @days = $models[0] == 3 ? (1) :
-                $models[1] == 1 && $models[0] == 2 ? (0,1) :
-                $models[1] == 1 ? (0,1,6) :
-                $models[1] == 0 && $models[0] == 2 ? (0..5) : (0..6)
-    }
-
-    if (!@days) {
-        if ( $model eq 'Mo-Fr' ) {
-            @days = (1);
-            $models[1] = 1;
-        } elsif ( $model eq 'Mo-So' ) {
-            @days = (1);
-            $models[1] = 1;
-            $models[0] = 3;
-        } elsif ( $model eq 'holiday' ) {
-            @days = (0);
-        } elsif ( $model eq 'selected' ) {
-            @days = (0..6);
-            $models[1] = 0;
-            $models[0] = 0;
-        } elsif ( $model eq 'Sa-So' ) {
-            @days = (0);
-            $models[0] = 2;
-        }
-    }
-
-    for my $i (@days) {
-        $payload = q{};
-        my $pairs = 0;
-        my $onOff = 'off';
-
-        for my $j (0..20) {
-            my $time = '00:00';
-            if (defined $text->{$D[$i]}{time}[$j]) {
-                $time = $text->{$D[$i]}{time}[$j-1] // '00:00';
-                my $val = $text->{$D[$i]}{temp}[$j];
-                if ( $val eq $onOff || (looks_like_number($val) && _compareOnOff( $val, $onOff, $onLimit ) ) ) {
-                    $time = '00:00' if !$j;
-                    $payload .= qq{$time;$text->{$D[$i]}{time}[$j];};
-                    $pairs++;
-                    $val = $val eq 'on' ? 'off' : 'on';
-                }
-            }
-            while ( $pairs < 3 && !defined $text->{$D[$i]}{time}[$j] ) {
-                #fill up the three pairs with last time
-                $pairs++;
-                $payload .= qq{-,-;-,-;};
-            }
-            last if $pairs == 3;
-        }
-
-        if ( $model eq 'holiday' ) {
-            $payload .= 'selected';
-            CommandSet($defs{$name},"$name $Dl[$wday] $payload") if ReadingsVal($name,$Dl[$wday],'') ne $payload;
-        } elsif ( $model eq 'selected' ) {
-            $payload .= 'selected';
-            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
-        } elsif ($i == 1) {
-            $payload .=  defined $models[0] && $models[0] == 3 ? 'Mo-So' : defined $models[1] && $models[1] ? 'Mo-Fr' : 'selected';
-            CommandSet($defs{$name},"$name $Dl[$i] $payload") if defined $models[0] && $models[0] == 3 ||defined $models[1] && $models[1];
-            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
-        } elsif ($i == 0 || $i == 6 ) {
-            my $united = defined $models[0] && $models[0] == 2; 
-            $payload .=  $united ? 'Sa-So' : 'selected';
-            CommandSet($defs{$name},"$name $Dl[$united ? 6 : $i] $payload") if ReadingsVal($name,$Dl[$united ? 6 : $i],'') ne $payload || $united;
-        } else {
-            $payload .= 'selected';
-            CommandSet($defs{$name},"$name $Dl[$i] $payload") if ReadingsVal($name,$Dl[$i],'') ne $payload;
-        }
-    }
-
-    readingsSingleUpdate( $defs{$name}, 'weekprofile', "$wp_name $wp_profile",1);
-    return;
-}
-
-sub _compareOnOff {
-    my $val   = shift // return;
-    my $onOff = shift // return;
-    my $lim   = shift;
-
-    if ( $onOff eq 'on' ) {
-        return $val < $lim;
-    } else {
-        return $val >= $lim;
-    }
-    return;
-}
-=cut
-
-
+first approach: every temp starting with 22 degrees is "on"
 
 =cut
+
+
+sub vitoconnect_compareOnOff {
+    my $val    = shift // return;
+    my $oldval = shift // return;
+    my $lim1   = shift // 22;
+    my $lim2   = shift;
+
+    if (looks_like_number($val)) { #numeric comparison
+        if ( $val >= $lim1 ) {
+            return if $oldval eq 'on' || $oldval eq 'comfort';
+            return 'comfort' if defined $lim2;
+            return 'on';
+        }
+        if ( !defined $lim2 || $val < $lim2) {
+            return if $oldval eq 'off';
+            return 'off';
+        }
+        return if $oldval eq 'normal';
+        return 'normal';
+    }
+
+    return if $oldval eq $val;
+    return $val;
+}
+
 
 1;
 
