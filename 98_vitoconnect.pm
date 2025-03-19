@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-14 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-03-17 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1284,6 +1284,7 @@ sub vitoconnect_Initialize {
       . "vitoconnect_serial:textField-long "            # Legt fest welcher Gateway abgefragt werden soll, wenn nicht gesetzt werden alle abgefragt
       . "vitoconnect_installationID:textField-long "    # Legt fest welche Installation abgefragt werden soll, muss zur serial passen
       . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
+      . "weekprofile "
       . $readingFnAttributes;
 
       eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -1371,7 +1372,7 @@ sub vitoconnect_Set {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
     
     # Standard Parameter setzen
-    my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg ";
+    my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg weekprofile ";
     Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
     
     # Setter für die Geräteauswahl dynamisch erstellen  
@@ -1457,9 +1458,17 @@ sub vitoconnect_Set {
         }
         return;
     }
-    elsif ($opt eq 'clearMappedErrors' ){
+    if ($opt eq 'clearMappedErrors' ){
      AnalyzeCommand($hash,"deletereading $name device.messages.errors.mapped.*");
      return;
+    }
+    
+    if ($opt eq 'weekprofile' ){
+        my $weekprof_device = $args[0];
+        my $weekprof_ref    = $args[1] // return 'Please provide a weekprofile reference!';
+        my $mode            = $args[2];
+        return "$weekprof_device is no valid weekprofile device!" if !defined $defs{$weekprof_device} || InternalVal($weekprof_device,'TYPE','') ne 'weekprofile';
+        return vitoconnect_send_weekprofile($name,$weekprof_device,$weekprof_ref,$mode);
     }
 
 return $val;
@@ -3414,7 +3423,7 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
     if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
         Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
-        return;
+        return "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available";
     }
 
     my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
@@ -4022,6 +4031,10 @@ __END__
         <a id="vitoconnect-attr-vitoconnect_device"></a>
         <li><i>vitoconnect_device</i>:<br>
             Es kann zwischen den Geräten 0 (Standard) oder 1 gewählt werden. Diese Funktion konnte nicht getestet werden, da nur ein Gerät verfügbar ist.
+        </li>
+        <a id="vitoconnect-attr-weekprofile"></a>
+        <li>weekprofile<br>    
+        Siehe <a href="#weekprofile-attr-weekprofile">weekprofile-Attribut bei weekprofile</a>        
         </li>
     </ul>
 </ul>

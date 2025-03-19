@@ -1,6 +1,5 @@
-
 ##############################################
-# $Id: 98_weekprofile.pm 25318 2022-10-10 Beta-User - follow reference $
+# $Id: 98_weekprofile.pm 27006 2025-03-17 Beta-User $
 #
 # Usage
 #
@@ -185,7 +184,7 @@ sub weekprofile_getDeviceType($$;$)
       return undef if (!defined($model));
     }
     Log3($me, 5, "$me(getDeviceType): $devHash->{NAME}, $model");
-	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
+      $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
     $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
   }  
 
@@ -214,6 +213,19 @@ sub weekprofile_getDeviceType($$;$)
     else {
       Log3($me, 4, "$me(getDeviceType): found MQTT2_DEVICE but not configured for weekprofile");
     }
+  } elsif (defined AttrVal($me,'extraClientModules',undef)) {
+      for my $attribute_type (split m{\s+}x, AttrVal($me,'extraClientModules','')) {
+        if ($devType eq $attribute_type) {
+            my $attr = AttrVal($device,'weekprofile','');
+            Log3($me, 5, "$me(getDeviceType): attr $devType $attr");
+            if ($attr ne "") {  
+              $type = 'extraClient';
+            } else {
+              Log3($me, 4, "$me(getDeviceType): found $devType but not configured for weekprofile");
+            }
+        }
+        last if $type;
+      }
   }
   
   if (defined($type)) {
@@ -400,14 +412,14 @@ sub weekprofile_sendDevProfile(@)
       
       return fhem("set $device profile_data $prf->{TOPIC}:$prf->{NAME} $json_text",1);
   }
-  elsif ($type eq "WDT") {
+  elsif ($type eq 'WDT' || $type eq 'MQTT2_DEVICE') {
     my $cmd = "set $device weekprofile $me:$prf->{TOPIC}:$prf->{NAME}";
-    Log3($me, 4, "$me(sendDevProfile): send to WDT $cmd");
+    Log3($me, 4, "$me(sendDevProfile): send to $type $cmd");
     return fhem("$cmd",1);
   }
-  elsif ($type eq "MQTT2_DEVICE") {
+  elsif ($type eq 'extraClient') {#XXXXX
     my $cmd = "set $device weekprofile $me $prf->{TOPIC}:$prf->{NAME}";
-    Log3($me, 4, "$me(sendDevProfile): send to MQTT2_DEVICE $cmd");
+    Log3($me, 4, "$me(sendDevProfile): send to extraClient device $device $cmd");
     return fhem("$cmd",1);
   }
 
@@ -577,7 +589,11 @@ sub weekprofile_refreshSendDevList($)
     my $module   = $defs{$d}{TYPE};
     
     my %sndHash;
-    @sndHash{@DEVLIST_SEND}=();
+    my @DEVLIST_SEND_Extra = @DEVLIST_SEND;
+    if (defined AttrVal($me,'extraClientModules',undef)) {
+        push @DEVLIST_SEND_Extra, split m{\s+}x, AttrVal($me,'extraClientModules','');
+    }
+    @sndHash{@DEVLIST_SEND_Extra}=();
     next if (!exists $sndHash{$module});
     
     my $type = weekprofile_getDeviceType($me, $defs{$d}{NAME},"SND");
@@ -608,20 +624,25 @@ sub weekprofile_receiveList($)
   
   my @rcvList = ();
    
-  foreach my $d (keys %defs)
+  foreach my $d (keys %defs)   
   {
     next if ($defs{$d}{NAME} eq $me);
     
     my $module   = $defs{$d}{TYPE};
     
     my %sndHash;
-    @sndHash{@DEVLIST_SEND}=();
+    my @DEVLIST_SEND_Extra = @DEVLIST_SEND;
+    if (defined AttrVal($me,'extraClientModules',undef)) {
+        push @DEVLIST_SEND_Extra, split m{\s+}x, AttrVal($me,'extraClientModules','');
+    }
+    @sndHash{@DEVLIST_SEND_Extra}=();
+#    @sndHash{@DEVLIST_SEND}=();
     next if (!exists $sndHash{$module});
     
     my $type = weekprofile_getDeviceType($me, $defs{$d}{NAME});
-    next if (!defined($type));
+    next if (!defined($type));    
     push @rcvList, $defs{$d}{NAME};
-  }
+  }  
   return @rcvList;
 }
 
@@ -728,7 +749,7 @@ sub weekprofile_Initialize($)
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
   $hash->{AttrList} = "useTopics:0,1 widgetTranslations widgetWeekdays widgetTempRange widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 \
-                       sendDelay tempON tempOFF configFile forceCompleteProfile:0,1 tempMap sendKeywordsToDevices:0,1 ".$readingFnAttributes;
+                       sendDelay tempON tempOFF configFile forceCompleteProfile:0,1 tempMap sendKeywordsToDevices:0,1 extraClientModules ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -784,19 +805,19 @@ sub sort_by_name
 ############################################## 
 sub dumpData($$$) 
 {
-	require Data::Dumper;
-	
-	my ($hash,$prefix,$data) = @_;
-	
-	my $me = $hash->{NAME};	 
-	my $dmp = Dumper($data);
-	
-	$dmp =~ s/^\s+|\s+$//g; #trim whitespace both ends
-	if (AttrVal($me,"verbose",3) < 4) {
-		Log3($me, 1, "$me$prefix - set verbose to 4 to see the data");
-	} else {
-		Log3($me, 4, "$me$prefix $dmp");
-	}
+    require Data::Dumper;
+    
+    my ($hash,$prefix,$data) = @_;
+    
+    my $me = $hash->{NAME};	 
+    my $dmp = Dumper($data);
+    
+    $dmp =~ s/^\s+|\s+$//g; #trim whitespace both ends
+    if (AttrVal($me,"verbose",3) < 4) {
+    Log3($me, 1, "$me$prefix - set verbose to 4 to see the data");
+    } else {
+    Log3($me, 4, "$me$prefix $dmp");
+    }
 }
 ############################################## 
 sub weekprofile_Get($$@)
@@ -1184,7 +1205,7 @@ sub weekprofile_Set($$@)
     return "Error unknown profile $srcName" unless($prfSrc);
     Log3($me, 4, "$me(Set): override profile $destName") if ($prfDest);
     
-    if (defined $prfDest){
+    if ($prfDest){
       $prfDest->{DATA} = undef;
       $prfDest->{REF} = "$srcTopic:$srcName";
     } else {
@@ -1254,17 +1275,17 @@ sub weekprofile_Set($$@)
   #----------------------------------------------------------
   $list.= " reread_master:noArg" if (defined($hash->{MASTERDEV}));
   if ($cmd eq 'reread_master') {
-	  return "Error no master device assigned" if (!defined($hash->{MASTERDEV}));
-	  my $devName = $hash->{MASTERDEV}->{NAME};
-	  Log3($me, 4, "$me(Set): reread master profile from $devName");
+      return "Error no master device assigned" if (!defined($hash->{MASTERDEV}));
+      my $devName = $hash->{MASTERDEV}->{NAME};
+      Log3($me, 4, "$me(Set): reread master profile from $devName");
       my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$hash->{MASTERDEV}->{TYPE}, $me);
       if(defined($prfDev)) {
         $hash->{PROFILES}[0]->{DATA} = $prfDev;
         weekprofile_updateReadings($hash);
         return undef;
       } else {
-		  return "Error reading master profile";
-	  }
+      return "Error reading master profile";
+      }
   }
 
   #----------------------------------------------------------  
@@ -1404,12 +1425,19 @@ sub weekprofile_Attr($$$)
   if ($attrName eq 'tempMap') {
       weekprofile_createTempMap($hash, $attrVal);
   }
+  
+  if ($attrName eq 'extraClientModules') {
+      
+  }
   return undef;
 }
 ############################################## 
 sub weekprofile_createTempMap($;$) {
     my ($hash, $attrMap) = @_;
     my $me = $hash->{NAME};
+    
+    #clear map
+    %{$hash->{TEMPMAP}} = ();
     
     my $tempOn = AttrVal($me,"tempON", undef);
     if (defined($tempOn)) {
@@ -1446,8 +1474,8 @@ sub weekprofile_writeProfilesToFile(@)
   my $me = $hash->{NAME};
   
   if (!defined($hash->{PROFILES})) {
-	  Log3($me, 4, "$me(writeProfileToFile): no profiles to save");
-	  return;
+      Log3($me, 4, "$me(writeProfileToFile): no profiles to save");
+      return;
   }
   
   my $start = (defined($hash->{MASTERDEV})) ? 1:0;
@@ -1802,7 +1830,7 @@ __END__
   <br><br>
   Note: WeekdayTimer and MQTT2_DEVICE TYPE devices can not be used as 'master'.
   <br><br>
-  An other use case is the usage of categories 'Topics'.
+  <a id="weekprofile-topics">An other use case is the usage of categories 'Topics'.
   To enable the feature the attribute 'useTopics' have to be set.
   Topics are e.q. winter, summer, holidays, party, and so on.
   A topic consists of different week profiles. Normally one profile for each thermostat.
@@ -2010,10 +2038,13 @@ __END__
     </li>
     <a id="weekprofile-attr-weekprofile"></a>
     <li>weekprofile<br>    
-    This attribute can be a userattr of supported modules of weekprofile to receive a specific profile with the
-    defined name at the <i>restore_topic</i> command. See topics for further information    
+    This attribute can be a userattr of modules supported by <a href="#weekprofile">weekprofile</a>  to receive a specific profile with the
+    defined weekprofile name at the <i>restore_topic</i> command. See <a href="#weekprofile-topics">topics</a> for further information.
     </li>
-    
+    <a id="weekprofile-attr-extraClientModules"></a>
+    <li>extraClientModules<br>
+    This attribute can be used to add (space separated) additional client module names to the list of supported modules. The module has to support a "weekprofile" <i>set</i> command to indipendently react on this  set command. <i>weekprofile</i> will hand over it's own instance name and a <i>topic:weekprofile</i> identifier to allow further processing (similar to WeekdayTimer or MQTT2_DEVICE) of the provided data. See also <a href="#vitoconnect">vitoconnect</a> code for reference about the possibilities this feature offers.
+    </li>
   </ul>
 </ul>
 =end html
@@ -2043,11 +2074,11 @@ __END__
   <br><br>Hinweis: Geräte des Typs WeekdayTimer und MQTT2_DEVICE können nicht als 'Master-Gerät' verwendet werden.
   <br><br>
 
-  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken\Kategorien 'Topics'.
+  <a id="weekprofile-topics"></a>Ein weiterer Anwendungsfall ist die Verwendung von Rubriken\Kategorien 'Topics'.
   Hier sollte kein 'Master-Gerät' angegeben werden. Dieses Feature muss erst über das Attribut 'useTopics' aktiviert werden.
   Topics sind z.B. Winter, Sommer, Urlaub, Party, etc.  
   Innerhalb einer Topic kann es mehrere Wochenprofile geben. Sinnvollerweise sollten es soviele wie Thermostate sein.
-  Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofile ohne Topicname angegeben.
+  Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofil ohne Topicname angegeben.
   Mittels 'restore_topic' wird dann das angebene Wochenprofil der Topic an das Thermostat übertragen.
   Somit kann man einfach zwischen den Topics wechseln und die Thermostate bekommen das passende Wochenprofil.
   <br><br>
@@ -2248,8 +2279,13 @@ __END__
     </li>
     <a id="weekprofile-attr-weekprofile"></a>
     <li>weekprofile<br>
-    Kann ein userattr eines unterstützten Moduls von weekprofile sein, um ein spezifisches Profil mit dem angegeben Namen
-    beim Befehl <i>restore_topic</i> zu empfangen. Siehe auch 'Topics'.    
+    Kann ein userattr eines von <a href="#weekprofile">weekprofile</a>  unterstützten Moduls sein, um ein spezifisches Wochenprofil mit dem angegeben Namen
+    beim Befehl <i>restore_topic</i> zu empfangen. Siehe auch <a href="#weekprofile-topics">'Topics'.
+    </a>
+    </li>
+    <a id="weekprofile-attr-extraClientModules"></a>
+    <li>extraClientModules<br>
+    Kann eine Leerzeichen-getrennte Liste weiterer Module enthalten, die dann von weekprofile als unterstützt erkannt werden. Die weiteren Module müssen ein "weekprofile" <i>set</i> Kommando kennen und dann selbst Code enthalten, der die empfangenen Informationen auswerten kann. weekprofile selbst übergibt nur den eigenen Namen und einen <i>topic:Wochenprofil</i>-Kenner, der dann - analog zu WeekdayTimer oder MQTT2_DEVICE - für die weitere Verarbeitung verwendet werden kann. Siehe hierzu auch den Code in  <a href="#vitoconnect">vitoconnect</a>, um einen Eindruck von den Möglichkeiten zu erhalten.
     </li>
   </ul>
 </ul>
