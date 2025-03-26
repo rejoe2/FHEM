@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-17 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-03-26 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1320,10 +1320,14 @@ sub vitoconnect_Define {
     #my @param = split( '[ \t]+', $def );
     my($unnamed, $named) = parseParams($def);
     #parseParams: my ( $hash, $a, $h ) = @_;
+    shift @{$unnamed}; # delete name from list
+    shift @{$unnamed}; # delete TYPE from list
+
     my $user = $named->{user} // shift @{$unnamed} // return 'no user provided!';
     $hash->{user}            = $user;
     my $interval= $named->{interval} // pop @{$unnamed} // 300;
     return 'no valid interval provided!' if !defined $interval || !looks_like_number($interval);
+    $hash->{interval} = $interval;
     
     $hash->{counter}         = 0;
     $hash->{timeout}         = 15;
@@ -1437,14 +1441,14 @@ sub vitoconnect_Set {
         return;
     }
     if ($opt eq "password" )                         {   # set <name> password: store password in key store
-        my $err = vitoconnect_StoreKeyValue($hash,"passwd",$args[0]);   # Kennwort verschlüsselt speichern
+        my $err = vitoconnect_StoreKeyValue($name,'passwd',$args[0]);   # Kennwort verschlüsselt speichern
         return $err if ($err);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
     if ($opt eq "apiKey" )                           {   # set <name> apiKey: bisher keine Beschreibung
         $hash->{apiKey} = $args[0];
-        my $err = vitoconnect_StoreKeyValue($hash,"apiKey",$args[0]);   # apiKey verschlüsselt speichern
+        my $err = vitoconnect_StoreKeyValue($name,"apiKey",$args[0]);   # apiKey verschlüsselt speichern
         RemoveInternalTimer($hash);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
@@ -3262,50 +3266,49 @@ sub vitoconnect_errorHandling {
                 vitoconnect_getRefresh($hash);    # neuen Access-Token anfragen
                 return(1);
             }
-            elsif ( $items->{statusCode} eq "404" ) {
+            if ( $items->{statusCode} eq "404" ) {
                 # DEVICE_NOT_FOUND
                 readingsSingleUpdate($hash,"state","Device not found: Optolink prüfen!",1);
                 Log3 $name, 1, "$name - Device not found: Optolink prüfen!";
                 InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
-            elsif ( $items->{statusCode} eq "429" ) {
+            if ( $items->{statusCode} eq "429" ) {
                 # RATE_LIMIT_EXCEEDED
-                readingsSingleUpdate($hash,"state","Anzahl der möglichen API Calls in überschritten!",1);
+                readingsSingleUpdate($hash,"state",'Anzahl der möglichen API Calls überschritten!',1);
                 Log3 $name, 1,
-                  "$name - Anzahl der möglichen API Calls in überschritten!";
+                  "$name - Anzahl der möglichen API Calls überschritten!";
                 InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
-            elsif ( $items->{statusCode} eq "502" ) {
+            if ( $items->{statusCode} eq "502" ) {
                 readingsSingleUpdate($hash,"state","temporärer API Fehler",1);
                 # DEVICE_COMMUNICATION_ERROR error: Bad Gateway
                 Log3 $name, 1, "$name - temporärer API Fehler";
                 InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
-            else {
-                readingsSingleUpdate($hash,"state","unbekannter Fehler, bitte den Entwickler informieren! (Typ: "
-                                     . ($items->{errorType} // 'undef') . " Grund: "
-                                     . ($items->{extendedPayload}->{reason} // 'NA') . ")",1);
-                Log3 $name, 1, "$name - unbekannter Fehler: "
-                             . "Bitte den Entwickler informieren!";
-                Log3 $name, 1, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
-                             . "errorType: " . ($items->{errorType} // 'undef') . " "
-                             . "message: " . ($items->{message} // 'undef') . " "
-                             . "error: " . ($items->{error} // 'undef') . " "
-                             . "reason: " . ($items->{extendedPayload}->{reason} // 'undef');
-             
-                my $dir         = path( AttrVal("global","logdir","log"));
-                my $file        = $dir->child("vitoconnect_" . $gw . ".err");
-                my $file_handle = $file->openw_utf8();
-                $file_handle->print(Dumper($items));                            # Datei 'vitoconnect_serial.err' schreiben
-                $file_handle->close();
-                Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
-                
-                InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
-                return(1);
-            }
+            
+            readingsSingleUpdate($hash,"state","unbekannter Fehler, bitte den Entwickler informieren! (Typ: "
+                 . ($items->{errorType} // 'undef') . " Grund: "
+                 . ($items->{extendedPayload}->{reason} // 'NA') . ")",1);
+            Log3 $name, 1, "$name - unbekannter Fehler: "
+                 . "Bitte den Entwickler informieren!";
+            Log3 $name, 1, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
+                 . "errorType: " . ($items->{errorType} // 'undef') . " "
+                 . "message: " . ($items->{message} // 'undef') . " "
+                 . "error: " . ($items->{error} // 'undef') . " "
+                 . "reason: " . ($items->{extendedPayload}->{reason} // 'undef');
+
+            my $dir         = path( AttrVal("global","logdir","log"));
+            my $file        = $dir->child("vitoconnect_" . $gw . ".err");
+            my $file_handle = $file->openw_utf8();
+            $file_handle->print(Dumper($items));                            # Datei 'vitoconnect_serial.err' schreiben
+            $file_handle->close();
+            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
+            return(1);
         }
 };
 
@@ -3525,7 +3528,7 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
         vitoconnect_action($hash,
             "heating.circuits.${entity}.schedule/commands/setSchedule",
                 qq({"newSchedule":$payload}),
-                $name,$opt,$payload
+                $name,"heating.circuits.${entity}.schedule",$payload
             );
     } else {
         readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);
