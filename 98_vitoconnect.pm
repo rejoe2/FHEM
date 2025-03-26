@@ -1264,13 +1264,15 @@ my $RequestListRoger = {
 #####################################################################################################################
 sub vitoconnect_Initialize {
     my ($hash) = @_;
-    $hash->{DefFn}   = \&vitoconnect_Define;    # wird beim 'define' eines Gerätes aufgerufen
-    $hash->{UndefFn} = \&vitoconnect_Undef;     # # wird beim Löschen einer Geräteinstanz aufgerufen
+    $hash->{DefFn}    = \&vitoconnect_Define;    # wird beim 'define' eines Gerätes aufgerufen
+    $hash->{UndefFn}  = \&vitoconnect_Undef;     # # wird beim Löschen einer Geräteinstanz aufgerufen
     $hash->{DeleteFn} = \&vitoconnect_DeleteKeyValue;
-    $hash->{SetFn}   = \&vitoconnect_Set;       # set-Befehle
-    $hash->{GetFn}   = \&vitoconnect_Get;       # get-Befehle
-    $hash->{AttrFn}  = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
-    $hash->{ReadFn}  = \&vitoconnect_Read;
+    $hash->{SetFn}    = \&vitoconnect_Set;       # set-Befehle
+    $hash->{GetFn}    = \&vitoconnect_Get;       # get-Befehle
+    $hash->{AttrFn}   = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
+    $hash->{ReadFn}   = \&vitoconnect_Read;
+    $hash->{RenameFn} = \&vitoconnect_Rename;
+
     $hash->{AttrList} =
         "disable:0,1 "
       . "vitoconnect_mappings:textField-long "
@@ -1315,32 +1317,40 @@ sub vitoconnect_Define {
   delete $params->{hash};
     
     
-    my @param = split( '[ \t]+', $def );
-
-    if ( int(@param) < 5 ) {
-        return "too few parameters: "
-          . "define <name> vitoconnect <user> <passwd> <intervall>";
-    }
-
-    $hash->{user}            = $param[2];
-    $hash->{intervall}       = $param[4];
+    #my @param = split( '[ \t]+', $def );
+    my($unnamed, $named) = parseParams($def);
+    #parseParams: my ( $hash, $a, $h ) = @_;
+    my $user = $named->{user} // shift @{$unnamed} // return 'no user provided!';
+    $hash->{user}            = $user;
+    my $interval= $named->{interval} // pop @{$unnamed} // 300;
+    return 'no valid interval provided!' if !defined $interval || !looks_like_number($interval);
+    
     $hash->{counter}         = 0;
     $hash->{timeout}         = 15;
-    $hash->{".access_token"} = "";
+    $hash->{'.access_token'} = '';
     $hash->{devices}         = []; 
-    $hash->{"Redirect_URI"}  = $callback_uri;
+    $hash->{Redirect_URI}    = $callback_uri;
 
-    my $isiwebpasswd = vitoconnect_ReadKeyValue($hash,"passwd");    # verschlüsseltes Kennwort auslesen
-    if ($isiwebpasswd eq "")        {   # Kennwort (noch) nicht gespeichert
-        my $err = vitoconnect_StoreKeyValue($hash,"passwd",$param[3]);  # Kennwort verschlüsselt speichern
-        return $err if ($err);
+    $named->{password} // shift @{$unnamed};
+    my $isiwebpasswd = vitoconnect_ReadKeyValue($name,'passwd');    # verschlüsseltes Kennwort auslesen
+    if ($isiwebpasswd eq '')        {   # Kennwort (noch) nicht gespeichert
+        $isiwebpasswd = $named->{password} // shift @{$unnamed};
+        if (defined $isiwebpasswd) {
+            my $err = vitoconnect_StoreKeyValue($name,'passwd',$isiwebpasswd);  # Kennwort verschlüsselt speichern
+            return $err if ($err);
+        }
     }
     else                            {   # Kennwort schon gespeichert
-        Log3($name,3,$name." - Passwort war bereits gespeichert");
+        Log3($name,4,$name." - Passwort war bereits gespeichert");
     }
-    $hash->{apiKey} = vitoconnect_ReadKeyValue($hash,"apiKey");         # verschlüsselten apiKey auslesen
+    $hash->{DEF} = "user=$user interval=$interval";
+    if (defined $named->{apiKey}) {
+        my $err = vitoconnect_StoreKeyValue($name,'apiKey',$named->{apiKey});  # Kennwort verschlüsselt speichern
+        return $err if ($err);
+    }
+    $hash->{apiKey} = vitoconnect_ReadKeyValue($name,'apiKey');         # verschlüsselten apiKey auslesen
     RemoveInternalTimer($hash); # Timer löschen, z.b. bei intervall change
-    InternalTimer(gettimeofday() + 10,"vitoconnect_GetUpdate",$hash);   # nach 10s
+    InternalTimer(gettimeofday() + 10,'vitoconnect_GetUpdate',$hash);   # nach 10s
     return;
 }
 
@@ -2105,7 +2115,7 @@ sub vitoconnect_GetUpdate {
     Log3($name,4,$name." - GetUpdate called ...");
     if (IsDisabled($name))      {   # Device disabled
         Log3($name,4,$name." - device disabled");
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);   # nach Intervall erneut versuchen
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);   # nach Intervall erneut versuchen
         return;
     }
     else                        {   # Device nicht disabled
@@ -2121,7 +2131,7 @@ sub vitoconnect_GetUpdate {
 sub vitoconnect_getCode {
     my ($hash)       = @_;  # Übergabe-Parameter
     my $name         = $hash->{NAME};
-    my $isiwebpasswd = vitoconnect_ReadKeyValue($hash,"passwd");        # verschlüsseltes Kennwort auslesen
+    my $isiwebpasswd = vitoconnect_ReadKeyValue($name,'passwd');        # verschlüsseltes Kennwort auslesen
     my $client_id    = $hash->{apiKey};
     if (!defined($client_id))   {   # $client_id/apiKey nicht definiert
         Log3($name,1,$name." - set apiKey first");                      # Fehlermeldung ins Log
@@ -2188,7 +2198,7 @@ sub vitoconnect_getCodeCallback {
     else                            {   # Fehler beim Login
         readingsSingleUpdate($hash,"state","Login failure. Check password and apiKey",1);   # Reading 'state' setzen
         Log3($name,1,$name." - Login failure. Check password and apiKey");
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);   # Forum: #880
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);   # Forum: #880
         return;
     }
     return;
@@ -2241,7 +2251,7 @@ sub vitoconnect_getAccessTokenCallback {
         if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
             Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             Log3($name,1,"$name, vitoconnect_getAccessTokenCallback: JSON error while request: $@");
-            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},'vitoconnect_GetUpdate',$hash);
             return;
         }
         return if !defined $decode_json;
@@ -2257,13 +2267,13 @@ sub vitoconnect_getAccessTokenCallback {
         else                        {
             Log3($name,1,$name." - Access Token: nicht definiert");
             Log3($name,5,$name." - Received response: ".$response_body."\n");
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
             return;
         }
     }
     else                            {   # Fehler bei Antwort
         Log3($name,1,$name.",vitoconnect_getAccessTokenCallback - getAccessToken: An error occured: ".$err);
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
         return;
     }
     return;
@@ -2313,7 +2323,7 @@ sub vitoconnect_getRefreshCallback {
         if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
             Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             Log3($name,1,"$name, vitoconnect_getRefreshCallback: JSON error while request: $@");
-            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},'vitoconnect_GetUpdate',$hash);
             return;
         }
         return if !defined $decode_json;
@@ -2329,13 +2339,13 @@ sub vitoconnect_getRefreshCallback {
         else {
             Log3 $name, 1, "$name - Access Token: nicht definiert";
             Log3 $name, 5, "$name - Received response: $response_body\n";
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);    # zurück zu getCode?
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);    # zurück zu getCode?
             return;
         }
     }
     else {
         Log3 $name, 1, "$name - getRefresh: An error occured: $err";
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
         return;
     }
     return;
@@ -2381,7 +2391,7 @@ sub vitoconnect_getGwCallback {
         if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             readingsSingleUpdate($hash,'state',"JSON error while request: $@",1);  # Reading 'state'
             Log3($name,1,"$name, vitoconnect_getGwCallback: JSON error while request: $@");
-            InternalTimer(gettimeofday() + $hash->{intervall},'vitoconnect_GetUpdate',$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},'vitoconnect_GetUpdate',$hash);
             return;
         }
         $err = vitoconnect_errorHandling($hash,$items);
@@ -2470,7 +2480,7 @@ sub vitoconnect_getGwCallback {
     }
     else                                    {   # Fehler aufgetreten
         Log3($name,1,$name." - An error occured: ".$err);
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
     }
     return;
 }
@@ -2515,7 +2525,7 @@ sub vitoconnect_getInstallationCallback {
         if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             readingsSingleUpdate( $hash, "state","JSON error while request: ".$@,1);
             Log3($name,1,$name.", vitoconnect_getInstallationCallback: JSON error while request: ".$@);
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
             return;
         }
         if ($hash->{".logResponseOnce"})    {
@@ -2536,7 +2546,7 @@ sub vitoconnect_getInstallationCallback {
     }
     else {
         Log3 $name, 1, "$name - An error occured: $err";
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
     }
     return;
 }
@@ -2659,7 +2669,7 @@ sub vitoconnect_getDeviceCallback {
             RemoveInternalTimer($hash);
             readingsSingleUpdate($hash,"state","JSON error while request: ".$@,1);
             Log3($name,1,$name.", vitoconnect_getDeviceCallback: JSON error while request: ".$@);           
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
             return;
         }
         if ( $hash->{".logResponseOnce"} )  {
@@ -2683,7 +2693,7 @@ sub vitoconnect_getDeviceCallback {
         Log3($name,1,$name." - An undefined error occured");
         }
         RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+        InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
     }
     return;
 }
@@ -2820,7 +2830,7 @@ sub vitoconnect_getResourceCallback {
         if ( !eval { $items = JSON->new->decode($response_body) ; 1 } ) {
             readingsSingleUpdate($hash,"state","JSON error while request: ".$@,1);  # Reading 'state'
             Log3($name,1,$name.", vitoconnect_getResourceCallback: JSON error while request: ".$@);
-            InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+            InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
             return;
         }
         return if !defined $items; # needs timer as well?
@@ -2989,7 +2999,7 @@ sub vitoconnect_getResourceCallback {
         Log3($name,1,$name." - An error occured: ".$err);
     }
       
-    InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+    InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
     Log(5,$name.", -getResourceCallback ended");
     
     
@@ -3256,7 +3266,7 @@ sub vitoconnect_errorHandling {
                 # DEVICE_NOT_FOUND
                 readingsSingleUpdate($hash,"state","Device not found: Optolink prüfen!",1);
                 Log3 $name, 1, "$name - Device not found: Optolink prüfen!";
-                InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+                InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
             elsif ( $items->{statusCode} eq "429" ) {
@@ -3264,14 +3274,14 @@ sub vitoconnect_errorHandling {
                 readingsSingleUpdate($hash,"state","Anzahl der möglichen API Calls in überschritten!",1);
                 Log3 $name, 1,
                   "$name - Anzahl der möglichen API Calls in überschritten!";
-                InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+                InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
             elsif ( $items->{statusCode} eq "502" ) {
                 readingsSingleUpdate($hash,"state","temporärer API Fehler",1);
                 # DEVICE_COMMUNICATION_ERROR error: Bad Gateway
                 Log3 $name, 1, "$name - temporärer API Fehler";
-                InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+                InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
             else {
@@ -3293,21 +3303,29 @@ sub vitoconnect_errorHandling {
                 $file_handle->close();
                 Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
                 
-                InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
+                InternalTimer(gettimeofday() + $hash->{interval},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
         }
 };
 
+sub vitoconnect_Rename {
+    my ($new, $old) = @_;
+    for my $element ( qw ( apiKey passwd ) ) {
+        my $val = vitoconnect_ReadKeyValue($old,$element);
+        vitoconnect_StoreKeyValue($new,$element,$val);
+    }
+    vitoconnect_DeleteKeyValue($old);
 
+}
 #####################################################################################################################
 # Werte verschlüsselt speichern
 #####################################################################################################################
 sub vitoconnect_StoreKeyValue {
     # checks and stores obfuscated keys like passwords
     # based on / copied from FRITZBOX_storePassword
-    my ( $hash, $kName, $value ) = @_;
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
+    my ( $name, $kName, $value ) = @_;
+    my $index = "vitoconnect_${name}_$kName";
     my $key   = getUniqueId().$index;
     my $enc   = "";
 
@@ -3333,10 +3351,9 @@ sub vitoconnect_ReadKeyValue {
 
     # reads obfuscated value
 
-    my ($hash,$kName) = @_;     # Übergabe-Parameter
-    my $name = $hash->{NAME};
-
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
+    my ($name,$kName) = @_;     # Übergabe-Parameter
+    
+    my $index = "vitoconnect_${name}_".$kName;
     my $key   = getUniqueId().$index;
 
     my ( $value, $err );
@@ -3374,14 +3391,13 @@ sub vitoconnect_ReadKeyValue {
 # verschlüsselte Werte löschen
 #####################################################################################################################
 sub vitoconnect_DeleteKeyValue {
-    my ($hash,$kName) = @_;    # Übergabe-Parameter
-    my $name = $hash->{NAME};
-
+    my ($name) = @_;    # Übergabe-Parameter
+    
     Log3( $name, 5,$name." - called function Delete()" );
 
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $index = "vitoconnect_${name}_passwd";
     setKeyValue( $index, undef );
-    $index = $hash->{TYPE}."_".$hash->{NAME}."_apiKey";
+    $index = "vitoconnect_${name}_apiKey";
     setKeyValue( $index, undef );
 
     return;
@@ -3503,15 +3519,17 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     }
     chop $payload; # remove last ","
     $payload .= ']';
-=pod
+    return if $payload eq ReadingsVal($name, "heating.circuits.${entity}.schedule.entries",'');
     #for heating types only; we will have to check that...
-    vitoconnect_action($hash,
-        "heating.circuits.${entity}.schedule/commands/setSchedule",
-            qq({"newSchedule":$payload}),
-            $name,$opt,$payload
-        );
-=cut
-    readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);
+    if( $entity =~ m{\d+.heating}x ) {
+        vitoconnect_action($hash,
+            "heating.circuits.${entity}.schedule/commands/setSchedule",
+                qq({"newSchedule":$payload}),
+                $name,$opt,$payload
+            );
+    } else {
+        readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);
+    }
     readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
     return;
 }
@@ -3603,11 +3621,15 @@ __END__
     <b>Define</b>
     <ul>
         <code>define &lt;name&gt; vitoconnect &lt;user&gt; &lt;password&gt; &lt;interval&gt;</code><br>
-        It is a good idea to use a fake password here and set the correct one later because it is
-        readable in the detail view of the device.
+        You may also hand over arguments as named list like
+        <code>define &lt;name&gt; vitoconnect &lt;user=your_API_user&gt; &lt;password=your_password&gt; &lt;apiKey=yourAPIkey&gt; &lt;interval=60&gt;</code><br>
+        If provided, password and apiKey will be stored elswhere and then be removed from the definition.
+        <br>
+        If not specified, 300 seconds will be used as interval.
         <br><br>
         Example:<br>
-        <code>define vitoconnect vitoconnect user@mail.xx fakePassword 60</code><br>
+        <code>define vitoconnect vitoconnect user@mail.xx password=somesecretthing apiKey=someothersecret 60</code><br>
+        Otherwise, you may use the set commands later<br>
         <code>set vitoconnect password correctPassword</code>
         <code>set vitoconnect apiKey Client-ID</code>
         <br><br>
@@ -3844,11 +3866,17 @@ __END__
     <b>Define</b>
     <ul>
         <code>define &lt;name&gt; vitoconnect &lt;user&gt; &lt;password&gt; &lt;interval&gt;</code><br>
-        Es wird empfohlen, zunächst ein falsches Passwort zu verwenden und dieses später zu ändern, da es in der Detailansicht des Geräts sichtbar ist.
+        Die Argumente können auch als benannte Liste übergeben werden, z.B.
+        <code>define &lt;name&gt; vitoconnect &lt;user=your_API_user&gt; &lt;password=your_password&gt; &lt;apiKey=yourAPIkey&gt; &lt;interval=60&gt;</code><br>
+        Werden Passwort bzw. apiKey angegeben, werden diese - analog zu den set-Kommandos 
+        weggespeichert und werden aus der Definition entfernt.
+        <br>
+        Wenn nicht anders angegeben, werden 300 Sekonden als Intervall angenommen.
         <br><br>
         Beispiel:<br>
-        <code>define vitoconnect vitoconnect user@mail.xx fakePassword 60</code><br>
-        <code>set vitoconnect password correctPassword 60</code>
+        <code>define vitoconnect vitoconnect user@mail.xx password=somesecretthing apiKey=someothersecret 60</code><br>
+        Wenn nicht über die Definition vorgegeben, können apiKey und Passwort auch später gesetzt werden:<br>
+        <code>set vitoconnect password correctPassword</code>
         <code>set vitoconnect apiKey Client-ID</code>
         <br><br>
     </ul>
