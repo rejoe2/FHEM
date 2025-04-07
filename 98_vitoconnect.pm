@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-03-26 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-07 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1666,25 +1666,29 @@ sub vitoconnect_Set_New {
                             my $data;
                             my $otherData = '';
                             if ($param->{type} eq 'number') {
-                             $data = "{\"$paramName\":@args";
+                                $data = "{\"$paramName\":@args";
                             } 
                             elsif ($param->{type} eq 'Schedule') {
-                             my $decoded_args = decode_json($args[0]);
-                             
-                             # Transformieren der Datenstruktur
-                             my %schedule;
-                             foreach my $day (@$decoded_args) {
-                                 foreach my $key (keys %$day) {
-                                     push @{$schedule{$key}}, $day->{$key};
-                                 }
-                             }
-                             
-                             # Konvertieren der transformierten Datenstruktur in JSON
-                             my $schedule_data = encode_json(\%schedule);
-                             $data = "{\"$paramName\":$schedule_data";
+                                my $decoded_args;
+                                if ( !eval { $decoded_args = JSON->new->decode($args[0]) ; 1 } ) {;
+                                    Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect set");
+                                    return "[vitoconnect] set $name $readingName: JSON decoding error $@";
+                                }
+                                 
+                                # Transformieren der Datenstruktur
+                                my %schedule;
+                                for my $day (@$decoded_args) {
+                                    for my $key (keys %$day) {
+                                        push @{$schedule{$key}}, $day->{$key};
+                                    }
+                                }
+                                 
+                                # Konvertieren der transformierten Datenstruktur in JSON
+                                my $schedule_data = encode_json(\%schedule);
+                                $data = "{\"$paramName\":$schedule_data";
                             }
                             else {
-                             $data = "{\"$paramName\":\"@args\"";
+                                $data = "{\"$paramName\":\"@args\"";
                             }
                             Log(5,$name.", -vitoconnect_Set_New, paramName:".$paramName.", args:".Dumper(\@args));
                             
@@ -2251,19 +2255,19 @@ sub vitoconnect_getAccessTokenCallback {
         Log3($name,4,$name." - getAccessTokenCallback went ok");
         Log3($name,5,$name." - Received response: ".$response_body."\n");
         
-        my $decode_json;
-        if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+        my $decoded_json;
+        if ( !eval { $decoded_json = JSON->new->decode($response_body) ; 1 } ) {
             Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             Log3($name,1,"$name, vitoconnect_getAccessTokenCallback: JSON error while request: $@");
             InternalTimer(gettimeofday() + $hash->{interval},'vitoconnect_GetUpdate',$hash);
             return;
         }
-        return if !defined $decode_json;
+        return if !defined $decoded_json;
                
-        my $access_token = $decode_json->{access_token};               # aus JSON dekodieren
+        my $access_token = $decoded_json->{access_token};               # aus JSON dekodieren
         if ($access_token ne "")    {
             $hash->{'.access_token'} = $access_token;                  # in Internals speichern
-            $hash->{refresh_token} = $decode_json->{refresh_token};    # in Internals speichern
+            $hash->{refresh_token} = $decoded_json->{refresh_token};    # in Internals speichern
 
             Log3($name,4,$name." - Access Token: ".substr($access_token,0,20)."...");
             vitoconnect_getGw($hash);   # Abfrage Gateway-Serial
@@ -2323,16 +2327,16 @@ sub vitoconnect_getRefreshCallback {
         Log3($name,4,$name.". - getRefreshCallback went ok");
         Log3($name,5,$name." - Received response: ".$response_body."\n");
         
-         my $decode_json;
-        if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+        my $decoded_json;
+        if ( !eval { $decoded_json = JSON->new->decode($response_body) ; 1 } ) {
             Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             Log3($name,1,"$name, vitoconnect_getRefreshCallback: JSON error while request: $@");
             InternalTimer(gettimeofday() + $hash->{interval},'vitoconnect_GetUpdate',$hash);
             return;
         }
-        return if !defined $decode_json;
+        return if !defined $decoded_json;
                
-        my $access_token = $decode_json->{access_token};               # aus JSON dekodieren
+        my $access_token = $decoded_json->{access_token};               # aus JSON dekodieren
         if ($access_token ne '')    {
             $hash->{'.access_token'} = $access_token;                  # in Internals speichern
             Log3($name,4,$name." - Access Token: ".substr($access_token,0,20)."...");
@@ -2593,15 +2597,15 @@ sub vitoconnect_getInstallationFeaturesCallback {
     my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
     
     #my $decode_json = eval {decode_json($response_body)};
-    my $decode_json;
-    if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+    my $decoded_json;
+    if ( !eval { $decoded_json = JSON->new->decode($response_body) ; 1 } ) {
         Log3($name,1,"$name, getInstallationFeaturesCallback: JSON error while request: $@");
         return;
     }
             
-    if ((defined($err) && $err ne '') || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
+    if ((defined($err) && $err ne '') || (defined($decoded_json->{statusCode}) && $decoded_json->{statusCode} ne "")) {   # Fehler aufgetreten
         Log3($name,1,$name.",vitoconnect_getFeatures: Fehler während installation features: ".$err." :: ".$response_body);
-        $err = vitoconnect_errorHandling($hash,$decode_json);
+        $err = vitoconnect_errorHandling($hash,$decoded_json);
         if ($err ==1){
            return;
         }
@@ -2612,7 +2616,7 @@ sub vitoconnect_getInstallationFeaturesCallback {
             my $dir         = path( AttrVal("global","logdir","log"));
             my $file        = $dir->child("installation_features_" . $gw . ".json");
             my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
+            $file_handle->print(Dumper($decoded_json));                # Datei 'installation.json' schreiben
             $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
         }
@@ -2744,15 +2748,15 @@ sub vitoconnect_getFeaturesCallback {
     my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
     
     #my $decode_json = eval {decode_json($response_body)};
-    my $decode_json;
-    if ( !eval { $decode_json = JSON->new->decode($response_body) ; 1 } ) {
+    my $decoded_json;
+    if ( !eval { $decoded_json = JSON->new->decode($response_body) ; 1 } ) {
         Log3($name,1,"$name, getFeaturesCallback: JSON error while request: $@");
         return;
     }
 
-    if ((defined($err) && $err ne '') || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {   # Fehler aufgetreten
+    if ((defined($err) && $err ne '') || (defined($decoded_json->{statusCode}) && $decoded_json->{statusCode} ne "")) {   # Fehler aufgetreten
         Log3($name,1,$name.",vitoconnect_getFeatures: Fehler während Gateway features: ".$err." :: ".$response_body);
-        $err = vitoconnect_errorHandling($hash,$decode_json);
+        $err = vitoconnect_errorHandling($hash,$decoded_json);
         if ($err ==1){
            return;
         }
@@ -2763,7 +2767,7 @@ sub vitoconnect_getFeaturesCallback {
             my $dir         = path( AttrVal("global","logdir","log"));
             my $file        = $dir->child("gw_features_" . $gw . ".json");
             my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
+            $file_handle->print(Dumper($decoded_json));                # Datei 'installation.json' schreiben
             $file_handle->close();
             Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
       }
@@ -3109,21 +3113,21 @@ sub vitoconnect_getErrorCode {
                 return;
             }
 
-            my $decode_json;
+            my $decoded_json;
 
-            if ( !eval { $decode_json = JSON->new->decode($msg) ; 1 } ) {
+            if ( !eval { $decoded_json = JSON->new->decode($msg) ; 1 } ) {
                 Log3($hash->{NAME}, 1, "JSON decoding error: $@");
                 return "API seems not to return valid JSON: $@";
             }
-            return if !defined $decode_json;
+            return if !defined $decoded_json;
             #Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
             
-            if (exists $decode_json->{statusCode} && $decode_json->{statusCode} ne '') {
+            if (exists $decoded_json->{statusCode} && $decoded_json->{statusCode} ne '') {
                 Log3($name, 1, "$name, vitoconnect_getErrorCode call finished with error, status code: $decode_json->{statusCode}");
             } else {   # Befehl korrekt ausgeführt
                 Log3($name, 5, $name . ", vitoconnect_getErrorCode: finished ok");
-                if (exists $decode_json->{faultCodes} && @{$decode_json->{faultCodes}}) {
-                    foreach my $fault (@{$decode_json->{faultCodes}}) {
+                if (exists $decoded_json->{faultCodes} && @{$decoded_json->{faultCodes}}) {
+                    foreach my $fault (@{$decoded_json->{faultCodes}}) {
                         $fault_counter++;
                         my $fault_code = $fault->{faultCode};
                         my $system_characteristics = $fault->{systemCharacteristics};
@@ -3145,7 +3149,7 @@ sub vitoconnect_getErrorCode {
                         }
                     }
                 } else {
-                    Log3($name, 1, $name . ", vitoconnect_getErrorCode no faultcode in json found. json=" . Dumper($decode_json));
+                    Log3($name, 1, $name . ", vitoconnect_getErrorCode no faultcode in json found. json=" . Dumper($decoded_json));
                 }
             }
         }
@@ -3183,16 +3187,16 @@ sub vitoconnect_action {
 #   https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_BlockingGet
     (my $err,my $msg) = HttpUtils_BlockingGet($param);
     #my $decode_json = eval {decode_json($msg)};
-    my $decode_json;
-    if ( !eval { $decode_json = JSON->new->decode($msg) ; 1 } ) {
+    my $decoded_json;
+    if ( !eval { $decoded_json = JSON->new->decode($msg) ; 1 } ) {
         Log3($hash->{NAME}, 1, "JSON decoding error: $@");
             return "API seems not to return valid JSON: $@";
         }
-    return if !defined $decode_json;
+    return if !defined $decoded_json;
 
     Log3($name,3,$name.", vitoconnect_action call finished, err:" .$err) if $err;
     my $Text = join(' ',@args); # Befehlsparameter in Text
-    if ( (defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "") )                   {   # Fehler bei Befehlsausführung
+    if ( (defined($err) && $err ne "") || (defined($decoded_json->{statusCode}) && $decoded_json->{statusCode} ne "") )                   {   # Fehler bei Befehlsausführung
         readingsSingleUpdate($hash,"Aktion_Status","Fehler: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
         Log3($name,1,$name.",vitoconnect_action: set ".$name." ".$opt." ".@args.", Fehler bei Befehlsausfuehrung: ".$err." :: ".$msg);
     }
@@ -3524,11 +3528,30 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     $payload .= ']';
     return if $payload eq ReadingsVal($name, "heating.circuits.${entity}.schedule.entries",'');
     #for heating types only; we will have to check that...
+    
+    #Transformation (copied from Set_New)
+    my $decoded_args;
+    if ( !eval { $decoded_args = JSON->new->decode($payload) ; 1 } ) {;
+        Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect_send_weekprofile");
+        return "[vitoconnect] JSON decoding error $@ in vitoconnect_send_weekprofile";
+    }
+     
+    # Transformieren der Datenstruktur
+    my %schedule;
+    for my $day (@$decoded_args) {
+        for my $key (keys %$day) {
+            push @{$schedule{$key}}, $day->{$key};
+        }
+    }
+     
+    # Konvertieren der transformierten Datenstruktur in JSON
+    my $schedule_data = encode_json(\%schedule);
+        
     if( $entity =~ m{\d+.heating}x ) {
         vitoconnect_action($hash,
             "heating.circuits.${entity}.schedule/commands/setSchedule",
-                qq({"newSchedule":$payload}),
-                $name,"heating.circuits.${entity}.schedule",$payload
+                qq({"newSchedule":$schedule_data}),
+                $name,"heating.circuits.${entity}.schedule",$payload #might no longer be $payload but $schedule_data
             );
     } else {
         readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);
