@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-07 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-08 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -3123,7 +3123,7 @@ sub vitoconnect_getErrorCode {
             #Log3($name, 5, $name . ", vitoconnect_getErrorCode debug err=$err msg=" . $msg . " json=" . Dumper($decode_json));  # wieder weg
             
             if (exists $decoded_json->{statusCode} && $decoded_json->{statusCode} ne '') {
-                Log3($name, 1, "$name, vitoconnect_getErrorCode call finished with error, status code: $decode_json->{statusCode}");
+                Log3($name, 1, "$name, vitoconnect_getErrorCode call finished with error, status code: $decoded_json->{statusCode}");
             } else {   # Befehl korrekt ausgeführt
                 Log3($name, 5, $name . ", vitoconnect_getErrorCode: finished ok");
                 if (exists $decoded_json->{faultCodes} && @{$decoded_json->{faultCodes}}) {
@@ -3465,7 +3465,7 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
         my $position = 0;
         my $start;
         my $dayname = lc $D[$i];
-        $payload .= qq({"$dayname":); #{"mon":
+        #$payload .= qq({"$dayname":); #{"mon":
         my $val;
 
         for my $j (0..20) {
@@ -3504,8 +3504,7 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
                         Log3($name,2,"vitoconnect only accepts 4 positions, check your weekprofiles!");
                         return "Error:vitoconnect only accepts 4 positions, check your weekprofile $wp_name: $wp_profile!";
                     }
-
-                    $payload .= qq({"mode":"$oldval","start":"$start","end":"$time","position":$position},);
+                    $payload .= qq({"$dayname":{"mode":"$oldval","start":"$start","end":"$time","position":$position}},);
                     $position++;
                 }
                 $start = $time;
@@ -3516,22 +3515,24 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
         }
         if (!$position) {    #prevent empty entry, so we set some defaults!
             if ( !defined $lim2 ) {
-                $payload .= qq({"mode":"on","start":"05:30","end":"21:30","position":0},);
+                $payload .= qq({"$dayname":{"mode":"on","start":"05:30","end":"21:30","position":0}},);
             } else {
-                $payload .= qq({"mode":"normal","start":"06:00","end":"22:00","position":0},);
+                $payload .= qq({"$dayname":{"mode":"normal","start":"06:00","end":"22:00","position":0}},);
             }
         }
-        chop $payload; # remove last ","
-        $payload .= '},';
     }
     chop $payload; # remove last ","
     $payload .= ']';
     return if $payload eq ReadingsVal($name, "heating.circuits.${entity}.schedule.entries",'');
     #for heating types only; we will have to check that...
-    
+
+=pod    
     #Transformation (copied from Set_New)
     my $decoded_args;
-    if ( !eval { $decoded_args = JSON->new->decode($payload) ; 1 } ) {;
+
+    readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);  #testing only
+
+    if ( !eval { $decoded_args = JSON->new->decode($payload) ; 1 } ) {
         Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect_send_weekprofile");
         return "[vitoconnect] JSON decoding error $@ in vitoconnect_send_weekprofile";
     }
@@ -3546,11 +3547,12 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
      
     # Konvertieren der transformierten Datenstruktur in JSON
     my $schedule_data = encode_json(\%schedule);
-        
+=cut        
     if( $entity =~ m{\d+.heating}x ) {
         vitoconnect_action($hash,
             "heating.circuits.${entity}.schedule/commands/setSchedule",
-                qq({"newSchedule":$schedule_data}),
+                #qq({"newSchedule":$schedule_data}),
+                qq({"newSchedule":$payload}),
                 $name,"heating.circuits.${entity}.schedule",$payload #might no longer be $payload but $schedule_data
             );
     } else {
