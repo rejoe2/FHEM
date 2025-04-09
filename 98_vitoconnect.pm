@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-08 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-09 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1322,6 +1322,22 @@ sub vitoconnect_Define {
     #parseParams: my ( $hash, $a, $h ) = @_;
     shift @{$unnamed}; # delete name from list
     shift @{$unnamed}; # delete TYPE from list
+    
+    if (defined $named->{IODev} && defined $named->{subset) { # client mode definition.
+        $hash->{SERVER} = $named->{IODev};
+        $hash->{subset} = $named->{subset);
+        RemoveInternalTimer($hash);
+        if (!$init_done) {
+            ; # we will have to initialze client mode as well lateron...
+            InternalTimer( gettimeofday() + 90, \&vitoconnect_Client_Register_Server, $hash, 1 );    # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
+            return;
+        }
+        
+        #circuits.0 - circuits.3, dhw, fuelCell, solar
+        return "choose one of circuits.0 - circuits.3, dhw, fuelCell or solar as subset!" if $named->{subset) !~ m{\A(circuits.[0-3]|dhw|fuelCell|solar)\z}x;
+        return "IODev no valid master vitoconnect device!" if !defined $defs{$named->{IODev)} || InternalVal($named->{IODev),'TYPE','unknown') ne 'vitoconnect' || !defined InternalVal($named->{IODev),'apiKey',undef);
+        return vitoconnect_Client_Register_Server($hash);
+    }
 
     my $user = $named->{user} // shift @{$unnamed} // return 'no user provided!';
     $hash->{user}            = $user;
@@ -1358,6 +1374,19 @@ sub vitoconnect_Define {
     return;
 }
 
+sub vitoconnect_Client_Register_Server {
+    my $hash = shift // return;
+    return if !defined $hash->{SERVER};
+    my $name   = $hash->{NAME} // return;
+    my $server = $hash->{SERVER};
+    if ( !defined $defs{$server} ) {
+        InternalTimer( gettimeofday() + 30, \&vitoconnect_Client_Register_Server, $hash, 1 );    # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
+        return;
+    }
+    #$server = $defs{$server};               # get the server hash
+    #Snapcast_getStatus($server);
+    return;
+}
 
 #####################################################################################################################
 # wird beim Löschen einer Geräteinstanz aufgerufen
@@ -3525,29 +3554,7 @@ if ($opt =~ m{WW.Zirkulationspumpe_Zeitplan}x )    {   # set <name> WW_Zirkulati
     $payload .= ']';
     return if $payload eq ReadingsVal($name, "heating.circuits.${entity}.schedule.entries",'');
     #for heating types only; we will have to check that...
-
-=pod    
-    #Transformation (copied from Set_New)
-    my $decoded_args;
-
-    readingsSingleUpdate( $hash, 'weekprofile_send_data', $payload,1);  #testing only
-
-    if ( !eval { $decoded_args = JSON->new->decode($payload) ; 1 } ) {
-        Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect_send_weekprofile");
-        return "[vitoconnect] JSON decoding error $@ in vitoconnect_send_weekprofile";
-    }
-     
-    # Transformieren der Datenstruktur
-    my %schedule;
-    for my $day (@$decoded_args) {
-        for my $key (keys %$day) {
-            push @{$schedule{$key}}, $day->{$key};
-        }
-    }
-     
-    # Konvertieren der transformierten Datenstruktur in JSON
-    my $schedule_data = encode_json(\%schedule);
-=cut        
+        
     if( $entity =~ m{\d+.heating}x ) {
         vitoconnect_action($hash,
             "heating.circuits.${entity}.schedule/commands/setSchedule",
