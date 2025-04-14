@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-09 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-14 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -26,13 +26,16 @@
 #   https://www.viessmann-community.com/t5/Getting-started-programming-with/Syntax-for-setting-a-value/td-p/374222
 #   https://forum.fhem.de/index.php?msg=1326376
 
+=pod
+#we don't need no forward declarations in Perl...
+
 sub vitoconnect_Initialize;             # Modul initialisieren und Namen zusätzlicher Funktionen bekannt geben
 sub vitoconnect_Define;                 # wird beim 'define' eines Gerätes aufgerufen
 sub vitoconnect_Undef;                  # wird beim Löschen einer Geräteinstanz aufgerufen
 sub vitoconnect_Get;                    # bisher kein 'get' implementiert
 sub vitoconnect_Set;                    # Implementierung set-Befehle
 sub vitoconnect_Set_New;                # Implementierung set-Befehle New dynamisch auf raw readings
-sub vitoconnect_Set_SVN;                # Implementierung set-Befehle SVN
+#sub vitoconnect_Set_SVN;                # Implementierung set-Befehle SVN
 sub vitoconnect_Set_Roger;              # Implementierung set-Befehle Roger
 sub vitoconnect_Attr;                   # Attribute setzen/ändern/löschen
 
@@ -71,7 +74,7 @@ sub vitoconnect_getErrorCode;           # Resolve Error code
 sub vitoconnect_StoreKeyValue;          # Werte verschlüsselt speichern
 sub vitoconnect_ReadKeyValue;           # verschlüsselte Werte auslesen
 sub vitoconnect_DeleteKeyValue;         # verschlüsselte Werte löschen
-
+=cut
 
 package main;
 use strict;
@@ -80,7 +83,7 @@ use Time::HiRes qw(gettimeofday);
 use JSON;
 #use JSON::XS qw( decode_json ); #Could be faster, but caused error for Schlimbo PERL WARNING: Prototype mismatch: sub main::decode_json ($;$$) vs ($) at /usr/local/lib/perl5/5.36.3/Exporter.pm line 63.
 use HttpUtils;
-use Encode qw(decode encode);
+#use Encode qw(decode encode);
 use Data::Dumper;
 use Path::Tiny;
 use DateTime;
@@ -134,16 +137,15 @@ my %vNotesIntern = (
   "0.1.0"  => "12.12.2024  first release with Version. "
 );
 
-my $client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
-my $callback_uri  = "http://localhost:4200/";
-my $apiURL        = "https://api.viessmann.com/iot/v1/equipment/";
-my $iotURL_V1     = "https://api.viessmann.com/iot/v1/equipment/";
-my $iotURL_V2     = "https://api.viessmann.com/iot/v2/features/";
-my $errorURL_V3   = "https://api.viessmann.com/service-documents/v3/error-database";
+my $vitoconnect_client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
+my $vitoconnect_callback_uri  = "http://localhost:4200/";
+my $vitoconnect_iotURL_V1     = "https://api.viessmann.com/iot/v1/equipment/";
+my $vitoconnect_iotURL_V2     = "https://api.viessmann.com/iot/v2/features/";
+my $vitoconnect_errorURL_V3   = "https://api.viessmann.com/service-documents/v3/error-database";
+#my $apiURL                   = "https://api.viessmann.com/iot/v1/equipment/";
 
 #Beta-User: highly dangerous, as these two affect the entire (main!) namespace!
-my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
-my %translations;       # Über das Attribut translations definierte Readings zum überschreiben der RequestList
+#my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
 
 
 # Feste Readings, orignal Verhalten des Moduls, können über RequestListMapping oder translations überschrieben werden.
@@ -1276,7 +1278,6 @@ sub vitoconnect_Initialize {
     $hash->{AttrList} =
         "disable:0,1 "
       . "vitoconnect_mappings:textField-long "
-      . "vitoconnect_translations:textField-long "
       . "vitoconnect_mapping_roger:0,1 "
       . "vitoconnect_raw_readings:0,1,svn "             # Liefert nur die raw readings und verhindert das mappen wenn auf 1 gesetzt; svn-Mapping, wenn auf svn gesetzt
       . "vitoconnect_disable_raw_readings:0,1 "         # Wird ein mapping verwendet können die weiteren RAW Readings ausgeblendet werden
@@ -1286,7 +1287,7 @@ sub vitoconnect_Initialize {
       . "vitoconnect_serial:textField-long "            # Legt fest welcher Gateway abgefragt werden soll, wenn nicht gesetzt werden alle abgefragt
       . "vitoconnect_installationID:textField-long "    # Legt fest welche Installation abgefragt werden soll, muss zur serial passen
       . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
-      . "weekprofile "
+      . 'weekprofile confFile '
       . $readingFnAttributes;
 
       eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -1349,7 +1350,7 @@ sub vitoconnect_Define {
     $hash->{timeout}         = 15;
     $hash->{'.access_token'} = '';
     $hash->{devices}         = []; 
-    $hash->{Redirect_URI}    = $callback_uri;
+    $hash->{Redirect_URI}    = $vitoconnect_callback_uri;
 
     $named->{password} // shift @{$unnamed};
     my $isiwebpasswd = vitoconnect_ReadKeyValue($name,'passwd');    # verschlüsseltes Kennwort auslesen
@@ -1414,23 +1415,26 @@ sub vitoconnect_Get {
 sub vitoconnect_Set {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
     
+    # Hier richtig?
+    return "set $name needs at least one argument" if !defined $opt;
+    
+    return $hash->{'.sets'} if $opt eq '?' && defined $hash->{'.sets'}; # return value for getAllSet()
+    
     # Standard Parameter setzen
     my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg weekprofile ";
-    Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
+    #Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
     
     # Setter für die Geräteauswahl dynamisch erstellen  
-    Log3($name,4,$name." - Set devices: ".$hash->{devices});
+    #Log3($name,4,$name." - Set devices: ".$hash->{devices});
     if (defined $hash->{devices} && ref($hash->{devices}) eq 'HASH' && keys %{$hash->{devices}} > 0) {
         my @device_serials = keys %{$hash->{devices}};
         $val .= " selectDevice:" . join(",", @device_serials);
     } else {
-        $val .= " selectDevice:noArg"
+        $val .= ' selectDevice:noArg'
     }
-    $val .= " ";
-    Log3($name,5,$name." - Set val: $val, Set Opt: $opt");
+    $val .= ' ';
+    #Log3($name,5,$name." - Set val: $val, Set Opt: $opt");
     
-    # Hier richtig?
-    return "set $name needs at least one argument" if !defined $opt;
     
     # Setter für Device Werte rufen
     my $more_sets;
@@ -1452,32 +1456,33 @@ sub vitoconnect_Set {
     return if !defined $more_sets;  #sucessfull set command in sub
 
     $val .= $more_sets;
+    $hash->{'.sets'} = $val if !defined $hash->{'.sets'};
     return $val if $opt eq '?'; # return value for getAllSet()
 
-    if  ($opt eq "update")                            {   # set <name> update: update readings immeadiatlely
+    if  ($opt eq 'update')                            {   # set <name> update: update readings immeadiatlely
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
         vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
         return;
     }
-    if ($opt eq "logResponseOnce" )                  {   # set <name> logResponseOnce: dumps the json response of Viessmann server to entities.json, gw.json, actions.json in FHEM log directory
-        $hash->{".logResponseOnce"} = 1;                    # in 'Internals' merken
+    if ($opt eq 'logResponseOnce' )                  {   # set <name> logResponseOnce: dumps the json response of Viessmann server to entities.json, gw.json, actions.json in FHEM log directory
+        $hash->{'.logResponseOnce'} = 1;                    # in 'Internals' merken
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    if ($opt eq "clearReadings" )                    {   # set <name> clearReadings: clear all readings immeadiatlely
-        AnalyzeCommand($hash,"deletereading ".$name." .*");
+    if ($opt eq 'clearReadings' )                    {   # set <name> clearReadings: clear all readings immeadiatlely
+        AnalyzeCommand($hash,"deletereading $name .*");
         return;
     }
-    if ($opt eq "password" )                         {   # set <name> password: store password in key store
+    if ($opt eq 'password' )                         {   # set <name> password: store password in key store
         my $err = vitoconnect_StoreKeyValue($name,'passwd',$args[0]);   # Kennwort verschlüsselt speichern
         return $err if ($err);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    if ($opt eq "apiKey" )                           {   # set <name> apiKey: bisher keine Beschreibung
+    if ($opt eq 'apiKey' )                           {   # set <name> apiKey: bisher keine Beschreibung
         $hash->{apiKey} = $args[0];
-        my $err = vitoconnect_StoreKeyValue($name,"apiKey",$args[0]);   # apiKey verschlüsselt speichern
+        my $err = vitoconnect_StoreKeyValue($name,'apiKey',$args[0]);   # apiKey verschlüsselt speichern
         RemoveInternalTimer($hash);
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
@@ -1497,7 +1502,7 @@ sub vitoconnect_Set {
             RemoveInternalTimer($hash);                         # bisherigen Timer löschen
             vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
         } else {
-            readingsSingleUpdate($hash,"state","Kein Gateway/Device gefunden, bitte Setup überprüfen",1);  
+            readingsSingleUpdate($hash,'state',"Kein Gateway/Device gefunden, bitte Setup überprüfen",1);  
         }
         return;
     }
@@ -1527,231 +1532,232 @@ sub vitoconnect_Set_New {
     my $val = '';
     
     my $Response = $hash->{".response_$gw"};
-    if ($Response) {  # Überprüfen, ob $Response Daten enthält
-        my $data;
+    return $val if !defined $Response; # we may add a request for adding that for the next time?
+    #if ($Response) {  # Überprüfen, ob $Response Daten enthält
+    my $data;
         
-        if ( !eval { $data = JSON->new->decode($Response) ; 1 } ) {
-            Log3($hash->{NAME}, 1, "JSON decoding error: $@");
-            # JSON-Dekodierung fehlgeschlagen, nur Standardoptionen zurückgeben
-            return $val;
-        }
-        return if !defined $data;
-        
-        for my $item (@{$data->{data}}) {
+    if ( !eval { $data = JSON->new->decode($Response) ; 1 } ) {
+        Log3($hash->{NAME}, 1, "JSON decoding error: $@");
+        # JSON-Dekodierung fehlgeschlagen, nur Standardoptionen zurückgeben
+        return $val;
+    }
+    return if !defined $data;
+    
+    my $cmdMapName = {
+        setTemperature              =>  'temperature',
+        setHysteresis               =>  'value',
+        setHysteresisSwitchOnValue  =>  'switchOnValue',
+        setHysteresisSwitchOffValue =>  'switchOffValue',
+        setMin                      =>  'min',
+        setMax                      =>  'max',
+        setSchedule                 =>  'entries'
+    };
+    
+    for my $item (@{$data->{data}}) {
 
-            if (exists $item->{commands}) {
-                my $feature = $item->{feature};
-                Log(5,$name.",vitoconnect_Set_New feature: ". $feature);
-                my $cmdMapName = {
-                    setTemperature              =>  'temperature',
-                    setHysteresis               =>  'value',
-                    setHysteresisSwitchOnValue  =>  'switchOnValue',
-                    setHysteresisSwitchOffValue =>  'switchOffValue',
-                    setMin                      =>  'min',
-                    setMax                      =>  'max',
-                    setSchedule                 =>  'entries'
-                };
+        if (exists $item->{commands}) {
+            my $feature = $item->{feature};
+            Log(5,$name.",vitoconnect_Set_New feature: ". $feature);
+            
 
-                for my $commandName (sort keys %{$item->{commands}}) {           #<====== Loop Commands, sort necessary for activate temperature for burners, see below
-                    my $commandNr = keys %{$item->{commands}};
-                    my @propertyKeys = keys %{$item->{properties}};
-                    my $propertyKeysNr = keys %{$item->{properties}};
-                    my $paramNr = keys %{$item->{commands}{$commandName}{params}};
-                    
-                    Log(5,$name.", -vitoconnect_Set_New isExecutable: ". $item->{commands}{$commandName}{isExecutable}); 
-                    if ($item->{commands}{$commandName}{isExecutable} == 0) {
-                        Log(5,$name.", -vitoconnect_Set_New $commandName nicht ausführbar"); 
-                        next; #diser Befehl ist nicht ausführbar, nächster 
-                    }
-
-                    Log(5,$name.", -vitoconnect_Set_New feature: ". $feature);
-                    Log(5,$name.", -vitoconnect_Set_New commandNr: ". $commandNr); 
-                    Log(5,$name.", -vitoconnect_Set_New commandname: ". $commandName); 
-                    my $readingNamePrep;
-                    
-                    if ( $commandName eq 'setLevels' ) {
-                        # duplicate, setMin, setMax can do this https://api.viessmann.com/iot/v2/features/installations/2772216/gateways/7736172146035226/devices/0/features/heating.circuits.0.temperature.levels/commands/setLevels
-                        next;
-                    }
-                                            
-                    if ($commandNr == 1 and $propertyKeysNr == 1) {               # Ein command value = property z.B. heating.circuits.0.operating.modes.active
-                        $readingNamePrep .= $feature.".". $propertyKeys[0];
-                    } elsif ( defined $cmdMapName->{$commandName} ) {
-                        $readingNamePrep .= "$feature.$cmdMapName->{$commandName}";
-                    }
-=pod
-                    eq "setTemperature" ) {
-                        $readingNamePrep .= $feature.".temperature";              #<------- setTemperature only 1 param, so it can be defined here, 
-                                                                                  # for burner Vitoladens 300C, heating.circuits.0.operating.programs.comfort
-                                                                                  # activate (temperature), deactivate(noArg), setTemperature (targetTemperature) only one can work with value provided
-                                                                                  # Activate should work, and is, since commands are sorted
-                    } elsif ( $commandName eq "setHysteresis" ) {                 #<------- setHysteresis very special mapping, must be predefined
-                        $readingNamePrep .= $feature.".value";
-                    } elsif ( $commandName eq "setHysteresisSwitchOnValue" ) {    #<------- setHysteresis very special mapping, must be predefined
-                        $readingNamePrep .= $feature.".switchOnValue";
-                    } elsif ( $commandName eq "setHysteresisSwitchOffValue" ) {   #<------- setHysteresis very special mapping, must be predefined
-                        $readingNamePrep .= $feature.".switchOffValue";
-                    } elsif ( $commandName eq "setMin" ) {
-                        $readingNamePrep .= $feature.".min";                      #<------- setMin/setMax very special mapping, must be predefined
-                    } elsif ( $commandName eq "setMax" ) {
-                        $readingNamePrep .= $feature.".max";
-                    } elsif ( $commandName eq "setSchedule" ) {                   #<------- setSchedule very special mapping, must be predefined
-                        $readingNamePrep .= $feature.".entries";
-                    }
-=cut
-                    else {
-                        # all other cases, will be defined in param loop
-                    }
-                    if( defined $readingNamePrep ) {
-                        Log(5,$name.", -vitoconnect_Set_New readingNamePrep: ". $readingNamePrep); 
-                    }
-
-                    if ($paramNr > 2) {                                          #<------- more then 2 parameters, with unsorted JSON can not be handled, but also do not exist at the moment
-                        Log(5,$name.", -vitoconnect_Set_New mehr als 2 Parameter in Command $commandName, kann nicht berechnet werden"); 
-                        next;
-                    } elsif ($paramNr == 0){                                     #<------- no parameters, create here, param loop will not be executed
-                        $readingNamePrep .= $feature.".".$commandName;
-                        $val .= "$readingNamePrep:noArg ";
-                        
-                        # Set execution
-                        if ($opt eq $readingNamePrep) {
-                            my $uri = $item->{commands}->{$commandName}->{'uri'};
-                            my ($shortUri) = $uri =~ m|.*features/(.*)|; #<=== URI ohne gateway zeug
-                            Log(4,$name.", -vitoconnect_Set_New, 0 param, short uri: ".$shortUri);
-                            vitoconnect_action($hash,
-                                $shortUri,
-                                "{}",
-                                $name, $opt, @args
-                            );
-                            return;
-                        }
-                    }
+            for my $commandName (sort keys %{$item->{commands}}) {           #<====== Loop Commands, sort necessary for activate temperature for burners, see below
+                my $commandNr = keys %{$item->{commands}};
+                my @propertyKeys = keys %{$item->{properties}};
+                my $propertyKeysNr = keys %{$item->{properties}};
+                my $paramNr = keys %{$item->{commands}{$commandName}{params}};
                 
-                # 1 oder 2 Params, all other cases see above
-                my @params = keys %{$item->{commands}{$commandName}{params}};
-                    foreach my $paramName (@params) {   #<==== Loop params
-                       
-                       my $otherParam;
-                       my $otherReadingName;
-                       if ($paramNr == 2) {
-                        $otherParam = $params[0] eq $paramName ? $params[1] : $params[0];
-                       }
-                       
-                       my $readingName = $readingNamePrep;
-                       if (!defined($readingName)) {                                            #<==== Bisher noch kein Reading gefunden, z.B. setCurve
-                         $readingName = $feature.".".$paramName;
-                         if (defined($otherParam)) {
-                            $otherReadingName = $feature.".".$otherParam;
-                         }
-                       }
-                       
-                       my $param = $item->{commands}{$commandName}{params}{$paramName};
-                       
-                       # fill $val
-                       if ($param->{type} eq 'number') {
-                            $val .= $readingName.":slider," . ($param->{constraints}{min}) . "," . ($param->{constraints}{stepping}) . "," . ($param->{constraints}{max});
-                        # Schauen ob float für slider
-                          if ($param->{constraints}{stepping} =~ m/\./)  {
-                                $val .= ",1 ";
-                          } else { 
-                            $val .= " ";
-                          }
-                       }
-                        elsif ($param->{'type'} eq 'string') {
-                            if ($commandName eq "setMode") {
-                              my $enum = $param->{constraints}->{'enum'};
-                              Log(5,$name.", -vitoconnect_Set_New enum: ". $enum); 
-                              my $enumNr = scalar @$enum;
-                              Log(5,$name.", -vitoconnect_Set_New enumNr: ". $enumNr); 
-                            
-                              my $i = 1;
-                              $val .= $readingName.":";
-                               foreach my $value (@$enum) {
-                                if ($i < $enumNr) {
-                                 $val .= $value.",";
-                                } else {
-                                 $val .= $value." ";
-                                }
-                                $i++;
-                               }
+                Log(5,$name.", -vitoconnect_Set_New isExecutable: ". $item->{commands}{$commandName}{isExecutable}); 
+                if ($item->{commands}{$commandName}{isExecutable} == 0) {
+                    Log(5,$name.", -vitoconnect_Set_New $commandName nicht ausführbar"); 
+                    next; #diser Befehl ist nicht ausführbar, nächster 
+                }
+
+                Log(5,$name.", -vitoconnect_Set_New feature: ". $feature);
+                Log(5,$name.", -vitoconnect_Set_New commandNr: ". $commandNr); 
+                Log(5,$name.", -vitoconnect_Set_New commandname: ". $commandName); 
+                my $readingNamePrep;
+                
+                if ( $commandName eq 'setLevels' ) {
+                    # duplicate, setMin, setMax can do this https://api.viessmann.com/iot/v2/features/installations/2772216/gateways/7736172146035226/devices/0/features/heating.circuits.0.temperature.levels/commands/setLevels
+                    next;
+                }
+                                        
+                if ($commandNr == 1 and $propertyKeysNr == 1) {               # Ein command value = property z.B. heating.circuits.0.operating.modes.active
+                    $readingNamePrep .= $feature.".". $propertyKeys[0];
+                } elsif ( defined $cmdMapName->{$commandName} ) {
+                    $readingNamePrep .= "$feature.$cmdMapName->{$commandName}";
+                }
+=pod
+                eq "setTemperature" ) {
+                    $readingNamePrep .= $feature.".temperature";              #<------- setTemperature only 1 param, so it can be defined here, 
+                                                                              # for burner Vitoladens 300C, heating.circuits.0.operating.programs.comfort
+                                                                              # activate (temperature), deactivate(noArg), setTemperature (targetTemperature) only one can work with value provided
+                                                                              # Activate should work, and is, since commands are sorted
+                } elsif ( $commandName eq "setHysteresis" ) {                 #<------- setHysteresis very special mapping, must be predefined
+                    $readingNamePrep .= $feature.".value";
+                } elsif ( $commandName eq "setHysteresisSwitchOnValue" ) {    #<------- setHysteresis very special mapping, must be predefined
+                    $readingNamePrep .= $feature.".switchOnValue";
+                } elsif ( $commandName eq "setHysteresisSwitchOffValue" ) {   #<------- setHysteresis very special mapping, must be predefined
+                    $readingNamePrep .= $feature.".switchOffValue";
+                } elsif ( $commandName eq "setMin" ) {
+                    $readingNamePrep .= $feature.".min";                      #<------- setMin/setMax very special mapping, must be predefined
+                } elsif ( $commandName eq "setMax" ) {
+                    $readingNamePrep .= $feature.".max";
+                } elsif ( $commandName eq "setSchedule" ) {                   #<------- setSchedule very special mapping, must be predefined
+                    $readingNamePrep .= $feature.".entries";
+                }
+=cut
+                else {
+                    # all other cases, will be defined in param loop
+                }
+                if( defined $readingNamePrep ) {
+                    Log(5,$name.", -vitoconnect_Set_New readingNamePrep: ". $readingNamePrep); 
+                }
+
+                if ($paramNr > 2) {                                          #<------- more then 2 parameters, with unsorted JSON can not be handled, but also do not exist at the moment
+                    Log(5,$name.", -vitoconnect_Set_New mehr als 2 Parameter in Command $commandName, kann nicht berechnet werden"); 
+                    next;
+                } elsif ($paramNr == 0){                                     #<------- no parameters, create here, param loop will not be executed
+                    $readingNamePrep .= $feature.".".$commandName;
+                    $val .= "$readingNamePrep:noArg ";
+                    
+                    # Set execution
+                    if ($opt eq $readingNamePrep) {
+                        my $uri = $item->{commands}->{$commandName}->{'uri'};
+                        my ($shortUri) = $uri =~ m|.*features/(.*)|; #<=== URI ohne gateway zeug
+                        Log(4,$name.", -vitoconnect_Set_New, 0 param, short uri: ".$shortUri);
+                        vitoconnect_action($hash,
+                            $shortUri,
+                            "{}",
+                            $name, $opt, @args
+                        );
+                        return;
+                    }
+                }
+            
+            # 1 oder 2 Params, all other cases see above
+            my @params = keys %{$item->{commands}{$commandName}{params}};
+                foreach my $paramName (@params) {   #<==== Loop params
+                   
+                   my $otherParam;
+                   my $otherReadingName;
+                   if ($paramNr == 2) {
+                    $otherParam = $params[0] eq $paramName ? $params[1] : $params[0];
+                   }
+                   
+                   my $readingName = $readingNamePrep;
+                   if (!defined($readingName)) {                                            #<==== Bisher noch kein Reading gefunden, z.B. setCurve
+                     $readingName = $feature.".".$paramName;
+                     if (defined($otherParam)) {
+                        $otherReadingName = $feature.".".$otherParam;
+                     }
+                   }
+                   
+                   my $param = $item->{commands}{$commandName}{params}{$paramName};
+                   
+                   # fill $val
+                   if ($param->{type} eq 'number') {
+                        $val .= $readingName.":slider," . ($param->{constraints}{min}) . "," . ($param->{constraints}{stepping}) . "," . ($param->{constraints}{max});
+                    # Schauen ob float für slider
+                      if ($param->{constraints}{stepping} =~ m/\./)  {
+                            $val .= ",1 ";
+                      } else { 
+                        $val .= " ";
+                      }
+                   }
+                    elsif ($param->{'type'} eq 'string') {
+                        if ($commandName eq "setMode") {
+                          my $enum = $param->{constraints}->{'enum'};
+                          Log(5,$name.", -vitoconnect_Set_New enum: ". $enum); 
+                          my $enumNr = scalar @$enum;
+                          Log(5,$name.", -vitoconnect_Set_New enumNr: ". $enumNr); 
+                        
+                          my $i = 1;
+                          $val .= $readingName.":";
+                           foreach my $value (@$enum) {
+                            if ($i < $enumNr) {
+                             $val .= $value.",";
                             } else {
-                              $val .= $readingName.":textField-long ";
+                             $val .= $value." ";
                             }
-                            
-                        } elsif ($param->{'type'} eq 'Schedule') {
-                            $val .= $readingName.":textField-long ";
-                        } elsif ($param->{'type'} eq 'boolean') {
-                            $val .= "$readingName ";
+                            $i++;
+                           }
                         } else {
-                            # Ohne type direkter befehl ohne args
-                            $val .= "$readingName:noArg ";
-                            Log(5,$name.", -vitoconnect_Set_New unknown type: ".$readingName);
+                          $val .= $readingName.":textField-long ";
                         }
                         
-                        Log(5,$name.", -vitoconnect_Set_New exec, opt:".$opt.", readingName:".$readingName);
-                        # Set execution
-                        if ($opt eq $readingName) {
-                            
-                            my $data;
-                            my $otherData = '';
-                            if ($param->{type} eq 'number') {
-                                $data = "{\"$paramName\":@args";
-                            } 
-                            elsif ($param->{type} eq 'Schedule') {
-                                my $decoded_args;
-                                if ( !eval { $decoded_args = JSON->new->decode($args[0]) ; 1 } ) {;
-                                    Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect set");
-                                    return "[vitoconnect] set $name $readingName: JSON decoding error $@";
+                    } elsif ($param->{'type'} eq 'Schedule') {
+                        $val .= $readingName.":textField-long ";
+                    } elsif ($param->{'type'} eq 'boolean') {
+                        $val .= "$readingName ";
+                    } else {
+                        # Ohne type direkter befehl ohne args
+                        $val .= "$readingName:noArg ";
+                        Log(5,$name.", -vitoconnect_Set_New unknown type: ".$readingName);
+                    }
+                    
+                    Log(5,$name.", -vitoconnect_Set_New exec, opt:".$opt.", readingName:".$readingName);
+                    # Set execution
+                    if ($opt eq $readingName) {
+                        
+                        my $data;
+                        my $otherData = '';
+                        if ($param->{type} eq 'number') {
+                            $data = "{\"$paramName\":@args";
+                        } 
+                        elsif ($param->{type} eq 'Schedule') {
+                            my $decoded_args;
+                            if ( !eval { $decoded_args = JSON->new->decode($args[0]) ; 1 } ) {;
+                                Log3($hash->{NAME}, 2, "JSON decoding error: $@ in vitoconnect set");
+                                return "[vitoconnect] set $name $readingName: JSON decoding error $@";
+                            }
+                             
+                            # Transformieren der Datenstruktur
+                            my %schedule;
+                            for my $day (@$decoded_args) {
+                                for my $key (keys %$day) {
+                                    push @{$schedule{$key}}, $day->{$key};
                                 }
-                                 
-                                # Transformieren der Datenstruktur
-                                my %schedule;
-                                for my $day (@$decoded_args) {
-                                    for my $key (keys %$day) {
-                                        push @{$schedule{$key}}, $day->{$key};
-                                    }
-                                }
-                                 
-                                # Konvertieren der transformierten Datenstruktur in JSON
-                                my $schedule_data = encode_json(\%schedule);
-                                $data = "{\"$paramName\":$schedule_data";
                             }
-                            else {
-                                $data = "{\"$paramName\":\"@args\"";
-                            }
-                            Log(5,$name.", -vitoconnect_Set_New, paramName:".$paramName.", args:".Dumper(\@args));
-                            
-                            # 2 params, one can be set the other must just be read and handed overload
-                            # This logic ensures that we get the correct names in an unsortet JSON
-                            if (defined($otherReadingName)) {
-                               my $otherValue = ReadingsVal($name,$otherReadingName,"");
-                              if ($param->{type} eq 'number') {
-                               $otherData = ",\"$otherParam\":$otherValue";
-                              } else {
-                               $otherData = ",\"$otherParam\":\"$otherValue\"";
-                              }
-                            }
-                            $data .= $otherData . '}';
-                            my $uri = $item->{commands}->{$commandName}->{'uri'};
-                            my ($shortUri) = $uri =~ m|.*features/(.*)|; #<=== URI ohne gateway zeug
-                            Log(4,$name.", -vitoconnect_Set_New, short uri:".$shortUri.", data:".$data);
-                            vitoconnect_action($hash,
-                                $shortUri,
-                                $data,
-                                $name, $opt, @args
-                            );
-                            return;
+                             
+                            # Konvertieren der transformierten Datenstruktur in JSON
+                            my $schedule_data = encode_json(\%schedule);
+                            $data = "{\"$paramName\":$schedule_data";
                         }
+                        else {
+                            $data = "{\"$paramName\":\"@args\"";
+                        }
+                        Log(5,$name.", -vitoconnect_Set_New, paramName:".$paramName.", args:".Dumper(\@args));
+                        
+                        # 2 params, one can be set the other must just be read and handed overload
+                        # This logic ensures that we get the correct names in an unsortet JSON
+                        if (defined($otherReadingName)) {
+                           my $otherValue = ReadingsVal($name,$otherReadingName,"");
+                          if ($param->{type} eq 'number') {
+                           $otherData = ",\"$otherParam\":$otherValue";
+                          } else {
+                           $otherData = ",\"$otherParam\":\"$otherValue\"";
+                          }
+                        }
+                        $data .= $otherData . '}';
+                        my $uri = $item->{commands}->{$commandName}->{'uri'};
+                        my ($shortUri) = $uri =~ m|.*features/(.*)|; #<=== URI ohne gateway zeug
+                        Log(4,$name.", -vitoconnect_Set_New, short uri:".$shortUri.", data:".$data);
+                        vitoconnect_action($hash,
+                            $shortUri,
+                            $data,
+                            $name, $opt, @args
+                        );
+                        return;
                     }
                 }
             }
         }
     }
-
     
     # Rückgabe der dynamisch erstellten $val Variable
-    Log(5,$name.", -vitoconnect_Set_New val: ". $val);
-    Log(5,$name.", -vitoconnect_Set_New ended ");
+    Log(5,"$name, -vitoconnect_Set_New val ended with: $val");
+    #Log(5,$name.", -vitoconnect_Set_New ended ");
     
     return $val;
 }
@@ -2083,20 +2089,13 @@ sub vitoconnect_Attr {
             }
         }
         elsif ($attr_name eq "vitoconnect_mappings")                        {
-            $RequestListMapping = eval $attr_value;
+            my $RequestListMapping = eval $attr_value;
             if ($@) {
                 # Fehlerbehandlung
                 my $err = "Invalid argument: $@\n";
                 return $err;
             }
-        }
-        elsif ($attr_name eq "vitoconnect_translations")                        {
-            %translations = eval $attr_value;
-            if ($@) {
-                # Fehlerbehandlung
-                my $err = "Invalid argument: $@\n";
-                return $err;
-            }
+            $defs{$name}->{helper}->{mappings} = $RequestListMapping;
         }
         elsif ($attr_name eq "vitoconnect_mapping_roger")   {
             Log3($name,1,"$name - using Roger mappings is no longer recommended!")                      # Warnung ins Log 
@@ -2107,36 +2106,47 @@ sub vitoconnect_Attr {
                 return $err;
             }
         }
-        elsif ($attr_name eq "vitoconnect_serial")                      {
+        elsif ($attr_name eq 'vitoconnect_serial')                      {
             if (length($attr_value) != 16)                      {
                 my $err = "Invalid argument $attr_value to $attr_name. Must be 16 characters long.";
                 Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
         }
-        elsif ($attr_name eq "vitoconnect_installationID")                      {
+        elsif ($attr_name eq 'vitoconnect_installationID')                      {
             if (length($attr_value) < 2)                      {
                 my $err = "Invalid argument $attr_value to $attr_name. Must be at least 2 characters long.";
                 Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
         }
-        elsif ($attr_name eq "disable")                     {
+        elsif ($attr_name eq 'disable')                     {
         }
-        elsif ($attr_name eq "verbose")                     {
+        elsif ($attr_name eq 'verbose')                     {
         }
+        elsif ( $attr_name eq 'confFile' ) {
+            my $hash = defs{$name};
+            delete $hash->{CONFIGFILE};
+            undef $hash->{helper}->{mappings};
+            my ($err, $mapping) = vitoconnect_readConfFile($hash, $attr_value);
+            return $err if $err;
+            $hash->{CONFIGFILE} = $attr_value;
+            return;
+        }
+    }
+        
         else                                                {
             # return "Unknown attr $attr_name";
             # This will return all attr, e.g. room. We do not want to see messages here.
             # Log(1,$name.", ".$cmd ." Unknow attr vitoconnect_: ".($attr_name // 'undef')." value: ".($attr_value // 'undef'));
         }
     }
-    elsif ($cmd eq "del") {
-        if ($attr_name eq "vitoconnect_mappings") {
-            undef $RequestListMapping;
-        }
-        elsif ($attr_name eq "vitoconnect_translations") {
-            undef %translations;
+    elsif ($cmd eq 'del') {
+        if ($attr_name eq 'vitoconnect_mappings') {
+            #undef $RequestListMapping;
+            delete $hash->{CONFIGFILE};
+            delete $attr{$name}{confFile};
+            undef $defs{$name}->{helper}->{mappings};
         }
     }
     return;
@@ -2180,8 +2190,8 @@ sub vitoconnect_getCode {
     my $param = {
         url => $authorizeURL
         ."?client_id=".$client_id
-        ."&redirect_uri=".$callback_uri."&"
-        ."code_challenge=2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c&"
+        ."&redirect_uri=${vitoconnect_callback_uri}&"
+        ."code_challenge=${vitoconnect_client_secret}&"
         ."&scope=IoT%20User%20offline_access"
         ."&response_type=code",
         hash            => $hash,
@@ -2255,9 +2265,9 @@ sub vitoconnect_getAccessToken {
         header => "Content-Type: application/x-www-form-urlencoded",
         data   => "grant_type=authorization_code"
         . "&code_verifier="
-        . $client_secret
+        . $vitoconnect_client_secret
         . "&client_id=$client_id"
-        . "&redirect_uri=$callback_uri"
+        . "&redirect_uri=$vitoconnect_callback_uri"
         . "&code="
         . $hash->{".code"},
         sslargs  => { SSL_verify_mode => 0 },
@@ -2398,9 +2408,7 @@ sub vitoconnect_getGw {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{'.access_token'};
     my $param        = {
-#       url      => $apiURL
-        url      => $iotURL_V1
-        ."gateways",
+        url      => "${vitoconnect_iotURL_V1}gateways",
         hash     => $hash,
         header   => "Authorization: Bearer ".$access_token,
         timeout  => $hash->{timeout},
@@ -2532,9 +2540,7 @@ sub vitoconnect_getInstallation {
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-#       url      => $apiURL
-        url      => $iotURL_V1
-        ."installations",
+        url      => "${vitoconnect_iotURL_V1}installations",
         hash     => $hash,
         header   => "Authorization: Bearer ".$access_token,
         timeout  => $hash->{timeout},
@@ -2601,9 +2607,7 @@ sub vitoconnect_getInstallationFeatures {
     
     # installation features      #Fixme call only once
     my $param = {
-#       url     => $apiURL
-        url     => $iotURL_V2
-        ."installations/".$installation."/features",
+        url     => "${vitoconnect_iotURL_V2}installations/${installation}/features",
         hash    => $hash,
         header  => "Authorization: Bearer ".$access_token,
         timeout => $hash->{timeout},
@@ -2669,13 +2673,12 @@ sub vitoconnect_getDevice {
     my $installation = AttrVal( $name, 'vitoconnect_installationID', 0 );
     my $gw           = AttrVal( $name, 'vitoconnect_serial', 0 );
     
-    Log(5,$name.", --getDevice gw for call set: ".$gw);
+    Log(5,"$name, --getDevice gw for call set: $gw");
 
     my $param        = {
-        url     => $iotURL_V1
-        ."installations/".$installation."/gateways/".$gw."/devices",
+        url     => "${vitoconnect_iotURL_V1}installations/${installation}/gateways/${gw}/devices",
         hash    => $hash,
-        header  => "Authorization: Bearer ".$access_token,
+        header  => "Authorization: Bearer $access_token",
         timeout => $hash->{timeout},
         sslargs => { SSL_verify_mode => 0 },
         callback => \&vitoconnect_getDeviceCallback
@@ -2752,7 +2755,7 @@ sub vitoconnect_getFeatures {
 
 # Gateway features
     my $param = {
-        url    => $iotURL_V2
+        url    => $vitoconnect_iotURL_V2
         ."installations/".$installation."/gateways/".$gw."/features",
         hash   => $hash,
         header => "Authorization: Bearer ".$access_token,
@@ -2831,7 +2834,7 @@ sub vitoconnect_getResource {
         return;
     }
     my $param = {
-        url => $iotURL_V2
+        url => $vitoconnect_iotURL_V2
         ."installations/".$installation."/gateways/".$gw."/devices/".$dev."/features",
         hash     => $hash,
         gw       => $gw,
@@ -2889,8 +2892,8 @@ sub vitoconnect_getResourceCallback {
         
         $hash->{".response_$gw"} = $response_body;
         
-        Log(5,$name.", translations count:".scalar keys %translations);
-        Log(5,$name.", RequestListMapping count:".scalar keys %$RequestListMapping);
+        #Log(5,$name.", translations count:".scalar keys %translations);
+        #Log(5,"$name, RequestListMapping count:".scalar keys %{$hash->{helper}->{mappings}};   #$RequestListMapping);
         
         readingsBeginUpdate($hash);
         for my $feature ( @{ $items->{data} } ) {
@@ -2910,23 +2913,10 @@ sub vitoconnect_getResourceCallback {
                 
                 my $Reading;
                 
-                if ( scalar keys %translations > 0) {
-                    
-                    # Use translation from attr
-                    my @parts = split(/\./, $feature->{feature} . "." . $key);
-                     foreach my $part (@parts) {
-                      if ($part !~ /\d+/) {
-                       $part = $translations{$part} // $part;  # Übersetze den Teil oder behalte ihn bei
-                      }
-                     }
-                    
-                    $Reading = join('.', @parts);
-                    
-                }
-                elsif ( scalar keys %$RequestListMapping > 0) {
+                if ( defined $hash->{helper} && scalar keys %{$hash->{helper}->{mappings}} > 0) {
                 # Use RequestListMapping from Attr
                 $Reading =
-                  $RequestListMapping->{ $feature->{feature} . "." . $key };
+                    $hash->{helper}->{mappings}->{ "$feature->{feature}.$key" };
                 }
                 elsif (AttrVal( $name, 'vitoconnect_mapping_roger', 0 ) eq "1") {
                  # Use build in Mapping Roger (old way)
@@ -3127,7 +3117,7 @@ sub vitoconnect_getErrorCode {
             }
 
             my $param = {
-                url => "https://api.viessmann.com/service-documents/v3/error-database?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=${\uc($language)}&languageCode=${\lc($language)}",
+                url => "${vitoconnect_errorURL_V3}?materialNumber=$materialNumber&errorCode=$errorCode&countryCode=${\uc($language)}&languageCode=${\lc($language)}",
                 hash => $hash,
                 timeout => $hash->{timeout},  # Timeout von Internals = 15s
                 method => "GET",  # Methode auf GET ändern
@@ -3200,7 +3190,7 @@ sub vitoconnect_action {
     my $dev          = AttrVal($name,'vitoconnect_device',0);
     
     my $param        = {
-        url => $iotURL_V2
+        url => $vitoconnect_iotURL_V2
         ."installations/".$installation."/gateways/".$gw."/"
         ."devices/".$dev."/features/".$feature,
         hash   => $hash,
@@ -3436,6 +3426,26 @@ sub vitoconnect_DeleteKeyValue {
     $index = "vitoconnect_${name}_apiKey";
     setKeyValue( $index, undef );
 
+    return;
+}
+
+sub vitoconnect_readConfFile {
+    my $hash     = shift // return;
+    my $filename = shift // AttrVal($hash->{NAME},'confFile',undef) // return 'no filename provided';
+
+    my $name = $hash->{NAME};
+    my ($ret, @content) = FileRead($filename);
+    if ($ret) {
+        Log3($name, 1, "$name failed to read confFile $filename!") ;
+        return $ret;
+    }
+    
+    my $mappings = eval { @content };
+    if ( !$mappings ) {
+        Log3($hash->{NAME}, 1, "decoding error in confFile $cfg: $@");
+        return "confFile $cfg seems not to be valid!";
+    }
+    $hash->{helper}->{mappings} = $mappings;
     return;
 }
 
@@ -3826,15 +3836,6 @@ __END__
                 'heating.boiler.sensors.temperature.main.value' => 'haupt_temperatur'}</code><br>
             Mapping will be preferred over the old mapping.
         </li>
-        <a id="vitoconnect-attr-vitoconnect_translations"></a>
-        <li><i>vitoconnect_translations</i>:<br>
-            Define your own translation; it will translate every word part by part. The format has to be:<br>
-            <code>translation<br>
-            {  'device' => 'gerät',<br>
-                'messages' => 'nachrichten',<br>
-                'errors' => 'fehler'}</code><br>
-            Translation will be preferred over mapping and old mapping.
-        </li>
         <a id="vitoconnect-attr-vitoconnect_mapping_roger"></a>
         <li><i>vitoconnect_mapping_roger</i>:<br>
             Use the mapping from Roger from 8. November (<a href="https://forum.fhem.de/index.php?msg=1292441">https://forum.fhem.de/index.php?msg=1292441</a>) instead of the raw mapping.
@@ -4060,15 +4061,6 @@ __END__
                 'heating.boiler.sensors.temperature.main.status' => 'status',<br>
                 'heating.boiler.sensors.temperature.main.value' => 'haupt_temperatur'}<br>
             Die eigene Zuordnung hat Vorrang vor der alten Zuordnung.
-        </li>
-        <a id="vitoconnect-attr-vitoconnect_translations"></a>
-        <li><i>vitoconnect_translations</i>:<br>
-            Definiert eigene Übersetzungen für Wörter, die dann Teil für Teil übersetzt werden. Das Format muss wie folgt sein:<br>
-            translation<br>
-            {  'device' => 'gerät',<br>
-                'messages' => 'nachrichten',<br>
-                'errors' => 'fehler'}<br>
-            Die eigene Übersetzung hat Vorrang vor der Zuordnung und der alten Zuordnung.
         </li>
         <a id="vitoconnect-attr-vitoconnect_mapping_roger"></a>
         <li><i>vitoconnect_mapping_roger</i>:<br>
