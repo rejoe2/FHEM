@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-14 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-21 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1324,9 +1324,9 @@ sub vitoconnect_Define {
     shift @{$unnamed}; # delete name from list
     shift @{$unnamed}; # delete TYPE from list
     
-    if (defined $named->{IODev} && defined $named->{subset) { # client mode definition.
+    if (defined $named->{IODev} && defined $named->{subset}) { # client mode definition.
         $hash->{SERVER} = $named->{IODev};
-        $hash->{subset} = $named->{subset);
+        $hash->{subset} = $named->{subset};
         RemoveInternalTimer($hash);
         if (!$init_done) {
             ; # we will have to initialze client mode as well lateron...
@@ -1335,8 +1335,8 @@ sub vitoconnect_Define {
         }
         
         #circuits.0 - circuits.3, dhw, fuelCell, solar
-        return "choose one of circuits.0 - circuits.3, dhw, fuelCell or solar as subset!" if $named->{subset) !~ m{\A(circuits.[0-3]|dhw|fuelCell|solar)\z}x;
-        return "IODev no valid master vitoconnect device!" if !defined $defs{$named->{IODev)} || InternalVal($named->{IODev),'TYPE','unknown') ne 'vitoconnect' || !defined InternalVal($named->{IODev),'apiKey',undef);
+        return "choose one of circuits.0 - circuits.3, dhw, fuelCell or solar as subset!" if $named->{subset} !~ m{\A(circuits.[0-3]|dhw|fuelCell|solar)\z}x;
+        return "IODev no valid master vitoconnect device!" if !defined $defs{$named->{IODev}} || InternalVal($named->{IODev},'TYPE','unknown') ne 'vitoconnect' || !defined InternalVal($named->{IODev},'apiKey',undef);
         return vitoconnect_Client_Register_Server($hash);
     }
 
@@ -2125,7 +2125,7 @@ sub vitoconnect_Attr {
         elsif ($attr_name eq 'verbose')                     {
         }
         elsif ( $attr_name eq 'confFile' ) {
-            my $hash = defs{$name};
+            my $hash = $defs{$name};
             delete $hash->{CONFIGFILE};
             undef $hash->{helper}->{mappings};
             my ($err, $mapping) = vitoconnect_readConfFile($hash, $attr_value);
@@ -2133,8 +2133,7 @@ sub vitoconnect_Attr {
             $hash->{CONFIGFILE} = $attr_value;
             return;
         }
-    }
-        
+
         else                                                {
             # return "Unknown attr $attr_name";
             # This will return all attr, e.g. room. We do not want to see messages here.
@@ -2144,7 +2143,7 @@ sub vitoconnect_Attr {
     elsif ($cmd eq 'del') {
         if ($attr_name eq 'vitoconnect_mappings') {
             #undef $RequestListMapping;
-            delete $hash->{CONFIGFILE};
+            delete defs{$name}->{CONFIGFILE};
             delete $attr{$name}{confFile};
             undef $defs{$name}->{helper}->{mappings};
         }
@@ -3442,8 +3441,8 @@ sub vitoconnect_readConfFile {
     
     my $mappings = eval { @content };
     if ( !$mappings ) {
-        Log3($hash->{NAME}, 1, "decoding error in confFile $cfg: $@");
-        return "confFile $cfg seems not to be valid!";
+        Log3($hash->{NAME}, 1, "decoding error in confFile $filename: $@");
+        return "confFile $filename seems not to be valid!";
     }
     $hash->{helper}->{mappings} = $mappings;
     return;
