@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-21 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-28 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -1269,6 +1269,7 @@ sub vitoconnect_Initialize {
     $hash->{DefFn}    = \&vitoconnect_Define;    # wird beim 'define' eines Gerätes aufgerufen
     $hash->{UndefFn}  = \&vitoconnect_Undef;     # # wird beim Löschen einer Geräteinstanz aufgerufen
     $hash->{DeleteFn} = \&vitoconnect_DeleteKeyValue;
+    $hash->{NotifyFn} = \&vitoconnect_Notify;    # confFile changed?
     $hash->{SetFn}    = \&vitoconnect_Set;       # set-Befehle
     $hash->{GetFn}    = \&vitoconnect_Get;       # get-Befehle
     $hash->{AttrFn}   = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
@@ -1323,6 +1324,8 @@ sub vitoconnect_Define {
     #parseParams: my ( $hash, $a, $h ) = @_;
     shift @{$unnamed}; # delete name from list
     shift @{$unnamed}; # delete TYPE from list
+    
+    setNotifyDev($hash, 'global');
     
     if (defined $named->{IODev} && defined $named->{subset}) { # client mode definition.
         $hash->{SERVER} = $named->{IODev};
@@ -2063,6 +2066,30 @@ sub vitoconnect_Set_Roger {
     return $val;
 }
 
+sub vitoconnect_Notify {
+    my $hash     = shift // return;
+    my $dev_hash = shift // return;
+    
+    my $filename = AttrVal($hash->{NAME},'confFile',undef) // return; # nothing to read...
+    
+    my $ownName = $hash->{NAME} // return; # own name / hash
+
+    return if IsDisabled($ownName); # Return without any further action if the module is disabled
+
+    my $devName = $dev_hash->{NAME} // return; # Device that created the events
+    return if $devName ne 'global';
+
+    my $events = deviceEvents($dev_hash,1);
+    return if !$events;
+
+    for my $event ( @{$events} ) {
+        next if !defined $event;
+        next if $event !~ m{FILEWRITE}xms;
+        return vitoconnect_readConfFile($hash, $filename) if $filename =~ m{$event}xms;        
+    }
+    return;
+}
+
 
 #####################################################################################################################
 # Attribute setzen/ändern/löschen
@@ -2127,7 +2154,7 @@ sub vitoconnect_Attr {
         elsif ( $attr_name eq 'confFile' ) {
             my $hash = $defs{$name};
             delete $hash->{CONFIGFILE};
-            undef $hash->{helper}->{mappings};
+            undef $hash->{helper}->{mappings};          
             my ($err, $mapping) = vitoconnect_readConfFile($hash, $attr_value);
             return $err if $err;
             $hash->{CONFIGFILE} = $attr_value;
@@ -2141,7 +2168,7 @@ sub vitoconnect_Attr {
         }
     }
     elsif ($cmd eq 'del') {
-        if ($attr_name eq 'vitoconnect_mappings') {
+        if ($attr_name eq 'confFile') {
             #undef $RequestListMapping;
             delete defs{$name}->{CONFIGFILE};
             delete $attr{$name}{confFile};
@@ -3445,6 +3472,8 @@ sub vitoconnect_readConfFile {
         return "confFile $filename seems not to be valid!";
     }
     $hash->{helper}->{mappings} = $mappings;
+    #https://forum.fhem.de/index.php?topic=95375.0
+    $data{confFiles}{$filename} = 0;
     return;
 }
 
