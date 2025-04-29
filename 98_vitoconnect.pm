@@ -1373,10 +1373,41 @@ sub vitoconnect_Set {
     return "set $name needs at least one argument" if !defined $opt;
     
     return $hash->{'.sets'} if $opt eq '?' && defined $hash->{'.sets'}; # return value for getAllSet()
-    
     # Standard Parameter setzen
+    
+    if ($opt eq 'clearReadings' )                    {   # set <name> clearReadings: clear all readings immeadiatlely
+        AnalyzeCommand($hash,"deletereading $name .*");
+        return;
+    }
+
     my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg weekprofile ";
     #Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
+    
+    #client modules...
+    if ( defined $hash->{SERVER} ) {
+        my $serverhash = $defs->{$hash->{SERVER}} // return;
+        $val = "unknown value $opt, choose one of clearReadings:noArg weekprofile ";
+        
+        if ( defined $hash->{helper} && !defined $hash->{'.sets'} ) {
+            my $commands = $serverhash->{'.sets'} // return vitoconnect_Set( $serverhash,$name,$opt,@args );
+            for my $commnd ( split m{\s+}x, $commands ) {
+                my ($cmnd, $opts) = split m{:}x, $commnd;
+                if ( defined $hash->{helper}->{mappings} && defined $hash->{helper}->{mappings}->{$cmnd} ) {
+                    $hash->{helper}->{sets}->{$cmnd} = $hash->{helper}->{mappings}->{$cmnd};
+                    $val .= "$hash->{helper}->{mappings}->{$cmnd}:$opts ";
+                } elsif ( $cmnd =~ m{$hash->{subset}} ) {
+                    $val .= "${cmnd}:$opts ";
+                }
+            }
+            $hash->{'.sets'} = $val;
+        }
+        
+        if ( defined $hash->{helper} && defined $hash->{helper}->{sets} ) {
+            $opt = $hash->{helper}->{sets}->{$opt}  // $opt;
+        }
+
+        return vitoconnect_Set( $serverhash,$name,$opt,@args );
+    }
     
     # Setter für die Geräteauswahl dynamisch erstellen  
     #Log3($name,4,$name." - Set devices: ".$hash->{devices});
@@ -1424,10 +1455,7 @@ sub vitoconnect_Set {
         vitoconnect_getCode($hash);                         # Werte für: Access-Token, Install-ID, Gateway anfragen
         return;
     }
-    if ($opt eq 'clearReadings' )                    {   # set <name> clearReadings: clear all readings immeadiatlely
-        AnalyzeCommand($hash,"deletereading $name .*");
-        return;
-    }
+    
     if ($opt eq 'password' )                         {   # set <name> password: store password in key store
         my $err = vitoconnect_StoreKeyValue($name,'passwd',$args[0]);   # Kennwort verschlüsselt speichern
         return $err if ($err);
@@ -1541,26 +1569,7 @@ sub vitoconnect_Set_New {
                 } elsif ( defined $cmdMapName->{$commandName} ) {
                     $readingNamePrep .= "$feature.$cmdMapName->{$commandName}";
                 }
-=pod
-                eq "setTemperature" ) {
-                    $readingNamePrep .= $feature.".temperature";              #<------- setTemperature only 1 param, so it can be defined here, 
-                                                                              # for burner Vitoladens 300C, heating.circuits.0.operating.programs.comfort
-                                                                              # activate (temperature), deactivate(noArg), setTemperature (targetTemperature) only one can work with value provided
-                                                                              # Activate should work, and is, since commands are sorted
-                } elsif ( $commandName eq "setHysteresis" ) {                 #<------- setHysteresis very special mapping, must be predefined
-                    $readingNamePrep .= $feature.".value";
-                } elsif ( $commandName eq "setHysteresisSwitchOnValue" ) {    #<------- setHysteresis very special mapping, must be predefined
-                    $readingNamePrep .= $feature.".switchOnValue";
-                } elsif ( $commandName eq "setHysteresisSwitchOffValue" ) {   #<------- setHysteresis very special mapping, must be predefined
-                    $readingNamePrep .= $feature.".switchOffValue";
-                } elsif ( $commandName eq "setMin" ) {
-                    $readingNamePrep .= $feature.".min";                      #<------- setMin/setMax very special mapping, must be predefined
-                } elsif ( $commandName eq "setMax" ) {
-                    $readingNamePrep .= $feature.".max";
-                } elsif ( $commandName eq "setSchedule" ) {                   #<------- setSchedule very special mapping, must be predefined
-                    $readingNamePrep .= $feature.".entries";
-                }
-=cut
+
                 else {
                     # all other cases, will be defined in param loop
                 }
@@ -2058,24 +2067,34 @@ sub vitoconnect_Attr {
             }
             Log3($name,1,"$name - using svn mappings might not be supported in the future!")                      # Warnung ins Log 
                 if !$init_done && $attr_value eq 'svn';
+            return;
         }
-        elsif ( $attr_name eq 'vitoconnect_disable_raw_readings' || $attr_name eq 'vitoconnect_gw_readings' || $attr_name eq 'vitoconnect_actions_active' )  {
+        if ( $attr_name eq 'vitoconnect_disable_raw_readings' || $attr_name eq 'vitoconnect_gw_readings' || $attr_name eq 'vitoconnect_actions_active' )  {
             if ($attr_value !~ /^0|1$/)                     {
                 my $err = "Invalid argument $attr_value to $attr_name. Must be 0 or 1.";
                 Log3($name,1,"$name, vitoconnect_Attr: $err");
                 return $err;
             }
+            return;
         }
-        elsif ($attr_name eq "vitoconnect_mappings")                        {
-            my $RequestListMapping = eval $attr_value;
+        if ($attr_name eq 'vitoconnect_mappings') {
+            my $RequestListMapping = eval { $attr_value };
             if ($@) {
                 # Fehlerbehandlung
-                my $err = "Invalid argument: $@\n";
+                my $err = "Invalid argument: $@";
                 return $err;
             }
-            $defs{$name}->{helper}->{mappings} = $RequestListMapping;
+            my $hash = $defs{$name};
+            delete $hash->{helper}->{mappings};
+            for ( keys %{$RequestListMapping} ) {
+                next if ref $RequestListMapping->{$_} ne 'SCALAR';
+                $hash->{helper}->{mappings}->{$_} = $RequestListMapping->{$_};
+            }
+            my $confFile = AttrVal($name,'confFile',undef) // return;
+            vitoconnect_readConfFile($hash, $confFile);
+            return;
         }
-        elsif ($attr_name eq "vitoconnect_mapping_roger")   {
+        if ($attr_name eq "vitoconnect_mapping_roger")   {
             Log3($name,1,"$name - using Roger mappings is no longer recommended!")                      # Warnung ins Log 
                 if !$init_done;
             if ($attr_value !~ /^0|1$/)                     {
@@ -2123,7 +2142,25 @@ sub vitoconnect_Attr {
             #undef $RequestListMapping;
             delete defs{$name}->{CONFIGFILE};
             delete $attr{$name}{confFile};
-            undef $defs{$name}->{helper}->{mappings};
+            delete $defs{$name}->{helper}->{mappings};
+            delete $hash->{'.sets'};
+            my $RequestListMapping = AttrVal($name,'vitoconnect_mappings',undef) // return;
+            my $RequestListMapping = eval { $RequestListMapping };
+            return if $@ || ref $RequestListMapping ne 'HASH';
+            
+            my $hash = $defs{$name};
+            for ( keys %{$RequestListMapping} ) {
+                next if ref $RequestListMapping->{$_} ne 'SCALAR';
+                $hash->{helper}->{mappings}->{$_} = $RequestListMapping->{$_};
+            }
+            return;
+        }
+        if ($attr_name eq 'vitoconnect_mappings') {
+            delete $hash->{helper}->{mappings};
+            delete $hash->{'.sets'};
+            my $confFile = AttrVal($name,'confFile',undef) // return;
+            vitoconnect_readConfFile($hash, $confFile);
+            return;
         }
     }
     return;
@@ -3427,8 +3464,11 @@ sub vitoconnect_readConfFile {
     }
     return if !defined $decoded;
     return "confFile $filename: JSON seems not to contain valid key-value pairs!" if ref $decoded ne 'HASH';
+    for ( keys %{$decoded} ) {
+        next if ref $decoded->{$_} ne 'SCALAR';
+        $hash->{helper}->{mappings}->{$_} = $decoded->{$_};
+    }
 
-    $hash->{helper}->{mappings} = $decoded;
     #https://forum.fhem.de/index.php?topic=95375.0
     $data{confFiles}{$filename} = 0;
     return;
