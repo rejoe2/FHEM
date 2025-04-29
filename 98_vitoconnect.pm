@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-04-28 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-04-29 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -26,55 +26,6 @@
 #   https://www.viessmann-community.com/t5/Getting-started-programming-with/Syntax-for-setting-a-value/td-p/374222
 #   https://forum.fhem.de/index.php?msg=1326376
 
-=pod
-#we don't need no forward declarations in Perl...
-
-sub vitoconnect_Initialize;             # Modul initialisieren und Namen zusätzlicher Funktionen bekannt geben
-sub vitoconnect_Define;                 # wird beim 'define' eines Gerätes aufgerufen
-sub vitoconnect_Undef;                  # wird beim Löschen einer Geräteinstanz aufgerufen
-sub vitoconnect_Get;                    # bisher kein 'get' implementiert
-sub vitoconnect_Set;                    # Implementierung set-Befehle
-sub vitoconnect_Set_New;                # Implementierung set-Befehle New dynamisch auf raw readings
-#sub vitoconnect_Set_SVN;                # Implementierung set-Befehle SVN
-sub vitoconnect_Set_Roger;              # Implementierung set-Befehle Roger
-sub vitoconnect_Attr;                   # Attribute setzen/ändern/löschen
-
-sub vitoconnect_GetUpdate;              # Abfrage aller Werte starten
-
-sub vitoconnect_getCode;                # Werte für: Access-Token, Install-ID, Gateway anfragen
-sub vitoconnect_getCodeCallback;        # Rückgabe: Access-Token, Install-ID, Gateway von vitoconnect_getCode Anfrage
-
-sub vitoconnect_getAccessToken;         # Access & Refresh-Token holen
-sub vitoconnect_getAccessTokenCallback; # Access & Refresh-Token speichern, Antwort auf: vitoconnect_getAccessToken
-
-sub vitoconnect_getRefresh;             # neuen Access-Token anfragen
-sub vitoconnect_getRefreshCallback;     # neuen Access-Token speichern
-
-sub vitoconnect_getGw;                  # Abfrage Gateway-Serial
-sub vitoconnect_getGwCallback;          # Gateway-Serial speichern, Anwort von Abfrage Gateway-Serial
-
-sub vitoconnect_getInstallation;        # Abfrage Install-ID
-sub vitoconnect_getInstallationCallback;# Install-ID speichern, Antwort von Abfrage Install-ID
-
-sub vitoconnect_getDevice;              # Abfrage Device-ID
-sub vitoconnect_getDeviceCallback;      # Device-ID speichern, Anwort von Abfrage Device-ID
-
-sub vitoconnect_getFeatures;            # Abruf GW Features
-sub vitoconnect_getFeaturesCallback;    # gw_features speichern
-
-sub vitoconnect_errorHandling;          # Errors bearbeiten für alle Calls
-sub vitoconnect_getResource;            # API call for all Gateways
-sub vitoconnect_getResourceCallback;    # Get all API readings
-sub vitoconnect_getPowerLast;           # Write the power reading of the full last day to the DB
-
-sub vitoconnect_action;                 # Send call to API
-
-sub vitoconnect_getErrorCode;           # Resolve Error code 
-
-sub vitoconnect_StoreKeyValue;          # Werte verschlüsselt speichern
-sub vitoconnect_ReadKeyValue;           # verschlüsselte Werte auslesen
-sub vitoconnect_DeleteKeyValue;         # verschlüsselte Werte löschen
-=cut
 
 package main;
 use strict;
@@ -3465,13 +3416,19 @@ sub vitoconnect_readConfFile {
         Log3($name, 1, "$name failed to read confFile $filename!") ;
         return $ret;
     }
-    
-    my $mappings = eval { @content };
-    if ( !$mappings ) {
-        Log3($hash->{NAME}, 1, "decoding error in confFile $filename: $@");
-        return "confFile $filename seems not to be valid!";
+    my @cleaned = grep { $_ !~ m{\A\s*[#]}x } @content;
+    for (@cleaned) {
+        $_ =~ s{\A\s+}{}gmxsu;
+    };
+    my $decoded;
+    if ( !eval { $decoded  = JSON->new->decode(\@cleaned) ; 1 } ) {
+        Log3($hash->{NAME}, 1, "JSON confFile $filename: $@");
+        return "confFile $filename seems not to contain valid JSON!";
     }
-    $hash->{helper}->{mappings} = $mappings;
+    return if !defined $decoded;
+    return "confFile $filename: JSON seems not to contain valid key-value pairs!" if ref $decoded ne 'HASH';
+
+    $hash->{helper}->{mappings} = $decoded;
     #https://forum.fhem.de/index.php?topic=95375.0
     $data{confFiles}{$filename} = 0;
     return;
