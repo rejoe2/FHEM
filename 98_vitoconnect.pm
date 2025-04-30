@@ -1372,7 +1372,7 @@ sub vitoconnect_Set {
     # Hier richtig?
     return "set $name needs at least one argument" if !defined $opt;
     
-    return $hash->{'.sets'} if $opt eq '?' && defined $hash->{'.sets'}; # return value for getAllSet()
+    return $hash->{'.sets'} if $opt eq '?' && defined $hash->{'.sets'}; # return value for getAllSets()
     # Standard Parameter setzen
     
     if ($opt eq 'clearReadings' )                    {   # set <name> clearReadings: clear all readings immeadiatlely
@@ -1385,18 +1385,19 @@ sub vitoconnect_Set {
     
     #client modules...
     if ( defined $hash->{SERVER} ) {
-        my $serverhash = $defs->{$hash->{SERVER}} // return;
+        my $serverhash = $defs{$hash->{SERVER}} // return;
         $val = "unknown value $opt, choose one of clearReadings:noArg weekprofile ";
         
         if ( defined $hash->{helper} && !defined $hash->{'.sets'} ) {
-            my $commands = $serverhash->{'.sets'} // return vitoconnect_Set( $serverhash,$name,$opt,@args );
+            my $commands = getAllSets($hash->{SERVER});
             for my $commnd ( split m{\s+}x, $commands ) {
                 my ($cmnd, $opts) = split m{:}x, $commnd;
                 if ( defined $hash->{helper}->{mappings} && defined $hash->{helper}->{mappings}->{$cmnd} ) {
-                    $hash->{helper}->{sets}->{$cmnd} = $hash->{helper}->{mappings}->{$cmnd};
-                    $val .= "$hash->{helper}->{mappings}->{$cmnd}:$opts ";
+                    #$hash->{helper}->{sets}->{$cmnd} = $hash->{helper}->{mappings}->{$cmnd};
+                    $hash->{helper}->{sets}->{$hash->{helper}->{mappings}->{$cmnd}} = $cmnd;
+                    $val .= defined $opts ? "$hash->{helper}->{mappings}->{$cmnd}:$opts " : "$hash->{helper}->{mappings}->{$cmnd} ";
                 } elsif ( $cmnd =~ m{$hash->{subset}} ) {
-                    $val .= "${cmnd}:$opts ";
+                    $val .= defined $opts ? "${cmnd}:$opts " : "${cmnd} ";
                 }
             }
             $hash->{'.sets'} = $val;
@@ -1406,7 +1407,7 @@ sub vitoconnect_Set {
             $opt = $hash->{helper}->{sets}->{$opt}  // $opt;
         }
 
-        return vitoconnect_Set( $serverhash,$name,$opt,@args );
+        return vitoconnect_Set( $serverhash,$hash->{SERVER},$opt,@args );
     }
     
     # Setter für die Geräteauswahl dynamisch erstellen  
@@ -2138,17 +2139,17 @@ sub vitoconnect_Attr {
         }
     }
     elsif ($cmd eq 'del') {
+        my $hash = $defs{$name};
         if ($attr_name eq 'confFile') {
             #undef $RequestListMapping;
-            delete defs{$name}->{CONFIGFILE};
+            delete $hash->{CONFIGFILE};
             delete $attr{$name}{confFile};
-            delete $defs{$name}->{helper}->{mappings};
+            delete $hash->{helper}->{mappings};
             delete $hash->{'.sets'};
             my $RequestListMapping = AttrVal($name,'vitoconnect_mappings',undef) // return;
             my $RequestListMapping = eval { $RequestListMapping };
             return if $@ || ref $RequestListMapping ne 'HASH';
             
-            my $hash = $defs{$name};
             for ( keys %{$RequestListMapping} ) {
                 next if ref $RequestListMapping->{$_} ne 'SCALAR';
                 $hash->{helper}->{mappings}->{$_} = $RequestListMapping->{$_};
@@ -3445,6 +3446,7 @@ sub vitoconnect_DeleteKeyValue {
 
 sub vitoconnect_readConfFile {
     my $hash     = shift // return;
+    delete $hash->{'.sets'};
     my $filename = shift // AttrVal($hash->{NAME},'confFile',undef) // return 'no filename provided';
 
     my $name = $hash->{NAME};
@@ -3458,14 +3460,17 @@ sub vitoconnect_readConfFile {
         $_ =~ s{\A\s+}{}gmxsu;
     };
     my $decoded;
-    if ( !eval { $decoded  = JSON->new->decode(\@cleaned) ; 1 } ) {
+    if ( !eval { $decoded  = JSON->new->decode(join q{ }, @cleaned) ; 1 } ) {
         Log3($hash->{NAME}, 1, "JSON confFile $filename: $@");
         return "confFile $filename seems not to contain valid JSON!";
     }
     return if !defined $decoded;
     return "confFile $filename: JSON seems not to contain valid key-value pairs!" if ref $decoded ne 'HASH';
+
+#    Log3($name, 3, "$name confFile has " . (keys %{$decoded}) . 'keys' ) ;
+
     for ( keys %{$decoded} ) {
-        next if ref $decoded->{$_} ne 'SCALAR';
+#        next if ref $decoded->{$_} ne 'SCALAR';
         $hash->{helper}->{mappings}->{$_} = $decoded->{$_};
     }
 
