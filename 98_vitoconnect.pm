@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_vitoconnect.pm 29740 2025-05-05 Beta-User $
+# $Id: 98_vitoconnect.pm 29740 2025-05-07 Beta-User $
 # fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #
@@ -269,11 +269,11 @@ sub vitoconnect_Set {
         my $serverhash = $defs{$hash->{SERVER}} // return;
         $val = "unknown value $opt, choose one of clearReadings:noArg weekprofile ";
         
-        if ( defined $hash->{helper} && !defined $hash->{'.sets'} ) {
+        if ( !defined $hash->{'.sets'} ) {
             my $commands = getAllSets($hash->{SERVER});
             for my $commnd ( split m{\s+}x, $commands ) {
                 my ($cmnd, $opts) = split m{:}x, $commnd;
-                if ( defined $hash->{helper}->{mappings} && defined $hash->{helper}->{mappings}->{$cmnd} ) {
+                if ( defined $hash->{helper} && defined $hash->{helper}->{mappings} && defined $hash->{helper}->{mappings}->{$cmnd} ) {
                     #$hash->{helper}->{sets}->{$cmnd} = $hash->{helper}->{mappings}->{$cmnd};
                     $hash->{helper}->{sets}->{$hash->{helper}->{mappings}->{$cmnd}} = $cmnd;
                     $val .= defined $opts ? "$hash->{helper}->{mappings}->{$cmnd}:$opts " : "$hash->{helper}->{mappings}->{$cmnd} ";
@@ -1619,11 +1619,11 @@ sub vitoconnect_Client_Update_Readings {
         my $readingName;
         my $updated = 0;
         for my $reading ( keys %{$readings} ) {
-            $readingName = $reading if $hash->{subset} =~ m{$reading};
+            $readingName = $reading if $reading =~ m{$hash->{subset}};
             if ( defined $hash->{helper} && defined $hash->{helper}->{mappings} && defined $hash->{helper}->{mappings}->{$reading} ) {
                 $readingName = $hash->{helper}->{mappings}->{$reading};
             }
-            next if ! defined  $readingName;
+            next if !$readingName;           # not defined or 0
             readingsBulkUpdate($hash,$readingName,$readings->{$reading},1);
             $updated = 1;
             $readingName = undef;
